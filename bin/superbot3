@@ -1,0 +1,94 @@
+#!/usr/bin/env node
+
+const { program } = require('commander');
+const path = require('path');
+
+const SUPERBOT3_HOME = process.env.SUPERBOT3_HOME || path.join(require('os').homedir(), 'superbot3');
+
+program
+  .name('superbot3')
+  .description('AI orchestration platform built on Claude Code')
+  .version('0.1.0');
+
+// init
+program
+  .command('init')
+  .description('Create ~/superbot3/ skeleton')
+  .action(() => {
+    require('../src/commands/init')(SUPERBOT3_HOME);
+  });
+
+// space commands
+const space = program.command('space').description('Manage spaces');
+
+space
+  .command('create <name>')
+  .description('Create a new space')
+  .option('--code-dir <path>', 'Path to the code directory for this space')
+  .action((name, opts) => {
+    require('../src/commands/space-create')(SUPERBOT3_HOME, name, opts);
+  });
+
+space
+  .command('list')
+  .description('List all spaces')
+  .action(() => {
+    require('../src/commands/space-list')(SUPERBOT3_HOME);
+  });
+
+space
+  .command('status <name>')
+  .description('Show detailed space status')
+  .action((name) => {
+    require('../src/commands/space-status')(SUPERBOT3_HOME, name);
+  });
+
+space
+  .command('stop <name>')
+  .description('Stop a running space')
+  .option('--force', 'Force stop without waiting for graceful shutdown')
+  .action((name, opts) => {
+    require('../src/commands/stop')(SUPERBOT3_HOME, name, opts);
+  });
+
+// start
+program
+  .command('start')
+  .description('Boot broker + master orchestrator + all active spaces')
+  .action(() => {
+    require('../src/commands/start')(SUPERBOT3_HOME);
+  });
+
+// stop (all)
+program
+  .command('stop')
+  .description('Stop everything (all spaces + master + broker)')
+  .action(() => {
+    require('../src/commands/stop-all')(SUPERBOT3_HOME);
+  });
+
+// message
+program
+  .command('message <args...>')
+  .description('Send a message: message <space> "text" OR message "text" (to master)')
+  .action((args) => {
+    let spaceName = null;
+    let text;
+    if (args.length === 1) {
+      text = args[0];
+    } else {
+      spaceName = args[0];
+      text = args.slice(1).join(' ');
+    }
+    require('../src/commands/message')(SUPERBOT3_HOME, spaceName, text);
+  });
+
+// logs
+program
+  .command('logs <space>')
+  .description('Tail a space\'s daily log')
+  .action((space) => {
+    require('../src/commands/logs')(SUPERBOT3_HOME, space);
+  });
+
+program.parse();

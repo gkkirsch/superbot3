@@ -1,0 +1,9 @@
+{
+  "version": "0.1.0",
+  "home": "/Users/gkkirsch/superbot3",
+  "broker": {
+    "port": 3100,
+    "host": "localhost"
+  },
+  "model": "claude-opus-4-6"
+}
