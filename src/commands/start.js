@@ -178,30 +178,28 @@ module.exports = async function start(home) {
     console.log('\nNo active spaces to start.');
   }
 
-  // Step 4: Wait for Claude instances to initialize, then send startup prompts
-  // Claude needs ~10-15s to load. We send prompts via tmux send-keys after it's ready.
-  console.log('\nWaiting for Claude instances to initialize...');
-  execSync('sleep 12');
+  // Step 4: Send startup prompts via inbox
+  // The inbox poller activates once Claude starts (team args enable it from boot).
+  // We write to the inbox immediately — the poller picks them up once ready.
+  console.log('\nSending startup prompts via inbox...');
 
-  // Send startup prompt to master
   const masterStartup = 'Scan ~/superbot3/spaces/*/space.json to discover all spaces. Report what spaces you find and their status.';
+  const masterInboxPath = path.join(home, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
   try {
-    execSync(`tmux send-keys -t superbot3:master -l '${masterStartup.replace(/'/g, "'\\''")}'`);
-    execSync(`tmux send-keys -t superbot3:master Enter`);
+    await writeToInbox(masterInboxPath, { from: 'superbot3', text: masterStartup });
     console.log('  Sent startup prompt to master');
   } catch (e) {
     console.log('  Could not send startup prompt to master');
   }
 
-  // Send startup prompt to each space
   for (const space of activeSpaces) {
-    const spaceStartup = `Read your CLAUDE.md. Scan knowledge/ for context. Report your identity, skills, agents, and knowledge files.`;
+    const spaceStartup = 'Read your CLAUDE.md. Scan knowledge/ for context. Report your identity, skills, agents, and knowledge files.';
+    const spaceInboxPath = path.join(space.claudeConfigDir, 'teams', space.slug, 'inboxes', 'team-lead.json');
     try {
-      execSync(`tmux send-keys -t superbot3:${space.slug} -l '${spaceStartup.replace(/'/g, "'\\''")}'`);
-      execSync(`tmux send-keys -t superbot3:${space.slug} Enter`);
+      await writeToInbox(spaceInboxPath, { from: 'superbot3', text: spaceStartup });
       console.log(`  Sent startup prompt to ${space.slug}`);
     } catch (e) {
-      console.log(`  Could not send startup prompt to ${space.slug} (may have closed)`);
+      console.log(`  Could not send startup prompt to ${space.slug}`);
     }
   }
 

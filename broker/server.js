@@ -51,19 +51,7 @@ function getInboxMessages(inboxPath) {
   }
 }
 
-function writeInboxMessage(inboxPath, text) {
-  fs.mkdirSync(path.dirname(inboxPath), { recursive: true });
-  try { fs.writeFileSync(inboxPath, '[]', { flag: 'wx' }); } catch {}
-  const messages = JSON.parse(fs.readFileSync(inboxPath, 'utf-8'));
-  messages.push({
-    from: 'dashboard',
-    text,
-    timestamp: new Date().toISOString(),
-    read: false,
-    summary: text.slice(0, 80),
-  });
-  fs.writeFileSync(inboxPath, JSON.stringify(messages, null, 2), 'utf-8');
-}
+const { writeToInbox } = require('../src/inbox');
 
 // ── Health ───────────────────────────────────────────────────────────────────
 
@@ -181,7 +169,7 @@ function copyDirRecursive(src, dest) {
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 
-app.post('/api/spaces/:name/message', (req, res) => {
+app.post('/api/spaces/:name/message', async (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
@@ -189,7 +177,7 @@ app.post('/api/spaces/:name/message', (req, res) => {
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
   const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
-  writeInboxMessage(inboxPath, text);
+  await writeToInbox(inboxPath, { from: 'dashboard', text, summary: text.slice(0, 80) });
   res.json({ ok: true });
 });
 
@@ -210,12 +198,12 @@ app.get('/api/spaces/:name/messages', (req, res) => {
   res.json(messages);
 });
 
-app.post('/api/master/message', (req, res) => {
+app.post('/api/master/message', async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
   const inboxPath = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
-  writeInboxMessage(inboxPath, text);
+  await writeToInbox(inboxPath, { from: 'dashboard', text, summary: text.slice(0, 80) });
   res.json({ ok: true });
 });
 
