@@ -53,14 +53,14 @@ export function Sidebar() {
     <aside
       className={cn(
         'flex flex-col border-r border-border-custom bg-surface/50 transition-all duration-200 h-screen sticky top-0',
-        collapsed ? 'w-12' : 'w-56'
+        collapsed ? 'w-16' : 'w-56'
       )}
     >
       {/* Logo */}
       <div className={cn('flex items-center shrink-0', collapsed ? 'justify-center px-0 pt-4 pb-4' : 'justify-center px-3 pt-5 pb-6')}>
         <NavLink to="/" className="block hover:opacity-80 transition-opacity">
           {collapsed ? (
-            <img src="/logo.png" alt="SB" className="h-6 w-6" />
+            <img src="/logo.png" alt="SB" className="h-8 w-8" />
           ) : (
             <img src="/superbot-logo.png" alt="Superbot" className="h-6" />
           )}
