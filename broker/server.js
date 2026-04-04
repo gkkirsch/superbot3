@@ -188,8 +188,20 @@ app.post('/api/spaces/:name/message', (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
+  // Write to inbox (for when Claude is actively processing)
   const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
   writeInboxMessage(inboxPath, text);
+
+  // Also send via tmux to wake Claude if it's idle at the prompt
+  try {
+    const spaceName = config.slug;
+    // Escape the text for tmux send-keys: replace single quotes
+    const escaped = text.replace(/'/g, "'\\''");
+    execSync(`tmux send-keys -t superbot3:${spaceName} '${escaped}' Enter`, { timeout: 5000 });
+  } catch (e) {
+    // tmux send may fail if window doesn't exist — that's ok, inbox will still work
+  }
+
   res.json({ ok: true });
 });
 
@@ -216,6 +228,13 @@ app.post('/api/master/message', (req, res) => {
 
   const inboxPath = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
   writeInboxMessage(inboxPath, text);
+
+  // Also send via tmux to wake master if idle
+  try {
+    const escaped = text.replace(/'/g, "'\\''");
+    execSync(`tmux send-keys -t superbot3:master '${escaped}' Enter`, { timeout: 5000 });
+  } catch (e) {}
+
   res.json({ ok: true });
 });
 
