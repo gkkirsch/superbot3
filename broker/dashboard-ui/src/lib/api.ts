@@ -70,6 +70,11 @@ export const fetchKnowledgeFile = (name: string, file: string) =>
   fetchJson<{ content: string }>(`/api/spaces/${name}/knowledge/${encodeURIComponent(file)}`)
 export const saveKnowledgeFile = (name: string, file: string, content: string) =>
   putJson<{ ok: boolean }>(`/api/spaces/${name}/knowledge/${encodeURIComponent(file)}`, { content })
+export const deleteKnowledgeFile = (name: string, file: string) =>
+  fetch(`/api/spaces/${name}/knowledge/${encodeURIComponent(file)}`, { method: 'DELETE' }).then(r => {
+    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
+    return r.json() as Promise<{ ok: boolean }>
+  })
 
 // Plugins & Skills
 export const fetchPlugins = (name: string) =>

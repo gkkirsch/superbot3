@@ -536,6 +536,17 @@ app.put('/api/spaces/:name/knowledge/:file', (req, res) => {
   res.json({ ok: true });
 });
 
+app.delete('/api/spaces/:name/knowledge/:file', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const filePath = path.join(config.spaceDir, 'knowledge', req.params.file);
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+
+  fs.unlinkSync(filePath);
+  res.json({ ok: true });
+});
+
 // ── Plugins ──────────────────────────────────────────────────────────────────
 
 /** Read plugins from a single marketplace directory (cloned repo or flat JSON) */
@@ -778,6 +789,27 @@ app.post('/api/spaces/:name/plugins/toggle', (req, res) => {
   res.json({ ok: true, enabled: !!enabled });
 });
 
+/** Add a marketplace to the space's known_marketplaces.json */
+app.post('/api/spaces/:name/plugins/add-marketplace', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'url required' });
+
+  const slug = url.replace(/.*\//, '').replace(/\.git$/, '').replace(/\.json$/, '') || 'custom';
+
+  const kmPath = path.join(config.claudeConfigDir, 'plugins', 'known_marketplaces.json');
+  const km = readJsonSafe(kmPath) || {};
+  km[slug] = {
+    source: { source: url.includes('github.com') ? 'github' : 'url', url },
+    installLocation: path.join(config.claudeConfigDir, 'plugins', 'marketplaces', slug),
+    lastUpdated: new Date().toISOString(),
+  };
+  fs.writeFileSync(kmPath, JSON.stringify(km, null, 2));
+  res.json({ ok: true, slug });
+});
+
 // ── Skills ───────────────────────────────────────────────────────────────────
 
 /** Parse YAML frontmatter from a markdown string */
@@ -861,6 +893,25 @@ app.get('/api/spaces/:name/skills/:skill/file', (req, res) => {
   } catch {
     res.json({ content: null, error: 'Binary file', size: stat.size });
   }
+});
+
+/** Create a new skill directory with SKILL.md */
+app.post('/api/spaces/:name/skills', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const { name, description } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+
+  const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
+  const skillDir = path.join(config.claudeConfigDir, 'skills', safeName);
+
+  if (fs.existsSync(skillDir)) return res.status(409).json({ error: 'Skill already exists' });
+
+  fs.mkdirSync(skillDir, { recursive: true });
+  const skillMd = `---\nname: ${safeName}\ndescription: "${(description || '').replace(/"/g, '\\"')}"\n---\n\n# ${safeName}\n\nAdd your skill documentation here.\n`;
+  fs.writeFileSync(path.join(skillDir, 'SKILL.md'), skillMd);
+  res.json({ ok: true, name: safeName });
 });
 
 // ── Agents ───────────────────────────────────────────────────────────────────
