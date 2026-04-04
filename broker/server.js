@@ -370,13 +370,80 @@ app.get('/api/spaces/:name/workers', (req, res) => {
 
 // ── Schedules ────────────────────────────────────────────────────────────────
 
+// Port of Claude Code's cronToHuman() from src/utils/cron.ts
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function formatLocalTime(minute, hour) {
+  const d = new Date(2000, 0, 1, hour, minute);
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function cronToHuman(cron) {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) return cron;
+
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+
+  // Every N minutes: */N * * * *
+  const everyMinMatch = minute.match(/^\*\/(\d+)$/);
+  if (everyMinMatch && hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+    const n = parseInt(everyMinMatch[1], 10);
+    return n === 1 ? 'Every minute' : `Every ${n} minutes`;
+  }
+
+  // Every hour: N * * * *
+  if (minute.match(/^\d+$/) && hour === '*' && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+    const m = parseInt(minute, 10);
+    if (m === 0) return 'Every hour';
+    return `Every hour at :${m.toString().padStart(2, '0')}`;
+  }
+
+  // Every N hours: M */N * * *
+  const everyHourMatch = hour.match(/^\*\/(\d+)$/);
+  if (minute.match(/^\d+$/) && everyHourMatch && dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+    const n = parseInt(everyHourMatch[1], 10);
+    const m = parseInt(minute, 10);
+    const suffix = m === 0 ? '' : ` at :${m.toString().padStart(2, '0')}`;
+    return n === 1 ? `Every hour${suffix}` : `Every ${n} hours${suffix}`;
+  }
+
+  // Remaining cases need numeric minute+hour
+  if (!minute.match(/^\d+$/) || !hour.match(/^\d+$/)) return cron;
+  const m = parseInt(minute, 10);
+  const h = parseInt(hour, 10);
+
+  // Daily at specific time: M H * * *
+  if (dayOfMonth === '*' && month === '*' && dayOfWeek === '*') {
+    return `Every day at ${formatLocalTime(m, h)}`;
+  }
+
+  // Specific day of week: M H * * D
+  if (dayOfMonth === '*' && month === '*' && dayOfWeek.match(/^\d$/)) {
+    const dayIndex = parseInt(dayOfWeek, 10) % 7;
+    const dayName = DAY_NAMES[dayIndex];
+    if (dayName) return `Every ${dayName} at ${formatLocalTime(m, h)}`;
+  }
+
+  // Weekdays: M H * * 1-5
+  if (dayOfMonth === '*' && month === '*' && dayOfWeek === '1-5') {
+    return `Weekdays at ${formatLocalTime(m, h)}`;
+  }
+
+  return cron;
+}
+
 app.get('/api/spaces/:name/schedules', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
   const schedulePath = path.join(config.claudeConfigDir, 'scheduled_tasks.json');
   const data = readJsonSafe(schedulePath) || { tasks: [] };
-  res.json(data);
+  // Enrich each task with human-readable cron description
+  const tasks = (data.tasks || []).map(t => ({
+    ...t,
+    humanCron: cronToHuman(t.cron),
+  }));
+  res.json({ tasks });
 });
 
 app.put('/api/spaces/:name/schedules', (req, res) => {
@@ -386,7 +453,44 @@ app.put('/api/spaces/:name/schedules', (req, res) => {
   const { tasks } = req.body;
   const schedulePath = path.join(config.claudeConfigDir, 'scheduled_tasks.json');
   const data = { tasks: (tasks || []).map(t => ({ ...t, permanent: true })) };
-  fs.writeFileSync(schedulePath, JSON.stringify(data, null, 2));
+  fs.writeFileSync(schedulePath, JSON.stringify(data, null, 2) + '\n');
+  res.json({ ok: true });
+});
+
+app.post('/api/spaces/:name/schedules', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const { cron, prompt, recurring } = req.body;
+  if (!cron || !prompt) return res.status(400).json({ error: 'cron and prompt are required' });
+
+  const schedulePath = path.join(config.claudeConfigDir, 'scheduled_tasks.json');
+  const data = readJsonSafe(schedulePath) || { tasks: [] };
+  const { randomUUID } = require('crypto');
+  const task = {
+    id: randomUUID().slice(0, 8),
+    cron,
+    prompt,
+    createdAt: Date.now(),
+    recurring: recurring !== false,
+    permanent: true,
+  };
+  data.tasks.push(task);
+  fs.mkdirSync(path.dirname(schedulePath), { recursive: true });
+  fs.writeFileSync(schedulePath, JSON.stringify(data, null, 2) + '\n');
+  res.json({ ...task, humanCron: cronToHuman(cron) });
+});
+
+app.delete('/api/spaces/:name/schedules/:id', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const schedulePath = path.join(config.claudeConfigDir, 'scheduled_tasks.json');
+  const data = readJsonSafe(schedulePath) || { tasks: [] };
+  const before = data.tasks.length;
+  data.tasks = data.tasks.filter(t => t.id !== req.params.id);
+  if (data.tasks.length === before) return res.status(404).json({ error: 'Task not found' });
+  fs.writeFileSync(schedulePath, JSON.stringify(data, null, 2) + '\n');
   res.json({ ok: true });
 });
 
@@ -556,6 +660,108 @@ app.get('/api/spaces/:name/plugins', (req, res) => {
   res.json(results);
 });
 
+/** Resolve a plugin's directory on disk given its name and marketplace */
+function resolvePluginDir(claudeConfigDir, pluginName, marketplace) {
+  // 1. Check space-local marketplace (cloned repo with external_plugins/ and plugins/)
+  const spaceMpDir = path.join(claudeConfigDir, 'plugins', 'marketplaces', marketplace);
+  for (const sub of ['external_plugins', 'plugins']) {
+    const candidate = path.join(spaceMpDir, sub, pluginName);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  // 2. Check global installed plugin cache
+  const cacheDir = path.join(require('os').homedir(), '.claude', 'plugins', 'cache', marketplace, pluginName);
+  if (fs.existsSync(cacheDir)) {
+    // Find latest version dir
+    try {
+      const versions = fs.readdirSync(cacheDir, { withFileTypes: true })
+        .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+        .map(e => e.name);
+      if (versions.length > 0) return path.join(cacheDir, versions[versions.length - 1]);
+    } catch { /* skip */ }
+  }
+
+  // 3. Check global marketplace (cloned repo style)
+  const globalMpDir = path.join(require('os').homedir(), '.claude', 'plugins', 'marketplaces', marketplace);
+  for (const sub of ['external_plugins', 'plugins']) {
+    const candidate = path.join(globalMpDir, sub, pluginName);
+    if (fs.existsSync(candidate)) return candidate;
+  }
+
+  return null;
+}
+
+/** Recursively list files in a directory, returning relative paths */
+function listFilesRecursive(dir, prefix = '') {
+  const results = [];
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      // Skip hidden dirs like .git, node_modules, bun.lock
+      if (entry.name.startsWith('.') && entry.isDirectory()) continue;
+      if (entry.name === 'node_modules') continue;
+
+      const relPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        results.push({ path: relPath, type: 'dir' });
+        results.push(...listFilesRecursive(path.join(dir, entry.name), relPath));
+      } else {
+        const stat = fs.statSync(path.join(dir, entry.name));
+        results.push({ path: relPath, type: 'file', size: stat.size });
+      }
+    }
+  } catch { /* skip */ }
+  return results;
+}
+
+/** List files in a plugin */
+app.get('/api/spaces/:name/plugins/:marketplace/:plugin/files', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const pluginDir = resolvePluginDir(config.claudeConfigDir, req.params.plugin, req.params.marketplace);
+  if (!pluginDir) return res.status(404).json({ error: 'Plugin not found on disk' });
+
+  const files = listFilesRecursive(pluginDir);
+  res.json({ root: pluginDir, files });
+});
+
+/** Read a single file from a plugin */
+app.get('/api/spaces/:name/plugins/:marketplace/:plugin/file', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const pluginDir = resolvePluginDir(config.claudeConfigDir, req.params.plugin, req.params.marketplace);
+  if (!pluginDir) return res.status(404).json({ error: 'Plugin not found on disk' });
+
+  const relPath = req.query.path;
+  if (!relPath) return res.status(400).json({ error: 'path query param required' });
+  const filePath = path.join(pluginDir, relPath);
+
+  // Security: ensure resolved path is inside pluginDir
+  const resolved = path.resolve(filePath);
+  if (!resolved.startsWith(path.resolve(pluginDir))) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  // Only serve text files up to 500KB
+  const stat = fs.statSync(resolved);
+  if (stat.size > 500 * 1024) {
+    return res.json({ content: null, error: 'File too large', size: stat.size });
+  }
+
+  try {
+    const content = fs.readFileSync(resolved, 'utf-8');
+    res.json({ content, size: stat.size, path: relPath });
+  } catch {
+    res.json({ content: null, error: 'Binary file', size: stat.size });
+  }
+});
+
 /** Toggle a plugin enabled/disabled in the space's settings.json */
 app.post('/api/spaces/:name/plugins/toggle', (req, res) => {
   const config = getSpaceConfig(req.params.name);
@@ -574,6 +780,25 @@ app.post('/api/spaces/:name/plugins/toggle', (req, res) => {
 
 // ── Skills ───────────────────────────────────────────────────────────────────
 
+/** Parse YAML frontmatter from a markdown string */
+function parseFrontmatter(content) {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return {};
+  const fm = {};
+  for (const line of match[1].split('\n')) {
+    const idx = line.indexOf(':');
+    if (idx > 0) {
+      const key = line.slice(0, idx).trim();
+      let val = line.slice(idx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      fm[key] = val;
+    }
+  }
+  return fm;
+}
+
 app.get('/api/spaces/:name/skills', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
@@ -583,10 +808,58 @@ app.get('/api/spaces/:name/skills', (req, res) => {
     const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
     const skills = entries
       .filter(e => e.isDirectory())
-      .map(e => ({ dirname: e.name, name: e.name }));
+      .map(e => {
+        const skillMd = path.join(skillsDir, e.name, 'SKILL.md');
+        let description = '';
+        if (fs.existsSync(skillMd)) {
+          const fm = parseFrontmatter(fs.readFileSync(skillMd, 'utf-8'));
+          description = fm.description || '';
+        }
+        return { dirname: e.name, name: e.name, description };
+      });
     res.json(skills);
   } catch {
     res.json([]);
+  }
+});
+
+app.get('/api/spaces/:name/skills/:skill', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const skillDir = path.join(config.claudeConfigDir, 'skills', req.params.skill);
+  if (!fs.existsSync(skillDir)) return res.status(404).json({ error: 'Skill not found' });
+
+  const skillMd = path.join(skillDir, 'SKILL.md');
+  let content = '', frontmatter = {};
+  if (fs.existsSync(skillMd)) {
+    content = fs.readFileSync(skillMd, 'utf-8');
+    frontmatter = parseFrontmatter(content);
+  }
+  const files = listFilesRecursive(skillDir);
+  res.json({ name: req.params.skill, content, frontmatter, files });
+});
+
+app.get('/api/spaces/:name/skills/:skill/file', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const skillDir = path.join(config.claudeConfigDir, 'skills', req.params.skill);
+  if (!fs.existsSync(skillDir)) return res.status(404).json({ error: 'Skill not found' });
+
+  const relPath = req.query.path;
+  if (!relPath) return res.status(400).json({ error: 'path query param required' });
+
+  const filePath = path.resolve(path.join(skillDir, relPath));
+  if (!filePath.startsWith(path.resolve(skillDir))) return res.status(403).json({ error: 'Access denied' });
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return res.status(404).json({ error: 'File not found' });
+
+  const stat = fs.statSync(filePath);
+  if (stat.size > 500 * 1024) return res.json({ content: null, error: 'File too large', size: stat.size });
+  try {
+    res.json({ content: fs.readFileSync(filePath, 'utf-8'), size: stat.size, path: relPath });
+  } catch {
+    res.json({ content: null, error: 'Binary file', size: stat.size });
   }
 });
 
@@ -601,13 +874,31 @@ app.get('/api/spaces/:name/agents', (req, res) => {
     const entries = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'));
     const agents = entries.map(f => {
       const content = fs.readFileSync(path.join(agentsDir, f), 'utf-8');
-      const nameMatch = content.match(/^name:\s*(.+)/m);
-      return { filename: f, name: nameMatch ? nameMatch[1].trim() : f.replace('.md', '') };
+      const fm = parseFrontmatter(content);
+      return {
+        filename: f,
+        name: fm.name || f.replace('.md', ''),
+        description: fm.description || '',
+        model: fm.model || null,
+        permissionMode: fm.permissionMode || null,
+      };
     });
     res.json(agents);
   } catch {
     res.json([]);
   }
+});
+
+app.get('/api/spaces/:name/agents/:agent', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const agentFile = path.join(config.claudeConfigDir, 'agents', req.params.agent);
+  if (!fs.existsSync(agentFile)) return res.status(404).json({ error: 'Agent not found' });
+
+  const content = fs.readFileSync(agentFile, 'utf-8');
+  const frontmatter = parseFrontmatter(content);
+  res.json({ filename: req.params.agent, content, frontmatter });
 });
 
 // ── WebSocket for real-time updates ──────────────────────────────────────────

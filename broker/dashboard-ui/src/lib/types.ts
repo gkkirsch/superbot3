@@ -28,6 +28,8 @@ export interface ScheduledTask {
   createdAt: number
   recurring: boolean
   permanent?: boolean
+  lastFiredAt?: number
+  humanCron?: string
 }
 
 export interface KnowledgeFile {
@@ -40,15 +42,50 @@ export interface KnowledgeFile {
 export interface AgentDef {
   name: string
   filename: string
+  description?: string
+  model?: string | null
+  permissionMode?: string | null
 }
 
 export interface SkillDef {
   name: string
   dirname: string
+  description?: string
+}
+
+export interface SkillDetail {
+  name: string
+  content: string
+  frontmatter: Record<string, string>
+  files: { path: string; type: 'file' | 'dir'; size?: number }[]
+}
+
+export interface AgentDetail {
+  filename: string
+  content: string
+  frontmatter: Record<string, string>
 }
 
 export interface WorkerInfo {
   name: string
   role: string
   status: string
+}
+
+export interface PluginInfo {
+  name: string
+  description: string
+  category: string
+  marketplace: string
+  homepage: string | null
+  source: string | null
+  installed: boolean
+  enabled: boolean
+  version: string | null
+  skills: string[] | null
+  lspServers: string[] | null
+  tags: string[] | null
+  keywords: string[] | null
+  strict: boolean | null
+  author: string | null
 }

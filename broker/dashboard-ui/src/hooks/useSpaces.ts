@@ -31,6 +31,7 @@ export function useSchedules(name: string) {
     queryKey: ['schedules', name],
     queryFn: () => api.fetchSchedules(name),
     enabled: !!name,
+    refetchInterval: 10_000,
   })
 }
 
