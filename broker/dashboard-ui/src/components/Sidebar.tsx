@@ -53,31 +53,31 @@ export function Sidebar() {
     <aside
       className={cn(
         'flex flex-col border-r border-border-custom bg-surface/50 transition-all duration-200 h-screen sticky top-0',
-        collapsed ? 'w-14' : 'w-56'
+        collapsed ? 'w-12' : 'w-56'
       )}
     >
       {/* Logo */}
-      <div className="flex items-center justify-center px-3 pt-5 pb-6 shrink-0">
-        {collapsed ? (
-          <NavLink to="/" className="block hover:opacity-80 transition-opacity">
-            <img src="/logo.png" alt="SB" className="h-8 w-8" />
-          </NavLink>
-        ) : (
-          <NavLink to="/" className="block hover:opacity-80 transition-opacity">
+      <div className={cn('flex items-center shrink-0', collapsed ? 'justify-center px-0 pt-4 pb-4' : 'justify-center px-3 pt-5 pb-6')}>
+        <NavLink to="/" className="block hover:opacity-80 transition-opacity">
+          {collapsed ? (
+            <img src="/logo.png" alt="SB" className="h-6 w-6" />
+          ) : (
             <img src="/superbot-logo.png" alt="Superbot" className="h-6" />
-          </NavLink>
-        )}
+          )}
+        </NavLink>
       </div>
 
       {/* Main nav */}
-      <nav className="flex-1 overflow-y-auto py-2 px-2 scrollbar-auto">
+      <nav className={cn('flex-1 overflow-y-auto scrollbar-auto', collapsed ? 'px-1.5 py-1' : 'px-2 py-2')}>
         <NavLink
           to="/"
           end
           className={() => cn(
-            'flex items-center gap-3 rounded-md px-2.5 py-1.5 text-sm transition-colors mb-0.5',
-            isActive('/', true) ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-ink'
+            'flex items-center rounded-md transition-colors mb-0.5',
+            collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-1.5 text-sm',
+            isActive('/', true) ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-surface'
           )}
+          title={collapsed ? 'Dashboard' : undefined}
         >
           <Gauge className="w-4 h-4 shrink-0" />
           {!collapsed && 'Dashboard'}
@@ -85,23 +85,25 @@ export function Sidebar() {
 
         {/* Spaces section */}
         {!collapsed && (
-          <div className="mt-5 mb-1.5 px-2.5 text-[10px] uppercase tracking-widest text-stone/70 font-medium">
+          <div className="mt-5 mb-1.5 px-3 text-[10px] uppercase tracking-widest text-stone/70 font-medium">
             Spaces
           </div>
         )}
-        {collapsed && <div className="mt-3 mb-1 border-t border-border-custom mx-1" />}
+        {collapsed && <div className="mt-3 mb-2 border-t border-border-custom mx-1" />}
 
         {sortedSpaces.map(space => (
           <NavLink
             key={space.slug}
             to={`/spaces/${space.slug}`}
             className={() => cn(
-              'group/item flex items-center gap-2 rounded-md px-3 py-1.5 text-xs transition-colors mb-0.5',
+              'group/item flex items-center rounded-md text-xs transition-colors mb-0.5',
+              collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-1.5',
               isActive(`/spaces/${space.slug}`) ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-surface'
             )}
+            title={collapsed ? space.slug : undefined}
           >
             {collapsed ? (
-              <span className="text-xs">{space.slug[0].toUpperCase()}</span>
+              <span className="text-[11px] font-medium">{space.slug[0].toUpperCase()}</span>
             ) : (
               <>
                 <span className="truncate flex-1">{space.slug}</span>
@@ -125,7 +127,11 @@ export function Sidebar() {
         {/* Create Space */}
         <button
           onClick={() => navigate('/create-space')}
-          className="flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-stone hover:text-parchment hover:bg-ink w-full mt-1 transition-colors"
+          className={cn(
+            'flex items-center rounded-md text-stone hover:text-parchment hover:bg-surface w-full mt-1 transition-colors',
+            collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-1.5 text-sm'
+          )}
+          title={collapsed ? 'Create Space' : undefined}
         >
           <Plus className="w-4 h-4 shrink-0" />
           {!collapsed && <span className="text-xs">Create Space</span>}
@@ -133,10 +139,10 @@ export function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div className="border-t border-border-custom px-2 py-2 flex items-center gap-1">
+      <div className={cn('border-t border-border-custom flex items-center', collapsed ? 'flex-col gap-1 px-1.5 py-2' : 'gap-1 px-2 py-2')}>
         <button
           onClick={toggleTheme}
-          className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
+          className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-surface transition-colors"
           title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -144,7 +150,7 @@ export function Sidebar() {
         {!collapsed && <div className="flex-1" />}
         <button
           onClick={() => setCollapsed(c => !c)}
-          className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
+          className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-surface transition-colors"
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
