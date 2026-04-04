@@ -2,6 +2,7 @@ const { execSync, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { getSpaces } = require('./space-list');
+const { writeToInbox } = require('../inbox');
 
 function tmuxSessionExists(name) {
   try {
@@ -21,12 +22,40 @@ function tmuxWindowExists(session, windowName) {
   }
 }
 
+/**
+ * Write a launcher script that starts Claude in interactive mode.
+ * Initial instructions come via CLAUDE.md, not -p flag.
+ */
+function writeLaunchScript(name, cwd, model, resumeSessionId) {
+  const scriptDir = path.join(require('os').homedir(), 'superbot3', '.tmp');
+  fs.mkdirSync(scriptDir, { recursive: true });
+
+  const scriptPath = path.join(scriptDir, `launch-${name}.sh`);
+
+  const claudeArgs = ['--dangerously-skip-permissions', `--model ${model}`];
+  if (resumeSessionId) {
+    claudeArgs.push(`--resume ${resumeSessionId}`);
+  }
+
+  // Start Claude in interactive mode. The CLAUDE.md in the cwd's .claude/ dir
+  // provides identity and instructions. We'll send a startup prompt via stdin.
+  const script = `#!/bin/bash
+cd "${cwd}"
+export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+exec claude ${claudeArgs.join(' ')}
+`;
+
+  fs.writeFileSync(scriptPath, script, { mode: 0o755 });
+  return scriptPath;
+}
+
 module.exports = async function start(home) {
   console.log('Starting superbot3...');
   console.log('');
 
   const config = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf-8'));
   const port = config.broker?.port || 3100;
+  const model = config.model || 'claude-opus-4-6';
 
   // Step 1: Start broker
   console.log('Starting broker...');
@@ -36,7 +65,6 @@ module.exports = async function start(home) {
     process.exit(1);
   }
 
-  // Check if broker is already running on our port
   let brokerRunning = false;
   try {
     const resp = execSync(`curl -s http://localhost:${port}/health 2>/dev/null`, { encoding: 'utf-8' });
@@ -57,11 +85,8 @@ module.exports = async function start(home) {
       },
     });
     broker.unref();
-
-    // Write PID file
     fs.writeFileSync(path.join(home, 'broker', 'broker.pid'), String(broker.pid), 'utf-8');
 
-    // Wait for broker to be ready
     let ready = false;
     for (let i = 0; i < 20; i++) {
       try {
@@ -79,41 +104,25 @@ module.exports = async function start(home) {
     }
   }
 
-  // Step 2: Create tmux session
-  console.log('Setting up tmux session...');
+  // Step 2: Create tmux session with master
+  console.log('Setting up tmux session + master orchestrator...');
+
   if (tmuxSessionExists('superbot3')) {
     console.log('  tmux session "superbot3" already exists');
-  } else {
-    execSync('tmux new-session -d -s superbot3 -n master');
-    console.log('  Created tmux session "superbot3" with window "master"');
-  }
-
-  // Step 3: Launch master orchestrator
-  console.log('Launching master orchestrator...');
-  const masterConfigDir = path.join(home, 'orchestrator', '.claude');
-
-  if (tmuxWindowExists('superbot3', 'master')) {
-    console.log('  Master window already exists');
-  }
-
-  // Send the launch command to master window
-  const masterCmd = `cd ${home}/orchestrator && env CLAUDECODE=1 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 CLAUDE_CONFIG_DIR=${masterConfigDir} claude --dangerously-skip-permissions --model ${config.model || 'claude-opus-4-6'}`;
-
-  // Only send if the window is fresh (check if claude is already running)
-  try {
-    const paneCmd = execSync(`tmux display-message -t superbot3:master -p "#{pane_current_command}" 2>/dev/null`, { encoding: 'utf-8' }).trim();
-    if (paneCmd === 'zsh' || paneCmd === 'bash') {
-      execSync(`tmux send-keys -t superbot3:master '${masterCmd}' Enter`);
-      console.log('  Master orchestrator launched in tmux');
+    if (!tmuxWindowExists('superbot3', 'master')) {
+      const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model);
+      execSync(`tmux new-window -t superbot3 -n master "bash ${masterScript}"`);
+      console.log('  Master orchestrator launched in new window');
     } else {
-      console.log(`  Master already running (${paneCmd})`);
+      console.log('  Master window already exists');
     }
-  } catch {
-    execSync(`tmux send-keys -t superbot3:master '${masterCmd}' Enter`);
-    console.log('  Master orchestrator launched in tmux');
+  } else {
+    const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model);
+    execSync(`tmux new-session -d -s superbot3 -n master "bash ${masterScript}"`);
+    console.log('  Created tmux session with master orchestrator');
   }
 
-  // Step 4: Start active spaces
+  // Step 3: Start active spaces
   const spaces = getSpaces(home);
   const activeSpaces = spaces.filter(s => s.active);
 
@@ -121,26 +130,46 @@ module.exports = async function start(home) {
     console.log(`\nStarting ${activeSpaces.length} active space(s)...`);
 
     for (const space of activeSpaces) {
-      const cwd = space.codeDir || space.spaceDir;
-      const spaceConfigDir = space.claudeConfigDir;
+      const spaceWorkDir = space.spaceDir;
 
       if (tmuxWindowExists('superbot3', space.slug)) {
         console.log(`  Space "${space.slug}" already has a window`);
         continue;
       }
 
-      // Create tmux window for space
-      execSync(`tmux new-window -t superbot3 -n ${space.slug}`);
-
-      // Build spawn command
-      const resumeFlag = space.sessionId ? ` --resume ${space.sessionId}` : '';
-      const spaceCmd = `cd ${cwd} && env CLAUDECODE=1 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 CLAUDE_CONFIG_DIR=${spaceConfigDir} claude --dangerously-skip-permissions --model ${config.model || 'claude-opus-4-6'}${resumeFlag}`;
-
-      execSync(`tmux send-keys -t superbot3:${space.slug} '${spaceCmd}' Enter`);
-      console.log(`  Started space "${space.slug}" (cwd: ${cwd})`);
+      const spaceScript = writeLaunchScript(space.slug, spaceWorkDir, model, space.sessionId);
+      execSync(`tmux new-window -t superbot3 -n ${space.slug} "bash ${spaceScript}"`);
+      console.log(`  Started space "${space.slug}" (cwd: ${spaceWorkDir})`);
     }
   } else {
     console.log('\nNo active spaces to start.');
+  }
+
+  // Step 4: Wait for Claude instances to initialize, then send startup prompts
+  // Claude needs ~10-15s to load. We send prompts via tmux send-keys after it's ready.
+  console.log('\nWaiting for Claude instances to initialize...');
+  execSync('sleep 12');
+
+  // Send startup prompt to master
+  const masterStartup = 'Scan ~/superbot3/spaces/*/space.json to discover all spaces. Report what spaces you find and their status.';
+  try {
+    execSync(`tmux send-keys -t superbot3:master -l '${masterStartup.replace(/'/g, "'\\''")}'`);
+    execSync(`tmux send-keys -t superbot3:master Enter`);
+    console.log('  Sent startup prompt to master');
+  } catch (e) {
+    console.log('  Could not send startup prompt to master');
+  }
+
+  // Send startup prompt to each space
+  for (const space of activeSpaces) {
+    const spaceStartup = `Read your CLAUDE.md. Scan knowledge/ for context. Report your identity, skills, agents, and knowledge files.`;
+    try {
+      execSync(`tmux send-keys -t superbot3:${space.slug} -l '${spaceStartup.replace(/'/g, "'\\''")}'`);
+      execSync(`tmux send-keys -t superbot3:${space.slug} Enter`);
+      console.log(`  Sent startup prompt to ${space.slug}`);
+    } catch (e) {
+      console.log(`  Could not send startup prompt to ${space.slug} (may have closed)`);
+    }
   }
 
   console.log('');
