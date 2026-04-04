@@ -117,13 +117,6 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
                   <div className="whitespace-pre-wrap break-words">{msg.text}</div>
                 )}
               </div>
-              <div className={cn(
-                'text-[10px] text-stone mt-1 px-1',
-                isUser ? 'text-right' : ''
-              )}>
-                {isAssistant ? 'Claude' : msg.from}
-                {msg.timestamp && ` \u00b7 ${new Date(msg.timestamp).toLocaleTimeString()}`}
-              </div>
             </div>
           )
         })}
