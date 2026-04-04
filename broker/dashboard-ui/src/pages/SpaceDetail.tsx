@@ -47,7 +47,7 @@ export function SpaceDetail() {
         </div>
       </div>
 
-      <div className="flex flex-1 min-h-0 relative">
+      <div className="flex flex-1 min-h-0">
         {/* Chat -- primary */}
         <div className="flex-1 flex flex-col min-w-0">
           <ChatSection
@@ -58,12 +58,9 @@ export function SpaceDetail() {
           />
         </div>
 
-        {/* Panel sheet — slides in from right */}
-        <div className={cn(
-          'absolute top-0 right-0 h-full bg-surface border-l border-border-custom transition-transform duration-200 z-10',
-          'w-full sm:w-96 xl:w-[28rem]',
-          panelOpen ? 'translate-x-0' : 'translate-x-full'
-        )}>
+        {/* Panel — pushes content when open */}
+        {panelOpen && (
+        <div className="w-96 xl:w-[28rem] shrink-0 bg-surface border-l border-border-custom">
           <div className="flex items-center justify-between px-3 pt-3 pb-1">
             <span className="text-xs uppercase tracking-widest text-stone/70 font-medium">Details</span>
             <button
@@ -105,6 +102,7 @@ export function SpaceDetail() {
             </Tabs>
           </div>
         </div>
+        )}
       </div>
     </div>
   )

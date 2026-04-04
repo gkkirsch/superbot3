@@ -96,19 +96,15 @@ export function Sidebar() {
             key={space.slug}
             to={`/spaces/${space.slug}`}
             className={() => cn(
-              'group/item flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors mb-0.5',
-              isActive(`/spaces/${space.slug}`) ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-ink'
+              'group/item flex items-center gap-2 rounded-md px-3 py-1.5 text-xs transition-colors mb-0.5',
+              isActive(`/spaces/${space.slug}`) ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-surface'
             )}
           >
-            <span className="relative shrink-0">
-              <span className={cn(
-                'block w-2 h-2 rounded-full',
-                space.running ? 'bg-moss' : 'bg-stone/30'
-              )} />
-            </span>
-            {!collapsed && (
+            {collapsed ? (
+              <span className="text-xs">{space.slug[0].toUpperCase()}</span>
+            ) : (
               <>
-                <span className="truncate flex-1 font-mono text-xs">{space.slug}</span>
+                <span className="truncate flex-1">{space.slug}</span>
                 <button
                   onClick={(e) => toggleStar(space.slug, e)}
                   className={cn(
