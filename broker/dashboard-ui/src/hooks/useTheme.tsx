@@ -19,7 +19,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('superbot3-theme', theme)
   }, [theme])
 
-  const toggle = () => setTheme(t => (t === 'dark' ? 'light' : 'dark'))
+  const toggle = () => {
+    // Disable transitions briefly so theme swap is instant
+    document.documentElement.style.setProperty('--transition-override', 'none')
+    document.documentElement.classList.add('no-transitions')
+    setTheme(t => (t === 'dark' ? 'light' : 'dark'))
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        document.documentElement.classList.remove('no-transitions')
+        document.documentElement.style.removeProperty('--transition-override')
+      })
+    })
+  }
 
   return (
     <ThemeContext.Provider value={{ theme, toggle }}>

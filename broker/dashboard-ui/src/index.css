@@ -71,6 +71,12 @@
   border-color: var(--color-border-custom);
 }
 
+.no-transitions *,
+.no-transitions *::before,
+.no-transitions *::after {
+  transition-duration: 0s !important;
+}
+
 body {
   margin: 0;
   background-color: var(--color-ink);
