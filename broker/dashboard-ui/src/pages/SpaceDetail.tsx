@@ -4,8 +4,6 @@ import { ChatSection } from '@/features/ChatSection'
 import { KnowledgeTab } from '@/features/KnowledgeTab'
 import { SchedulesTab } from '@/features/SchedulesTab'
 import { PluginsTab } from '@/features/PluginsTab'
-import { SkillsTab } from '@/features/SkillsTab'
-import { WorkersTab } from '@/features/WorkersTab'
 import { SettingsTab } from '@/features/SettingsTab'
 import { useSpace, useSpaceMessages, useSpaceConversation } from '@/hooks/useSpaces'
 import { sendSpaceMessage } from '@/lib/api'
@@ -76,30 +74,22 @@ export function SpaceDetail() {
             </button>
           </div>
           <div className="flex-1 overflow-y-auto scrollbar-auto">
-            <Tabs defaultValue="knowledge">
+            <Tabs defaultValue="plugins">
               <TabsList className="mx-4 mt-3">
-                <TabsTrigger value="knowledge">Knowledge</TabsTrigger>
-                <TabsTrigger value="schedules">Schedules</TabsTrigger>
-                <TabsTrigger value="skills">Skills</TabsTrigger>
                 <TabsTrigger value="plugins">Plugins</TabsTrigger>
-                <TabsTrigger value="workers">Workers</TabsTrigger>
+                <TabsTrigger value="files">Files</TabsTrigger>
+                <TabsTrigger value="schedules">Schedules</TabsTrigger>
                 <TabsTrigger value="settings">Settings</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="knowledge" className="px-4">
+              <TabsContent value="plugins" className="px-4">
+                <PluginsTab slug={slug!} />
+              </TabsContent>
+              <TabsContent value="files" className="px-4">
                 <KnowledgeTab slug={slug!} />
               </TabsContent>
               <TabsContent value="schedules" className="px-4">
                 <SchedulesTab slug={slug!} />
-              </TabsContent>
-              <TabsContent value="skills" className="px-4">
-                <SkillsTab slug={slug!} />
-              </TabsContent>
-              <TabsContent value="plugins" className="px-4">
-                <PluginsTab slug={slug!} />
-              </TabsContent>
-              <TabsContent value="workers" className="px-4">
-                <WorkersTab slug={slug!} />
               </TabsContent>
               <TabsContent value="settings" className="px-4">
                 <SettingsTab space={space} />
