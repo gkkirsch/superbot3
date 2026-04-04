@@ -132,9 +132,9 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
             >
               <div
                 className={cn(
-                  'rounded-2xl text-[0.9375rem] leading-relaxed max-w-[85%]',
+                  'rounded-2xl text-[0.9375rem] leading-relaxed',
                   isUser
-                    ? 'bg-sand/15 text-parchment px-5 py-3'
+                    ? 'bg-sand/15 text-parchment px-5 py-3 max-w-md'
                     : 'text-parchment px-5 py-3'
                 )}
               >
