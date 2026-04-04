@@ -103,7 +103,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
       {title && (
         <div className="px-4 py-2.5 border-b text-sm font-medium text-parchment">{title}</div>
       )}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-8 py-4 space-y-3 scrollbar-auto">
         {merged.length === 0 && (
           <div className="text-center text-stone text-sm py-12">
             No messages yet. Send one below.
@@ -159,7 +159,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
           </div>
         )}
       </div>
-      <form onSubmit={handleSubmit} className="border-t p-3 flex items-center gap-2">
+      <form onSubmit={handleSubmit} className="border-t px-8 py-3 flex items-center gap-2">
         <input
           value={text}
           onChange={e => setText(e.target.value)}
