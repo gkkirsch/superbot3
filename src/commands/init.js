@@ -112,7 +112,8 @@ module.exports = function init(home) {
 
   // Set up auth (credentials + config) for orchestrator
   const orchConfigDir = path.join(home, 'orchestrator', '.claude');
-  if (setupConfigDir(orchConfigDir)) {
+  const orchWorkDir = path.join(home, 'orchestrator');
+  if (setupConfigDir(orchConfigDir, orchWorkDir)) {
     console.log('  Auth configured for orchestrator');
   }
 

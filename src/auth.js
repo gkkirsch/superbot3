@@ -77,11 +77,13 @@ function readDefaultGlobalConfig() {
  * Files created:
  * 1. .credentials.json — OAuth tokens (fallback when keychain entry doesn't exist)
  * 2. .claude.json — Global config with onboarding, trust, and bypass-permissions pre-accepted
+ * 3. settings.json — Merged with skipDangerousModePermissionPrompt: true
  *
  * @param {string} configDir - The CLAUDE_CONFIG_DIR path (e.g., /path/to/space/.claude)
  * @param {string} workDir - The cwd where Claude will run (for trust dialog pre-acceptance)
+ * @param {string} [codeDir] - Optional additional directory to trust (e.g., the linked code repo)
  */
-function setupConfigDir(configDir, workDir) {
+function setupConfigDir(configDir, workDir, codeDir) {
   fs.mkdirSync(configDir, { recursive: true });
   let success = true;
 
@@ -100,19 +102,34 @@ function setupConfigDir(configDir, workDir) {
     bypassPermissionsModeAccepted: true,
   };
 
-  // Pre-accept trust dialog for the working directory
+  // Pre-accept trust dialog for the working directory (and codeDir if set)
   const effectiveWorkDir = workDir || path.dirname(configDir);
   globalConfig.projects = globalConfig.projects || {};
   globalConfig.projects[effectiveWorkDir] = {
     hasTrustDialogAccepted: true,
     allowedTools: [],
   };
+  if (codeDir && codeDir !== effectiveWorkDir) {
+    globalConfig.projects[codeDir] = {
+      hasTrustDialogAccepted: true,
+      allowedTools: [],
+    };
+  }
 
   fs.writeFileSync(
     path.join(configDir, '.claude.json'),
     JSON.stringify(globalConfig, null, 2),
     'utf-8'
   );
+
+  // 3. Merge skipDangerousModePermissionPrompt into settings.json
+  const settingsPath = path.join(configDir, 'settings.json');
+  let settings = {};
+  try {
+    settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+  } catch {}
+  settings.skipDangerousModePermissionPrompt = true;
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 
   return success;
 }
@@ -135,7 +152,7 @@ function refreshAllSpaceCredentials(home) {
 
     const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
     // Re-run full setup for each space (updates credentials + config)
-    setupConfigDir(config.claudeConfigDir, config.spaceDir);
+    setupConfigDir(config.claudeConfigDir, config.spaceDir, config.codeDir);
   }
 
   // Also update orchestrator

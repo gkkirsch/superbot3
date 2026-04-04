@@ -90,7 +90,7 @@ module.exports = function spaceCreate(home, name, opts) {
 
   // Set up auth (credentials + config) so CLAUDE_CONFIG_DIR works
   const claudeConfigDir = path.join(spaceDir, '.claude');
-  if (setupConfigDir(claudeConfigDir, spaceDir)) {
+  if (setupConfigDir(claudeConfigDir, spaceDir, codeDir)) {
     console.log('  Auth configured from default keychain');
   }
 
