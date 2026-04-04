@@ -305,12 +305,22 @@ function parseConversation(jsonlPath) {
             if (block.type === 'text' && block.text?.trim()) {
               texts.push(block.text.trim());
             }
+            // Extract actual response from SendMessage tool calls
+            if (block.type === 'tool_use' && block.name === 'SendMessage' && block.input) {
+              const msg = block.input.message;
+              if (typeof msg === 'string' && msg.trim()) {
+                texts.push(msg.trim());
+              }
+            }
           }
         }
-        if (texts.length > 0) {
+        // Filter out terse tool summaries like "Replied to user with..."
+        const meaningful = texts.filter(t => !t.match(/^Replied to \w+[ :]/)
+          && !t.match(/^Responded to \w+[ :]/));
+        if (meaningful.length > 0) {
           messages.push({
             from: 'assistant',
-            text: texts.join('\n\n'),
+            text: meaningful.join('\n\n'),
             timestamp: obj.timestamp || '',
             read: true,
             role: 'assistant',
@@ -424,28 +434,66 @@ app.put('/api/spaces/:name/knowledge/:file', (req, res) => {
 
 // ── Plugins ──────────────────────────────────────────────────────────────────
 
-/** Read marketplace.json from a space's marketplace directory */
-function getMarketplacePlugins(claudeConfigDir) {
-  const marketplacesDir = path.join(claudeConfigDir, 'plugins', 'marketplaces');
+/** Read plugins from a single marketplace directory (cloned repo or flat JSON) */
+function readMarketplaceDir(mpDir, marketplaceName) {
+  const plugins = [];
+  // Style 1: cloned repo with .claude-plugin/marketplace.json
+  const clonedPath = path.join(mpDir, '.claude-plugin', 'marketplace.json');
+  if (fs.existsSync(clonedPath)) {
+    try {
+      const mp = JSON.parse(fs.readFileSync(clonedPath, 'utf-8'));
+      if (mp.plugins) {
+        for (const p of mp.plugins) plugins.push({ ...p, marketplace: marketplaceName });
+      }
+    } catch { /* skip */ }
+    return plugins;
+  }
+  // Style 2: flat JSON file (supercharge-style, the marketplace entry IS a JSON file)
+  try {
+    const stat = fs.statSync(mpDir);
+    if (stat.isFile()) {
+      const mp = JSON.parse(fs.readFileSync(mpDir, 'utf-8'));
+      if (mp.plugins) {
+        for (const p of mp.plugins) plugins.push({ ...p, marketplace: marketplaceName });
+      }
+    }
+  } catch { /* skip */ }
+  return plugins;
+}
+
+/** Read marketplace plugins from a given marketplaces directory */
+function readMarketplacesFrom(marketplacesDir) {
   const plugins = [];
   try {
     const entries = fs.readdirSync(marketplacesDir, { withFileTypes: true });
     for (const entry of entries) {
-      const mpDir = path.join(marketplacesDir, entry.name);
-      // Check .claude-plugin/marketplace.json (cloned repo style)
-      const mpJsonPath = path.join(mpDir, '.claude-plugin', 'marketplace.json');
-      if (fs.existsSync(mpJsonPath)) {
-        try {
-          const mp = JSON.parse(fs.readFileSync(mpJsonPath, 'utf-8'));
-          if (mp.plugins) {
-            for (const p of mp.plugins) {
-              plugins.push({ ...p, marketplace: entry.name });
-            }
-          }
-        } catch { /* skip bad json */ }
-      }
+      const mpPath = path.join(marketplacesDir, entry.name);
+      plugins.push(...readMarketplaceDir(mpPath, entry.name));
     }
-  } catch { /* no marketplaces dir */ }
+  } catch { /* dir doesn't exist */ }
+  return plugins;
+}
+
+/** Read all marketplace plugins: space-local + global ~/.claude */
+function getMarketplacePlugins(claudeConfigDir) {
+  const seen = new Set();
+  const plugins = [];
+
+  // Space-local marketplaces
+  const spacePlugins = readMarketplacesFrom(path.join(claudeConfigDir, 'plugins', 'marketplaces'));
+  for (const p of spacePlugins) {
+    const key = `${p.name}@${p.marketplace}`;
+    if (!seen.has(key)) { seen.add(key); plugins.push(p); }
+  }
+
+  // Global ~/.claude marketplaces (fallback for marketplaces not in the space)
+  const globalDir = path.join(require('os').homedir(), '.claude', 'plugins', 'marketplaces');
+  const globalPlugins = readMarketplacesFrom(globalDir);
+  for (const p of globalPlugins) {
+    const key = `${p.name}@${p.marketplace}`;
+    if (!seen.has(key)) { seen.add(key); plugins.push(p); }
+  }
+
   return plugins;
 }
 
@@ -488,7 +536,13 @@ app.get('/api/spaces/:name/plugins', (req, res) => {
       source: typeof mp.source === 'string' ? mp.source : (mp.source?.url || null),
       installed: isInstalled,
       enabled: isEnabled,
-      version: installEntries[0]?.version || null,
+      version: mp.version || installEntries[0]?.version || null,
+      skills: mp.skills || null,
+      lspServers: mp.lspServers ? Object.keys(mp.lspServers) : null,
+      tags: mp.tags || null,
+      keywords: mp.keywords || null,
+      strict: mp.strict ?? null,
+      author: mp.author?.name || null,
     };
   });
 

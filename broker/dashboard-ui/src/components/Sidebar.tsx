@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { Gauge, Star, Plus, Sun, Moon, ChevronLeft, ChevronRight } from 'lucide-react'
+import { MessageSquare, Star, Plus, Sun, Moon, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useTheme } from '@/hooks/useTheme'
@@ -77,10 +77,10 @@ export function Sidebar() {
             collapsed ? 'justify-center p-2' : 'gap-3 px-3 py-1.5 text-[0.8125rem]',
             isActive('/', true) ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-surface'
           )}
-          title={collapsed ? 'Dashboard' : undefined}
+          title={collapsed ? 'Chat' : undefined}
         >
-          <Gauge className="w-4 h-4 shrink-0" />
-          {!collapsed && 'Dashboard'}
+          <MessageSquare className="w-4 h-4 shrink-0" />
+          {!collapsed && 'Chat'}
         </NavLink>
 
         {/* Spaces section */}
