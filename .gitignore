@@ -2,7 +2,12 @@ node_modules/
 *.pid
 *.lock
 .credentials.json
+.claude.json
 spaces/*/
 orchestrator/.claude/teams/
 orchestrator/.claude/.credentials.json
+orchestrator/.claude/.claude.json
 broker/broker.pid
+broker/dashboard-ui/node_modules/
+broker/dashboard-ui/dist/
+.tmp/
