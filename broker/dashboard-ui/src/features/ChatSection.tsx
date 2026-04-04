@@ -103,10 +103,10 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
             >
               <div
                 className={cn(
-                  'rounded-lg text-sm max-w-[85%]',
+                  'rounded-2xl text-[0.9375rem] leading-relaxed max-w-[85%]',
                   isUser
-                    ? 'bg-sand/15 text-parchment px-3 py-2'
-                    : 'text-parchment'
+                    ? 'bg-sand/15 text-parchment px-5 py-3'
+                    : 'text-parchment px-5 py-3'
                 )}
               >
                 {isAssistant ? (
