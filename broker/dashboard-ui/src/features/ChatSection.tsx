@@ -15,9 +15,12 @@ interface ChatSectionProps {
   title?: string
 }
 
+const PAGE_SIZE = 20
+
 export function ChatSection({ messages, conversation, sendFn, queryKey, title }: ChatSectionProps) {
   const [text, setText] = useState('')
   const [waitingForReply, setWaitingForReply] = useState(false)
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const scrollRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const prevLenRef = useRef(0)
@@ -99,7 +102,17 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
             No messages yet. Send one below.
           </div>
         )}
-        {merged.map((msg, i) => {
+        {merged.length > visibleCount && (
+          <div className="text-center pb-2">
+            <button
+              onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+              className="text-xs text-stone hover:text-parchment transition-colors"
+            >
+              Load earlier messages ({merged.length - visibleCount} more)
+            </button>
+          </div>
+        )}
+        {merged.slice(-visibleCount).map((msg, i) => {
           const isUser = msg.role === 'user'
           const isAssistant = msg.role === 'assistant'
           return (
