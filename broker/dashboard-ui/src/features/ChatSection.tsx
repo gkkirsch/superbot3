@@ -17,6 +17,7 @@ interface ChatSectionProps {
 
 export function ChatSection({ messages, conversation, sendFn, queryKey, title }: ChatSectionProps) {
   const [text, setText] = useState('')
+  const [waitingForReply, setWaitingForReply] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
   const prevLenRef = useRef(0)
@@ -25,6 +26,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
     mutationFn: (msg: string) => sendFn(msg),
     onSuccess: () => {
       setText('')
+      setWaitingForReply(true)
       setTimeout(() => queryClient.invalidateQueries({ queryKey }), 1000)
     },
   })
@@ -65,13 +67,20 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
     return all
   }, [messages, conversation])
 
-  // Auto-scroll only when new messages arrive
+  // Clear typing indicator when a new assistant message arrives
   useEffect(() => {
-    if (merged.length > prevLenRef.current) {
+    if (waitingForReply && merged.length > 0 && merged[merged.length - 1].role === 'assistant') {
+      setWaitingForReply(false)
+    }
+  }, [merged, waitingForReply])
+
+  // Auto-scroll when new messages arrive or typing indicator shows
+  useEffect(() => {
+    if (merged.length > prevLenRef.current || waitingForReply) {
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
     }
     prevLenRef.current = merged.length
-  }, [merged.length])
+  }, [merged.length, waitingForReply])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -120,6 +129,15 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
             </div>
           )
         })}
+        {waitingForReply && (
+          <div className="animate-fade-up">
+            <div className="flex items-center gap-1.5 px-5 py-3">
+              <span className="typing-dot" />
+              <span className="typing-dot [animation-delay:0.15s]" />
+              <span className="typing-dot [animation-delay:0.3s]" />
+            </div>
+          </div>
+        )}
       </div>
       <form onSubmit={handleSubmit} className="border-t p-3 flex gap-2">
         <input
