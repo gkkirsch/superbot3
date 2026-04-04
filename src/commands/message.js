@@ -32,7 +32,7 @@ module.exports = async function message(home, spaceName, text) {
     const inboxPath = getSpaceInboxPath(config.claudeConfigDir, config.slug);
     try {
       await writeToInbox(inboxPath, {
-        from: 'superbot3-cli',
+        from: 'user',
         text: text,
         summary: text.slice(0, 80),
       });
@@ -47,7 +47,7 @@ module.exports = async function message(home, spaceName, text) {
     const inboxPath = getMasterInboxPath(home);
     try {
       await writeToInbox(inboxPath, {
-        from: 'superbot3-cli',
+        from: 'user',
         text: text,
         summary: text.slice(0, 80),
       });

@@ -54,8 +54,8 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
 
     // Add inbox messages not yet in the conversation (pending pickup)
     for (const msg of messages) {
-      const isDashboard = msg.from === 'dashboard' || msg.from === 'superbot3-cli'
-      if (!isDashboard) continue
+      const isFromUser = msg.from === 'user' || msg.from === 'dashboard' || msg.from === 'superbot3-cli'
+      if (!isFromUser) continue
       const alreadyInConvo = all.some(c =>
         c.role === 'user'
         && Math.abs(new Date(c.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 10000

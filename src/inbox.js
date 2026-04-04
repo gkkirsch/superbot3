@@ -33,7 +33,7 @@ async function writeToInbox(inboxPath, message) {
   try {
     const messages = JSON.parse(fs.readFileSync(inboxPath, 'utf-8'));
     messages.push({
-      from: message.from || 'superbot3-cli',
+      from: message.from || 'user',
       text: message.text,
       timestamp: new Date().toISOString(),
       read: false,

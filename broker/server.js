@@ -177,7 +177,7 @@ app.post('/api/spaces/:name/message', async (req, res) => {
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
   const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
-  await writeToInbox(inboxPath, { from: 'dashboard', text, summary: text.slice(0, 80) });
+  await writeToInbox(inboxPath, { from: 'user', text, summary: text.slice(0, 80) });
   res.json({ ok: true });
 });
 
@@ -203,7 +203,7 @@ app.post('/api/master/message', async (req, res) => {
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
   const inboxPath = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
-  await writeToInbox(inboxPath, { from: 'dashboard', text, summary: text.slice(0, 80) });
+  await writeToInbox(inboxPath, { from: 'user', text, summary: text.slice(0, 80) });
   res.json({ ok: true });
 });
 
@@ -258,7 +258,7 @@ function unwrapTeammateMessage(text) {
   if (match) {
     // Extract the sender from teammate_id attribute
     const fromMatch = text.match(/teammate_id="([^"]+)"/);
-    return { text: match[1].trim(), from: fromMatch ? fromMatch[1] : 'user' };
+    return { text: match[1].trim(), from: 'user' };
   }
   return null;
 }
