@@ -73,3 +73,17 @@ export const fetchSkills = (name: string) =>
 // Agents
 export const fetchAgents = (name: string) =>
   fetchJson<AgentDef[]>(`/api/spaces/${name}/agents`)
+
+// Conversation logs (Claude's session JSONL)
+export interface ConversationMessage {
+  from: string
+  text: string
+  timestamp: string
+  read: boolean
+  role: 'user' | 'assistant' | 'system'
+}
+
+export const fetchSpaceConversation = (name: string) =>
+  fetchJson<ConversationMessage[]>(`/api/spaces/${name}/conversation`)
+export const fetchMasterConversation = () =>
+  fetchJson<ConversationMessage[]>('/api/master/conversation')

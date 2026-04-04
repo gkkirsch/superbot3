@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 @theme {
+  /* Dark mode values — defines Tailwind token names */
   --color-ink: #0a0a0a;
   --color-surface: #141414;
   --color-parchment: #d4cdc4;
@@ -11,49 +14,61 @@
   --color-border-custom: #1f1f1e;
   --color-codebg: #111110;
 
-  --font-heading: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+  --font-heading: "Space Mono", monospace;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Space Mono", monospace;
 
-  --color-background: var(--color-ink);
-  --color-foreground: var(--color-parchment);
-  --color-card: var(--color-surface);
-  --color-card-foreground: var(--color-parchment);
-  --color-primary: var(--color-sand);
-  --color-primary-foreground: var(--color-ink);
-  --color-secondary: var(--color-surface);
-  --color-secondary-foreground: var(--color-parchment);
-  --color-muted: #1a1a1a;
-  --color-muted-foreground: var(--color-stone);
-  --color-accent: #1a1a1a;
-  --color-accent-foreground: var(--color-parchment);
-  --color-destructive: var(--color-ember);
-  --color-border: var(--color-border-custom);
-  --color-input: var(--color-border-custom);
-  --color-ring: var(--color-sand);
-  --radius: 0.5rem;
+  --radius-lg: 0.5rem;
+  --radius-md: calc(var(--radius-lg) - 2px);
+  --radius-sm: calc(var(--radius-lg) - 4px);
 }
 
-.light {
+/* Light mode color overrides */
+:root:not(.dark) {
   --color-ink: #faf9f7;
-  --color-surface: #ffffff;
-  --color-parchment: #1a1a1a;
-  --color-stone: #8a8580;
-  --color-sand: #9a7b5a;
-  --color-border-custom: #e5e2de;
-  --color-codebg: #f5f4f2;
-  --color-background: var(--color-ink);
-  --color-foreground: var(--color-parchment);
-  --color-card: var(--color-surface);
-  --color-muted: #f0eeeb;
-  --color-muted-foreground: var(--color-stone);
-  --color-accent: #f0eeeb;
-  --color-border: var(--color-border-custom);
-  --color-input: var(--color-border-custom);
+  --color-surface: #f0eeea;
+  --color-parchment: #1c1a17;
+  --color-stone: #6d6862;
+  --color-sand: #8a6b45;
+  --color-ember: #c7413c;
+  --color-moss: #5d7550;
+  --color-border-custom: #ddd9d3;
+  --color-codebg: #ece9e3;
+
+  --scrollbar-track: #faf9f7;
+  --scrollbar-thumb: #d0ccc6;
+  --scrollbar-thumb-hover: #bab5ae;
+
+  --background: 40 15% 98%;
+  --foreground: 30 10% 10%;
+  --card: 30 12% 94%;
+  --card-foreground: 30 10% 10%;
+  --muted: 30 10% 92%;
+  --muted-foreground: 30 8% 40%;
+  --border: 30 10% 87%;
+  --input: 30 10% 87%;
+  --ring: 2 55% 51%;
+}
+
+/* Dark mode */
+.dark {
+  --scrollbar-track: #0a0a0a;
+  --scrollbar-thumb: #2a2a28;
+  --scrollbar-thumb-hover: #3a3a38;
+
+  --background: 0 0% 4%;
+  --foreground: 30 10% 80%;
+  --card: 0 0% 8%;
+  --card-foreground: 30 10% 80%;
+  --muted: 30 6% 15%;
+  --muted-foreground: 30 6% 41%;
+  --border: 0 0% 12%;
+  --input: 0 0% 12%;
+  --ring: 2 64% 58%;
 }
 
 * {
-  border-color: var(--color-border);
+  border-color: var(--color-border-custom);
 }
 
 body {
@@ -63,38 +78,37 @@ body {
   font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scrollbar-gutter: stable;
 }
 
 #root {
   min-height: 100vh;
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #2a2a28;
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3a3a38;
-}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track, #0a0a0a); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb, #2a2a28); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover, #3a3a38); }
+::selection { background: color-mix(in srgb, var(--color-sand) 25%, transparent); color: var(--color-parchment); }
 
-.scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: #2a2a28 transparent;
-}
+/* Auto-hiding scrollbar */
+.scrollbar-auto { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+.scrollbar-auto:hover { scrollbar-color: var(--scrollbar-thumb, #2a2a28) transparent; }
+.scrollbar-auto::-webkit-scrollbar { width: 6px; }
+.scrollbar-auto::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-auto::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+.scrollbar-auto:hover::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb, #2a2a28); }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .animate-fade-up {
-  animation: fadeUp 0.3s ease-out forwards;
+  opacity: 0;
+  animation: fadeUp 0.4s ease-out forwards;
 }
 
 @keyframes pulse-dot {
@@ -103,4 +117,34 @@ body {
 }
 .animate-pulse-dot {
   animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Markdown in chat messages */
+.markdown-compact { font-size: 0.8125rem; line-height: 1.7; overflow-wrap: anywhere; }
+.markdown-compact h1, .markdown-compact h2 { font-family: var(--font-heading); font-size: 0.875rem; color: var(--color-parchment); margin-top: 0.75rem; margin-bottom: 0.375rem; font-weight: 600; }
+.markdown-compact h3, .markdown-compact h4 { font-family: var(--font-heading); font-size: 0.8125rem; color: var(--color-parchment); margin-top: 0.5rem; margin-bottom: 0.25rem; }
+.markdown-compact h1:first-child, .markdown-compact h2:first-child, .markdown-compact h3:first-child { margin-top: 0; }
+.markdown-compact p { margin-bottom: 0.5rem; }
+.markdown-compact p:last-child { margin-bottom: 0; }
+.markdown-compact ul, .markdown-compact ol { margin-left: 1rem; margin-bottom: 0.5rem; }
+.markdown-compact li { margin-bottom: 0.125rem; }
+.markdown-compact li::marker { color: var(--color-stone); }
+.markdown-compact strong { color: var(--color-parchment); font-weight: 600; }
+.markdown-compact code { background: var(--color-codebg); border-radius: 0.1875rem; padding: 0.0625rem 0.25rem; font-size: 0.6875rem; font-family: var(--font-mono); color: var(--color-sand); }
+.markdown-compact pre { background: var(--color-codebg); border-radius: 0.375rem; padding: 0.625rem; overflow-x: auto; margin-bottom: 0.5rem; max-width: 100%; }
+.markdown-compact pre code { padding: 0; background: none; color: var(--color-parchment); font-size: 0.6875rem; }
+.markdown-compact hr { border-color: var(--color-border-custom); margin: 0.75rem 0; }
+.markdown-compact a { color: var(--color-sand); text-decoration: underline; }
+.markdown-compact blockquote { border-left: 2px solid color-mix(in srgb, var(--color-sand) 30%, transparent); padding-left: 0.625rem; color: color-mix(in srgb, var(--color-stone) 80%, transparent); font-style: italic; margin-bottom: 0.5rem; }
+.markdown-compact table { width: 100%; font-size: 0.75rem; border-collapse: collapse; margin-bottom: 0.5rem; }
+.markdown-compact th { text-align: left; padding: 0.375rem 0.5rem; color: var(--color-parchment); font-family: var(--font-heading); font-size: 0.6875rem; border-bottom: 1px solid var(--color-border-custom); }
+.markdown-compact td { padding: 0.375rem 0.5rem; color: var(--color-stone); font-size: 0.6875rem; border-bottom: 1px solid var(--color-border-custom); }
+
+/* Chrome autofill override */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px var(--color-surface) inset !important;
+  -webkit-text-fill-color: var(--color-parchment) !important;
+  transition: background-color 5000s ease-in-out 0s;
 }

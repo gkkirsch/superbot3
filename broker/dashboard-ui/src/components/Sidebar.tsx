@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { Gauge, Star, Plus, Sun, Moon, ChevronLeft, ChevronRight, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSpaces } from '@/hooks/useSpaces'
@@ -17,6 +17,7 @@ export function Sidebar() {
   const { data: spaces } = useSpaces()
   const { theme, toggle: toggleTheme } = useTheme()
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     localStorage.setItem('superbot3-sidebar-collapsed', String(collapsed))
@@ -43,58 +44,66 @@ export function Sidebar() {
     return a.slug.localeCompare(b.slug)
   })
 
+  const isActive = (to: string, end?: boolean) => {
+    if (end) return location.pathname === to
+    return location.pathname.startsWith(to)
+  }
+
   return (
     <aside
       className={cn(
-        'flex flex-col border-r bg-surface transition-all duration-200 h-screen sticky top-0',
+        'flex flex-col border-r border-border-custom bg-surface/50 transition-all duration-200 h-screen sticky top-0',
         collapsed ? 'w-14' : 'w-56'
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-2 px-3 py-4 border-b">
-        <Bot className="w-6 h-6 text-sand shrink-0" />
-        {!collapsed && <span className="font-semibold text-sm text-foreground">superbot3</span>}
+      <div className="flex items-center gap-2.5 px-3 py-4 border-b border-border-custom">
+        <Bot className="w-5 h-5 text-sand shrink-0" />
+        {!collapsed && (
+          <span className="font-heading font-bold text-sm tracking-tight text-parchment">superbot3</span>
+        )}
       </div>
 
       {/* Main nav */}
-      <nav className="flex-1 overflow-y-auto py-2 px-2 scrollbar-thin">
+      <nav className="flex-1 overflow-y-auto py-2 px-2 scrollbar-auto">
         <NavLink
           to="/"
           end
-          className={({ isActive }) => cn(
-            'flex items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors mb-1',
-            isActive ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-muted'
+          className={() => cn(
+            'flex items-center gap-3 rounded-md px-2.5 py-1.5 text-sm transition-colors mb-0.5',
+            isActive('/', true) ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-ink'
           )}
         >
           <Gauge className="w-4 h-4 shrink-0" />
           {!collapsed && 'Dashboard'}
         </NavLink>
 
-        {/* Spaces */}
+        {/* Spaces section */}
         {!collapsed && (
-          <div className="mt-4 mb-1 px-2 text-[10px] uppercase tracking-wider text-stone font-medium">
+          <div className="mt-5 mb-1.5 px-2.5 text-[10px] uppercase tracking-widest text-stone/70 font-medium">
             Spaces
           </div>
         )}
+        {collapsed && <div className="mt-3 mb-1 border-t border-border-custom mx-1" />}
 
         {sortedSpaces.map(space => (
           <NavLink
             key={space.slug}
             to={`/spaces/${space.slug}`}
-            className={({ isActive }) => cn(
-              'group/item flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors mb-0.5',
-              isActive ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-muted'
+            className={() => cn(
+              'group/item flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors mb-0.5',
+              isActive(`/spaces/${space.slug}`) ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-ink'
             )}
           >
             <span className="relative shrink-0">
               <span className={cn(
                 'block w-2 h-2 rounded-full',
-                space.running ? 'bg-moss animate-pulse-dot' : 'bg-stone/40'
+                space.running ? 'bg-moss animate-pulse-dot' : 'bg-stone/30'
               )} />
             </span>
             {!collapsed && (
               <>
-                <span className="truncate flex-1">{space.slug}</span>
+                <span className="truncate flex-1 font-mono text-xs">{space.slug}</span>
                 <button
                   onClick={(e) => toggleStar(space.slug, e)}
                   className="opacity-0 group-hover/item:opacity-100 transition-opacity"
@@ -112,18 +121,18 @@ export function Sidebar() {
         {/* Create Space */}
         <button
           onClick={() => navigate('/create-space')}
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-stone hover:text-parchment hover:bg-muted w-full mt-1"
+          className="flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm text-stone hover:text-parchment hover:bg-ink w-full mt-1 transition-colors"
         >
           <Plus className="w-4 h-4 shrink-0" />
-          {!collapsed && 'Create Space'}
+          {!collapsed && <span className="text-xs">Create Space</span>}
         </button>
       </nav>
 
       {/* Bottom */}
-      <div className="border-t px-2 py-2 flex items-center gap-1">
+      <div className="border-t border-border-custom px-2 py-2 flex items-center gap-1">
         <button
           onClick={toggleTheme}
-          className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-muted transition-colors"
+          className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
           title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
         >
           {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -131,7 +140,7 @@ export function Sidebar() {
         {!collapsed && <div className="flex-1" />}
         <button
           onClick={() => setCollapsed(c => !c)}
-          className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-muted transition-colors"
+          className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>

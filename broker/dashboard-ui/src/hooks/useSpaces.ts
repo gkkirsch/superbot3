@@ -90,3 +90,20 @@ export function useSpaceMessages(name: string) {
     refetchInterval: 5_000,
   })
 }
+
+export function useMasterConversation() {
+  return useQuery({
+    queryKey: ['master-conversation'],
+    queryFn: api.fetchMasterConversation,
+    refetchInterval: 3_000,
+  })
+}
+
+export function useSpaceConversation(name: string) {
+  return useQuery({
+    queryKey: ['space-conversation', name],
+    queryFn: () => api.fetchSpaceConversation(name),
+    enabled: !!name,
+    refetchInterval: 3_000,
+  })
+}

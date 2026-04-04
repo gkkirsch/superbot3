@@ -237,6 +237,96 @@ app.get('/api/master/status', (req, res) => {
   res.json({ running: isWindowRunning('master') });
 });
 
+// ── Conversation Logs ────────────────────────────────────────────────────────
+// Read Claude's conversation from JSONL session logs
+
+function findLatestSession(projectsDir) {
+  try {
+    const dirs = fs.readdirSync(projectsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory());
+    let latest = null;
+    let latestMtime = 0;
+    for (const dir of dirs) {
+      const dirPath = path.join(projectsDir, dir.name);
+      const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.jsonl'));
+      for (const file of files) {
+        const filePath = path.join(dirPath, file);
+        const stat = fs.statSync(filePath);
+        if (stat.mtimeMs > latestMtime) {
+          latestMtime = stat.mtimeMs;
+          latest = filePath;
+        }
+      }
+    }
+    return latest;
+  } catch {
+    return null;
+  }
+}
+
+function parseConversation(jsonlPath) {
+  if (!jsonlPath) return [];
+  const messages = [];
+  try {
+    const lines = fs.readFileSync(jsonlPath, 'utf-8').split('\n').filter(Boolean);
+    for (const line of lines) {
+      const obj = JSON.parse(line);
+      if (obj.type === 'user' && obj.message?.role === 'user') {
+        const content = obj.message.content;
+        const text = typeof content === 'string' ? content
+          : Array.isArray(content) ? content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+          : '';
+        if (text.trim()) {
+          messages.push({
+            from: obj.userType === 'external' ? 'user' : 'system',
+            text: text.trim(),
+            timestamp: obj.timestamp || '',
+            read: true,
+            role: 'user',
+          });
+        }
+      } else if (obj.type === 'assistant' && obj.message?.role === 'assistant') {
+        const content = obj.message.content;
+        const texts = [];
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'text' && block.text?.trim()) {
+              texts.push(block.text.trim());
+            }
+          }
+        }
+        if (texts.length > 0) {
+          messages.push({
+            from: 'assistant',
+            text: texts.join('\n\n'),
+            timestamp: obj.timestamp || '',
+            read: true,
+            role: 'assistant',
+          });
+        }
+      }
+    }
+  } catch {}
+  return messages;
+}
+
+app.get('/api/spaces/:name/conversation', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const projectsDir = path.join(config.claudeConfigDir, 'projects');
+  const sessionPath = findLatestSession(projectsDir);
+  const messages = parseConversation(sessionPath);
+  res.json(messages);
+});
+
+app.get('/api/master/conversation', (req, res) => {
+  const projectsDir = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'projects');
+  const sessionPath = findLatestSession(projectsDir);
+  const messages = parseConversation(sessionPath);
+  res.json(messages);
+});
+
 // ── Workers ──────────────────────────────────────────────────────────────────
 
 app.get('/api/spaces/:name/workers', (req, res) => {
@@ -388,17 +478,24 @@ try {
   const watchPaths = [
     path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', '**', 'inboxes', '*.json'),
     path.join(SUPERBOT3_HOME, 'spaces', '*', '.claude', 'teams', '**', 'inboxes', '*.json'),
+    // Watch conversation JSONL files for real-time Claude responses
+    path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'projects', '**', '*.jsonl'),
+    path.join(SUPERBOT3_HOME, 'spaces', '*', '.claude', 'projects', '**', '*.jsonl'),
   ];
 
   const watcher = chokidar.watch(watchPaths, {
     ignoreInitial: true,
-    awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 50 },
+    awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
   });
 
   watcher.on('change', (filePath) => {
-    // Determine if this is master or a space inbox
     let type = 'unknown';
     let space = null;
+    let eventType = 'inbox_update';
+
+    if (filePath.endsWith('.jsonl')) {
+      eventType = 'conversation_update';
+    }
 
     if (filePath.includes('/orchestrator/')) {
       type = 'master';
@@ -410,13 +507,10 @@ try {
       }
     }
 
-    try {
-      const messages = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-      const payload = JSON.stringify({ type: 'inbox_update', source: type, space, messages });
-      wss.clients.forEach(client => {
-        if (client.readyState === 1) client.send(payload);
-      });
-    } catch {}
+    const payload = JSON.stringify({ type: eventType, source: type, space });
+    wss.clients.forEach(client => {
+      if (client.readyState === 1) client.send(payload);
+    });
   });
 
   server.listen(PORT, () => {

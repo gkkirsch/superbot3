@@ -16,6 +16,7 @@ export function useWebSocket() {
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
+
           if (data.type === 'inbox_update') {
             if (data.source === 'master') {
               queryClient.invalidateQueries({ queryKey: ['master-messages'] })
@@ -23,11 +24,18 @@ export function useWebSocket() {
               queryClient.invalidateQueries({ queryKey: ['space-messages', data.space] })
             }
           }
+
+          if (data.type === 'conversation_update') {
+            if (data.source === 'master') {
+              queryClient.invalidateQueries({ queryKey: ['master-conversation'] })
+            } else if (data.source === 'space' && data.space) {
+              queryClient.invalidateQueries({ queryKey: ['space-conversation', data.space] })
+            }
+          }
         } catch {}
       }
 
       ws.onclose = () => {
-        // Reconnect after 3 seconds
         setTimeout(connect, 3000)
       }
 
