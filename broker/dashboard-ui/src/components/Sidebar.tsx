@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { Gauge, Star, Plus, Sun, Moon, ChevronLeft, ChevronRight, Bot } from 'lucide-react'
+import { Gauge, Star, Plus, Sun, Moon, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useTheme } from '@/hooks/useTheme'
@@ -57,10 +57,15 @@ export function Sidebar() {
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-3 py-4 border-b border-border-custom">
-        <Bot className="w-5 h-5 text-sand shrink-0" />
-        {!collapsed && (
-          <span className="font-heading font-bold text-sm tracking-tight text-parchment">superbot3</span>
+      <div className="flex items-center justify-center px-3 pt-2 pb-6 shrink-0">
+        {collapsed ? (
+          <NavLink to="/" className="block hover:opacity-80 transition-opacity">
+            <img src="/logo.png" alt="SB" className="h-8 w-8" />
+          </NavLink>
+        ) : (
+          <NavLink to="/" className="block hover:opacity-80 transition-opacity">
+            <img src="/superbot-logo.png" alt="Superbot" className="h-6" />
+          </NavLink>
         )}
       </div>
 

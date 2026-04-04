@@ -181,6 +181,19 @@ function copyDirRecursive(src, dest) {
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 
+// tmux send-keys fallback: used when inbox polling isn't available (e.g., session
+// wasn't launched with team args). Follows Claude Code's pattern of using tmux
+// as a backend when available.
+function tmuxFallback(windowName, text) {
+  try {
+    const escaped = text.replace(/'/g, "'\\''");
+    execSync(`tmux send-keys -t superbot3:${windowName} '${escaped}' Enter`, { timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 app.post('/api/spaces/:name/message', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
@@ -188,19 +201,12 @@ app.post('/api/spaces/:name/message', (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
-  // Write to inbox (for when Claude is actively processing)
+  // Primary: write to inbox (polled by Claude's inbox poller every 1s)
   const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
   writeInboxMessage(inboxPath, text);
 
-  // Also send via tmux to wake Claude if it's idle at the prompt
-  try {
-    const spaceName = config.slug;
-    // Escape the text for tmux send-keys: replace single quotes
-    const escaped = text.replace(/'/g, "'\\''");
-    execSync(`tmux send-keys -t superbot3:${spaceName} '${escaped}' Enter`, { timeout: 5000 });
-  } catch (e) {
-    // tmux send may fail if window doesn't exist — that's ok, inbox will still work
-  }
+  // Fallback: also send via tmux if available (for sessions without team args)
+  tmuxFallback(config.slug, text);
 
   res.json({ ok: true });
 });
@@ -228,13 +234,7 @@ app.post('/api/master/message', (req, res) => {
 
   const inboxPath = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
   writeInboxMessage(inboxPath, text);
-
-  // Also send via tmux to wake master if idle
-  try {
-    const escaped = text.replace(/'/g, "'\\''");
-    execSync(`tmux send-keys -t superbot3:master '${escaped}' Enter`, { timeout: 5000 });
-  } catch (e) {}
-
+  tmuxFallback('master', text);
   res.json({ ok: true });
 });
 
@@ -283,6 +283,17 @@ function findLatestSession(projectsDir) {
   }
 }
 
+// Strip <teammate-message> XML wrapper from inbox-delivered messages
+function unwrapTeammateMessage(text) {
+  const match = text.match(/<teammate-message[^>]*>\n?([\s\S]*?)\n?<\/teammate-message>/);
+  if (match) {
+    // Extract the sender from teammate_id attribute
+    const fromMatch = text.match(/teammate_id="([^"]+)"/);
+    return { text: match[1].trim(), from: fromMatch ? fromMatch[1] : 'user' };
+  }
+  return null;
+}
+
 function parseConversation(jsonlPath) {
   if (!jsonlPath) return [];
   const messages = [];
@@ -292,13 +303,26 @@ function parseConversation(jsonlPath) {
       const obj = JSON.parse(line);
       if (obj.type === 'user' && obj.message?.role === 'user') {
         const content = obj.message.content;
-        const text = typeof content === 'string' ? content
+        let text = typeof content === 'string' ? content
           : Array.isArray(content) ? content.filter(b => b.type === 'text').map(b => b.text).join('\n')
           : '';
-        if (text.trim()) {
+        text = text.trim();
+        if (!text) continue;
+
+        // Unwrap teammate-message XML if present (inbox-delivered messages)
+        const unwrapped = unwrapTeammateMessage(text);
+        if (unwrapped) {
+          messages.push({
+            from: unwrapped.from,
+            text: unwrapped.text,
+            timestamp: obj.timestamp || '',
+            read: true,
+            role: 'user',
+          });
+        } else {
           messages.push({
             from: obj.userType === 'external' ? 'user' : 'system',
-            text: text.trim(),
+            text,
             timestamp: obj.timestamp || '',
             read: true,
             role: 'user',

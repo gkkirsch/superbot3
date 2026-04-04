@@ -28,7 +28,7 @@ function tmuxWindowExists(session, windowName) {
  * Sets CLAUDE_CONFIG_DIR for full isolation (teams, inbox, plugins, settings).
  * Auth works via .credentials.json fallback (copied from default keychain during init/space-create).
  */
-function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir) {
+function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, teamArgs) {
   const scriptDir = path.join(require('os').homedir(), 'superbot3', '.tmp');
   fs.mkdirSync(scriptDir, { recursive: true });
 
@@ -37,6 +37,12 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir) {
   const claudeArgs = ['--dangerously-skip-permissions', `--model ${model}`];
   if (resumeSessionId) {
     claudeArgs.push(`--resume ${resumeSessionId}`);
+  }
+  // Add team args for inbox polling (--agent-id, --agent-name, --team-name)
+  if (teamArgs) {
+    claudeArgs.push(`--agent-id '${teamArgs.agentId}'`);
+    claudeArgs.push(`--agent-name '${teamArgs.agentName}'`);
+    claudeArgs.push(`--team-name '${teamArgs.teamName}'`);
   }
 
   const script = `#!/bin/bash
@@ -48,6 +54,19 @@ exec claude ${claudeArgs.join(' ')}
 
   fs.writeFileSync(scriptPath, script, { mode: 0o755 });
   return scriptPath;
+}
+
+/**
+ * Ensure the inbox file exists for an agent in a team.
+ * This is needed so the inbox poller can read from it immediately on startup.
+ */
+function ensureInbox(claudeConfigDir, teamName, agentName) {
+  const inboxDir = path.join(claudeConfigDir, 'teams', teamName, 'inboxes');
+  fs.mkdirSync(inboxDir, { recursive: true });
+  const inboxPath = path.join(inboxDir, `${agentName}.json`);
+  if (!fs.existsSync(inboxPath)) {
+    fs.writeFileSync(inboxPath, '[]', 'utf-8');
+  }
 }
 
 module.exports = async function start(home) {
@@ -112,19 +131,22 @@ module.exports = async function start(home) {
   // Step 2: Create tmux session with master
   console.log('Setting up tmux session + master orchestrator...');
 
+  const masterConfigDir = path.join(home, 'orchestrator', '.claude');
+  const masterTeamName = 'superbot3';
+  const masterTeamArgs = { agentId: `team-lead@${masterTeamName}`, agentName: 'team-lead', teamName: masterTeamName };
+  ensureInbox(masterConfigDir, masterTeamName, 'team-lead');
+
   if (tmuxSessionExists('superbot3')) {
     console.log('  tmux session "superbot3" already exists');
     if (!tmuxWindowExists('superbot3', 'master')) {
-      const masterConfigDir = path.join(home, 'orchestrator', '.claude');
-      const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir);
+      const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir, masterTeamArgs);
       execSync(`tmux new-window -t superbot3 -n master "bash ${masterScript}"`);
       console.log('  Master orchestrator launched in new window');
     } else {
       console.log('  Master window already exists');
     }
   } else {
-    const masterConfigDir = path.join(home, 'orchestrator', '.claude');
-    const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir);
+    const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir, masterTeamArgs);
     execSync(`tmux new-session -d -s superbot3 -n master "bash ${masterScript}"`);
     console.log('  Created tmux session with master orchestrator');
   }
@@ -144,7 +166,11 @@ module.exports = async function start(home) {
         continue;
       }
 
-      const spaceScript = writeLaunchScript(space.slug, spaceWorkDir, model, space.sessionId, space.claudeConfigDir);
+      // Set up team args so the inbox poller is active from startup
+      const spaceTeamArgs = { agentId: `team-lead@${space.slug}`, agentName: 'team-lead', teamName: space.slug };
+      ensureInbox(space.claudeConfigDir, space.slug, 'team-lead');
+
+      const spaceScript = writeLaunchScript(space.slug, spaceWorkDir, model, space.sessionId, space.claudeConfigDir, spaceTeamArgs);
       execSync(`tmux new-window -t superbot3 -n ${space.slug} "bash ${spaceScript}"`);
       console.log(`  Started space "${space.slug}" (cwd: ${spaceWorkDir})`);
     }

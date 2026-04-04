@@ -29,42 +29,35 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
     },
   })
 
-  // Merge inbox messages + conversation log, deduplicate by timestamp proximity
+  // Merge inbox messages + conversation log, deduplicate by text + timestamp proximity
   const merged = useMemo(() => {
-    const all: Array<{
-      from: string
-      text: string
-      timestamp: string
-      role: 'user' | 'assistant' | 'system'
-    }> = []
+    type Msg = { from: string; text: string; timestamp: string; role: 'user' | 'assistant' | 'system' }
+    const all: Msg[] = []
 
-    // Add conversation messages (Claude's actual conversation)
+    // Add conversation messages, deduplicating within the conversation itself
+    // (tmux fallback + inbox poller can create duplicate user messages)
     for (const msg of conversation) {
-      all.push({
-        from: msg.from,
-        text: msg.text,
-        timestamp: msg.timestamp,
-        role: msg.role,
-      })
+      const isDupe = all.some(existing =>
+        existing.role === msg.role
+        && existing.text === msg.text
+        && Math.abs(new Date(existing.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 10000
+      )
+      if (!isDupe) {
+        all.push({ from: msg.from, text: msg.text, timestamp: msg.timestamp, role: msg.role })
+      }
     }
 
-    // Add inbox messages that aren't already in the conversation
-    // (inbox messages from "dashboard" that haven't been picked up yet)
+    // Add inbox messages not yet in the conversation (pending pickup)
     for (const msg of messages) {
       const isDashboard = msg.from === 'dashboard' || msg.from === 'superbot3-cli'
       if (!isDashboard) continue
-      // Check if this message is already represented in the conversation
-      const alreadyInConvo = conversation.some(c =>
-        c.role === 'user' && Math.abs(new Date(c.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 5000
+      const alreadyInConvo = all.some(c =>
+        c.role === 'user'
+        && Math.abs(new Date(c.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 10000
         && c.text.includes(msg.text.slice(0, 40))
       )
       if (!alreadyInConvo) {
-        all.push({
-          from: msg.from,
-          text: msg.text,
-          timestamp: msg.timestamp,
-          role: 'user',
-        })
+        all.push({ from: msg.from, text: msg.text, timestamp: msg.timestamp, role: 'user' })
       }
     }
 
