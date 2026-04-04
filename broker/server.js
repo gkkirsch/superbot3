@@ -181,19 +181,6 @@ function copyDirRecursive(src, dest) {
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 
-// tmux send-keys fallback: used when inbox polling isn't available (e.g., session
-// wasn't launched with team args). Follows Claude Code's pattern of using tmux
-// as a backend when available.
-function tmuxFallback(windowName, text) {
-  try {
-    const escaped = text.replace(/'/g, "'\\''");
-    execSync(`tmux send-keys -t superbot3:${windowName} '${escaped}' Enter`, { timeout: 5000 });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 app.post('/api/spaces/:name/message', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
@@ -201,13 +188,8 @@ app.post('/api/spaces/:name/message', (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
-  // Primary: write to inbox (polled by Claude's inbox poller every 1s)
   const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
   writeInboxMessage(inboxPath, text);
-
-  // Fallback: also send via tmux if available (for sessions without team args)
-  tmuxFallback(config.slug, text);
-
   res.json({ ok: true });
 });
 
@@ -234,7 +216,6 @@ app.post('/api/master/message', (req, res) => {
 
   const inboxPath = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
   writeInboxMessage(inboxPath, text);
-  tmuxFallback('master', text);
   res.json({ ok: true });
 });
 
