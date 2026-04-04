@@ -11,6 +11,7 @@ import { useSpace, useSpaceMessages, useSpaceConversation } from '@/hooks/useSpa
 import { sendSpaceMessage } from '@/lib/api'
 import { usePanel } from '@/hooks/usePanel'
 import { PanelRight, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export function SpaceDetail() {
   const { slug } = useParams<{ slug: string }>()
@@ -59,11 +60,14 @@ export function SpaceDetail() {
         </div>
       </div>
 
-      {/* Panel — pushes content, no overlay */}
-      {panelOpen && (
-        <div className="w-96 xl:w-[28rem] shrink-0 border-l border-border-custom bg-surface flex flex-col h-screen">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border-custom shrink-0">
-            <span className="text-xs uppercase tracking-widest text-stone/70 font-medium">Details</span>
+      {/* Panel — slides in, pushes content */}
+      <div className={cn(
+        'shrink-0 border-l border-border-custom bg-surface flex flex-col h-screen overflow-hidden transition-[width] duration-200 ease-in-out',
+        panelOpen ? 'w-96 xl:w-[28rem]' : 'w-0 border-l-0'
+      )}>
+        {panelOpen && (
+          <>
+          <div className="flex items-center justify-end px-4 py-3 border-b border-border-custom shrink-0">
             <button
               onClick={closePanel}
               className="p-1 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
@@ -102,8 +106,9 @@ export function SpaceDetail() {
               </TabsContent>
             </Tabs>
           </div>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   )
 }
