@@ -22,6 +22,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
   const [waitingForReply, setWaitingForReply] = useState(false)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const queryClient = useQueryClient()
   const prevLenRef = useRef(0)
 
@@ -30,6 +31,9 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
     onSuccess: () => {
       setText('')
       setWaitingForReply(true)
+      if (inputRef.current) {
+        inputRef.current.style.height = 'auto'
+      }
       setTimeout(() => queryClient.invalidateQueries({ queryKey }), 1000)
     },
   })
@@ -161,25 +165,43 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
         )}
       </div>
       </div>
-      <div className="max-w-5xl mx-auto px-4 w-full">
-      <form onSubmit={handleSubmit} className="py-3 flex items-center gap-2">
-        <input
-          value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder="Message this space..."
-          className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/50 transition-colors"
-          disabled={mutation.isPending}
-        />
-        <button
-          type="submit"
-          disabled={!text.trim() || mutation.isPending}
-          className="shrink-0 p-2 rounded-lg text-stone hover:text-sand hover:bg-sand/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-        >
-          <Send className="w-4 h-4" />
-        </button>
+      <div className="max-w-5xl mx-auto px-4 w-full pt-2 pb-6">
+      <form onSubmit={handleSubmit}>
+        <div className="relative bg-ink/80 border border-border-custom rounded-xl focus-within:border-stone/30 transition-colors">
+          <textarea
+            ref={inputRef}
+            value={text}
+            onChange={e => setText(e.target.value)}
+            rows={2}
+            placeholder="Message this space..."
+            className="w-full bg-transparent px-4 pt-2.5 pb-10 text-sm text-parchment placeholder:text-stone/45 focus:outline-none resize-none overflow-y-auto max-h-32 no-scrollbar"
+            disabled={mutation.isPending}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                e.currentTarget.form?.requestSubmit()
+              }
+            }}
+            onInput={(e) => {
+              const target = e.currentTarget
+              target.style.height = 'auto'
+              target.style.height = `${Math.min(target.scrollHeight, 128)}px`
+            }}
+          />
+          <div className="absolute bottom-2 left-2 right-2 flex items-center">
+            <div className="flex-1" />
+            <button
+              type="submit"
+              disabled={!text.trim() || mutation.isPending}
+              className="p-1.5 rounded-lg text-stone/50 hover:text-parchment hover:bg-surface/40 transition-colors disabled:opacity-25"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       </form>
       {mutation.isError && (
-        <div className="pb-2 text-xs text-ember">Failed to send message</div>
+        <span className="text-[10px] text-ember/70 mt-1 ml-1">Failed</span>
       )}
       </div>
     </div>
