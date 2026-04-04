@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { setupConfigDir } = require('../auth');
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -108,6 +109,12 @@ module.exports = function init(home) {
     path.join(home, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json'),
     '[]'
   );
+
+  // Set up auth (credentials + config) for orchestrator
+  const orchConfigDir = path.join(home, 'orchestrator', '.claude');
+  if (setupConfigDir(orchConfigDir)) {
+    console.log('  Auth configured for orchestrator');
+  }
 
   // Broker server.js (minimal /health for now)
   writeIfNotExists(

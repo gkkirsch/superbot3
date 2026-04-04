@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { getSpaces } = require('./space-list');
 const { writeToInbox } = require('../inbox');
+const { refreshAllSpaceCredentials } = require('../auth');
 
 function tmuxSessionExists(name) {
   try {
@@ -24,9 +25,10 @@ function tmuxWindowExists(session, windowName) {
 
 /**
  * Write a launcher script that starts Claude in interactive mode.
- * Initial instructions come via CLAUDE.md, not -p flag.
+ * Sets CLAUDE_CONFIG_DIR for full isolation (teams, inbox, plugins, settings).
+ * Auth works via .credentials.json fallback (copied from default keychain during init/space-create).
  */
-function writeLaunchScript(name, cwd, model, resumeSessionId) {
+function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir) {
   const scriptDir = path.join(require('os').homedir(), 'superbot3', '.tmp');
   fs.mkdirSync(scriptDir, { recursive: true });
 
@@ -37,10 +39,9 @@ function writeLaunchScript(name, cwd, model, resumeSessionId) {
     claudeArgs.push(`--resume ${resumeSessionId}`);
   }
 
-  // Start Claude in interactive mode. The CLAUDE.md in the cwd's .claude/ dir
-  // provides identity and instructions. We'll send a startup prompt via stdin.
   const script = `#!/bin/bash
 cd "${cwd}"
+export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 exec claude ${claudeArgs.join(' ')}
 `;
@@ -56,6 +57,10 @@ module.exports = async function start(home) {
   const config = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf-8'));
   const port = config.broker?.port || 3100;
   const model = config.model || 'claude-opus-4-6';
+
+  // Step 0: Refresh credentials in all spaces (tokens may have been refreshed since creation)
+  console.log('Refreshing credentials...');
+  refreshAllSpaceCredentials(home);
 
   // Step 1: Start broker
   console.log('Starting broker...');
@@ -110,14 +115,16 @@ module.exports = async function start(home) {
   if (tmuxSessionExists('superbot3')) {
     console.log('  tmux session "superbot3" already exists');
     if (!tmuxWindowExists('superbot3', 'master')) {
-      const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model);
+      const masterConfigDir = path.join(home, 'orchestrator', '.claude');
+      const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir);
       execSync(`tmux new-window -t superbot3 -n master "bash ${masterScript}"`);
       console.log('  Master orchestrator launched in new window');
     } else {
       console.log('  Master window already exists');
     }
   } else {
-    const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model);
+    const masterConfigDir = path.join(home, 'orchestrator', '.claude');
+    const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir);
     execSync(`tmux new-session -d -s superbot3 -n master "bash ${masterScript}"`);
     console.log('  Created tmux session with master orchestrator');
   }
@@ -137,7 +144,7 @@ module.exports = async function start(home) {
         continue;
       }
 
-      const spaceScript = writeLaunchScript(space.slug, spaceWorkDir, model, space.sessionId);
+      const spaceScript = writeLaunchScript(space.slug, spaceWorkDir, model, space.sessionId, space.claudeConfigDir);
       execSync(`tmux new-window -t superbot3 -n ${space.slug} "bash ${spaceScript}"`);
       console.log(`  Started space "${space.slug}" (cwd: ${spaceWorkDir})`);
     }

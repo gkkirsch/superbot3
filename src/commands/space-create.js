@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { setupConfigDir } = require('../auth');
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -85,6 +86,12 @@ module.exports = function spaceCreate(home, name, opts) {
     let content = fs.readFileSync(claudeMdPath, 'utf-8');
     content = content.replace(/\{\{SPACE_NAME\}\}/g, slug);
     fs.writeFileSync(claudeMdPath, content, 'utf-8');
+  }
+
+  // Set up auth (credentials + config) so CLAUDE_CONFIG_DIR works
+  const claudeConfigDir = path.join(spaceDir, '.claude');
+  if (setupConfigDir(claudeConfigDir, spaceDir)) {
+    console.log('  Auth configured from default keychain');
   }
 
   // Ensure scheduled_tasks.json exists (empty — no default schedules)
