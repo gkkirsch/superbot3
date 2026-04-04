@@ -424,17 +424,98 @@ app.put('/api/spaces/:name/knowledge/:file', (req, res) => {
 
 // ── Plugins ──────────────────────────────────────────────────────────────────
 
+/** Read marketplace.json from a space's marketplace directory */
+function getMarketplacePlugins(claudeConfigDir) {
+  const marketplacesDir = path.join(claudeConfigDir, 'plugins', 'marketplaces');
+  const plugins = [];
+  try {
+    const entries = fs.readdirSync(marketplacesDir, { withFileTypes: true });
+    for (const entry of entries) {
+      const mpDir = path.join(marketplacesDir, entry.name);
+      // Check .claude-plugin/marketplace.json (cloned repo style)
+      const mpJsonPath = path.join(mpDir, '.claude-plugin', 'marketplace.json');
+      if (fs.existsSync(mpJsonPath)) {
+        try {
+          const mp = JSON.parse(fs.readFileSync(mpJsonPath, 'utf-8'));
+          if (mp.plugins) {
+            for (const p of mp.plugins) {
+              plugins.push({ ...p, marketplace: entry.name });
+            }
+          }
+        } catch { /* skip bad json */ }
+      }
+    }
+  } catch { /* no marketplaces dir */ }
+  return plugins;
+}
+
+/** Read installed_plugins.json for a space */
+function getInstalledPlugins(claudeConfigDir) {
+  const ipPath = path.join(claudeConfigDir, 'plugins', 'installed_plugins.json');
+  const data = readJsonSafe(ipPath);
+  if (!data || !data.plugins) return {};
+  return data.plugins; // { "name@marketplace": [ { scope, installPath, ... } ] }
+}
+
+/** Read enabledPlugins from space settings.json */
+function getEnabledPlugins(claudeConfigDir) {
+  const settingsPath = path.join(claudeConfigDir, 'settings.json');
+  const settings = readJsonSafe(settingsPath);
+  if (!settings || !settings.enabledPlugins) return {};
+  return settings.enabledPlugins; // { "name@marketplace": true/false }
+}
+
 app.get('/api/spaces/:name/plugins', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const pluginsDir = path.join(config.claudeConfigDir, 'plugins');
-  try {
-    const entries = fs.readdirSync(pluginsDir, { withFileTypes: true });
-    res.json(entries.filter(e => e.isDirectory()).map(e => e.name));
-  } catch {
-    res.json([]);
-  }
+  const marketplacePlugins = getMarketplacePlugins(config.claudeConfigDir);
+  const installed = getInstalledPlugins(config.claudeConfigDir);
+  const enabled = getEnabledPlugins(config.claudeConfigDir);
+
+  // Build enriched plugin list
+  const results = marketplacePlugins.map(mp => {
+    const key = `${mp.name}@${mp.marketplace}`;
+    const installEntries = installed[key] || [];
+    const isInstalled = installEntries.length > 0;
+    const isEnabled = enabled[key] === true;
+    return {
+      name: mp.name,
+      description: mp.description || '',
+      category: mp.category || 'other',
+      marketplace: mp.marketplace,
+      homepage: mp.homepage || null,
+      source: typeof mp.source === 'string' ? mp.source : (mp.source?.url || null),
+      installed: isInstalled,
+      enabled: isEnabled,
+      version: installEntries[0]?.version || null,
+    };
+  });
+
+  // Sort: enabled first, then installed, then alphabetical
+  results.sort((a, b) => {
+    if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+    if (a.installed !== b.installed) return a.installed ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  res.json(results);
+});
+
+/** Toggle a plugin enabled/disabled in the space's settings.json */
+app.post('/api/spaces/:name/plugins/toggle', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const { pluginKey, enabled } = req.body;
+  if (!pluginKey) return res.status(400).json({ error: 'pluginKey required' });
+
+  const settingsPath = path.join(config.claudeConfigDir, 'settings.json');
+  const settings = readJsonSafe(settingsPath) || { permissions: { allow: [], deny: [] } };
+  if (!settings.enabledPlugins) settings.enabledPlugins = {};
+  settings.enabledPlugins[pluginKey] = !!enabled;
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  res.json({ ok: true, enabled: !!enabled });
 });
 
 // ── Skills ───────────────────────────────────────────────────────────────────
