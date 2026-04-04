@@ -33,7 +33,7 @@ export function SpaceDetail() {
       {/* Main area: header + chat */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border-custom shrink-0">
+        <div className="flex items-center gap-3 px-4 py-3 shrink-0">
           <h1 className="text-base font-semibold text-parchment">{space.slug}</h1>
           {space.codeDir && (
             <span className="text-xs text-stone font-mono">{space.codeDir}</span>
