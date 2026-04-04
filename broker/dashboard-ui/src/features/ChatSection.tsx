@@ -140,7 +140,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
                 )}
               >
                 {isAssistant ? (
-                  <div className="markdown-compact prose-sm">
+                  <div className="markdown-compact">
                     <Markdown remarkPlugins={[remarkGfm]}>{msg.text}</Markdown>
                   </div>
                 ) : (
