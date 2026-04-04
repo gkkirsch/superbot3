@@ -4,6 +4,7 @@ import { Dashboard } from '@/pages/Dashboard'
 import { SpaceDetail } from '@/pages/SpaceDetail'
 import { CreateSpace } from '@/pages/CreateSpace'
 import { useWebSocket } from '@/hooks/useWebSocket'
+import { PanelProvider } from '@/hooks/usePanel'
 
 function AppContent() {
   useWebSocket()
@@ -24,7 +25,9 @@ function AppContent() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <PanelProvider>
+        <AppContent />
+      </PanelProvider>
     </BrowserRouter>
   )
 }
