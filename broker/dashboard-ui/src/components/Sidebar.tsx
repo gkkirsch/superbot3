@@ -57,7 +57,7 @@ export function Sidebar() {
       )}
     >
       {/* Logo */}
-      <div className="flex items-center justify-center px-3 pt-2 pb-6 shrink-0">
+      <div className="flex items-center justify-center px-3 pt-5 pb-6 shrink-0">
         {collapsed ? (
           <NavLink to="/" className="block hover:opacity-80 transition-opacity">
             <img src="/logo.png" alt="SB" className="h-8 w-8" />
@@ -103,7 +103,7 @@ export function Sidebar() {
             <span className="relative shrink-0">
               <span className={cn(
                 'block w-2 h-2 rounded-full',
-                space.running ? 'bg-moss animate-pulse-dot' : 'bg-stone/30'
+                space.running ? 'bg-moss' : 'bg-stone/30'
               )} />
             </span>
             {!collapsed && (
@@ -111,7 +111,10 @@ export function Sidebar() {
                 <span className="truncate flex-1 font-mono text-xs">{space.slug}</span>
                 <button
                   onClick={(e) => toggleStar(space.slug, e)}
-                  className="opacity-0 group-hover/item:opacity-100 transition-opacity"
+                  className={cn(
+                    'transition-opacity',
+                    starred.has(space.slug) ? 'opacity-100' : 'opacity-0 group-hover/item:opacity-100'
+                  )}
                 >
                   <Star className={cn(
                     'w-3 h-3',

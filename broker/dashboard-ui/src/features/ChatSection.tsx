@@ -139,18 +139,18 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
           </div>
         )}
       </div>
-      <form onSubmit={handleSubmit} className="border-t p-3 flex gap-2">
+      <form onSubmit={handleSubmit} className="border-t p-3 flex items-center gap-2">
         <input
           value={text}
           onChange={e => setText(e.target.value)}
-          placeholder="Send a message..."
-          className="flex-1 bg-surface rounded-md px-3 py-2 text-sm text-parchment placeholder:text-stone border border-border-custom outline-none focus:ring-1 focus:ring-sand/40 transition-colors"
+          placeholder="Message this space..."
+          className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/50 transition-colors"
           disabled={mutation.isPending}
         />
         <button
           type="submit"
           disabled={!text.trim() || mutation.isPending}
-          className="px-3 py-2 rounded-md bg-sand text-ink text-sm font-medium hover:bg-sand/90 disabled:opacity-30 transition-colors"
+          className="shrink-0 p-2 rounded-lg text-stone hover:text-sand hover:bg-sand/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <Send className="w-4 h-4" />
         </button>
