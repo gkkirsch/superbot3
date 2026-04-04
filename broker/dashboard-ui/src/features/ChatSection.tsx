@@ -77,10 +77,17 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
     }
   }, [merged, waitingForReply])
 
-  // Auto-scroll when new messages arrive or typing indicator shows
+  // Auto-scroll: instant on first load, smooth for new messages
+  const initialLoadRef = useRef(true)
   useEffect(() => {
     if (merged.length > prevLenRef.current || waitingForReply) {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+      if (initialLoadRef.current) {
+        // Jump to bottom instantly on mount — no visible scroll
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
+        initialLoadRef.current = false
+      } else {
+        scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+      }
     }
     prevLenRef.current = merged.length
   }, [merged.length, waitingForReply])
