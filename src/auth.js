@@ -4,24 +4,51 @@ const path = require('path');
 const os = require('os');
 
 /**
- * Read OAuth credentials from the default macOS Keychain entry.
- * Claude Code stores credentials under "Claude Code-credentials" (no hash suffix for ~/.claude).
+ * Read OAuth credentials from the macOS Keychain.
+ * Searches all "Claude Code-credentials*" entries and returns the one with
+ * the latest (or non-expired) token. Claude Code stores credentials with a
+ * hash suffix based on CLAUDE_CONFIG_DIR — different sessions have different entries.
  */
 function readDefaultCredentials() {
+  const username = os.userInfo().username;
+
+  // Find all Claude Code credential service names in the keychain
+  let serviceNames = [];
   try {
-    const username = os.userInfo().username;
-    const raw = execSync(
-      `security find-generic-password -a "${username}" -s "Claude Code-credentials" -w 2>/dev/null`,
-      { encoding: 'utf-8' }
-    ).trim();
-    const parsed = JSON.parse(raw);
-    if (parsed.claudeAiOauth && parsed.claudeAiOauth.accessToken) {
-      return raw;
+    const dump = execSync('security dump-keychain 2>/dev/null', { encoding: 'utf-8' });
+    const lines = dump.split('\n').filter(l => l.includes('"svce"') && l.includes('Claude Code-credentials'));
+    for (const line of lines) {
+      const match = line.match(/="(Claude Code-credentials[^"]*)"/);
+      if (match) serviceNames.push(match[1]);
     }
-    return null;
-  } catch {
-    return null;
+    serviceNames = [...new Set(serviceNames)];
+  } catch {}
+
+  if (serviceNames.length === 0) {
+    serviceNames = ['Claude Code-credentials'];
   }
+
+  let bestRaw = null;
+  let bestExpiry = 0;
+
+  for (const svc of serviceNames) {
+    try {
+      const raw = execSync(
+        `security find-generic-password -a "${username}" -s "${svc}" -w 2>/dev/null`,
+        { encoding: 'utf-8' }
+      ).trim();
+      const parsed = JSON.parse(raw);
+      if (parsed.claudeAiOauth && parsed.claudeAiOauth.accessToken) {
+        const expiry = parsed.claudeAiOauth.expiresAt || 0;
+        if (expiry > bestExpiry) {
+          bestExpiry = expiry;
+          bestRaw = raw;
+        }
+      }
+    } catch {}
+  }
+
+  return bestRaw;
 }
 
 /**
