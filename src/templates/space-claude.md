@@ -62,15 +62,16 @@ Progressive enhancement: frontmatter → H1 → filename + first line.
 Daily logs: knowledge/logs/YYYY/MM/YYYY-MM-DD.md, append-only, timestamped bullets.
 Periodically consolidate logs into topic files.
 
-## Schedule Management
+## Important: Scheduling
 
-Use CronCreate/CronList/CronDelete for recurring tasks. Always use permanent: true.
+NEVER use the CronCreate tool — it has a bug where durable:true is ignored.
+Instead, use the /schedule-manager skill to create persistent schedules.
+
 No default schedules — wait for user to request them or suggest based on space goals.
 
 On startup:
-1. Run CronList to see current scheduled tasks
-2. For each schedule that isn't registered, use CronCreate to add it
-3. Use permanent: true for all schedules
+1. Read `.claude/scheduled_tasks.json` to see current scheduled tasks
+2. Use the /schedule-manager skill to add, list, or remove schedules
 
 ## Communication
 

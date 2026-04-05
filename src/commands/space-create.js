@@ -43,6 +43,7 @@ function createSpace(home, name, codeDir) {
   const dirs = [
     path.join(spaceDir, '.claude', 'skills', 'core-methodology'),
     path.join(spaceDir, '.claude', 'skills', 'space-cli'),
+    path.join(spaceDir, '.claude', 'skills', 'schedule-manager'),
     path.join(spaceDir, '.claude', 'agents'),
     path.join(spaceDir, '.claude', 'plugins'),
     path.join(spaceDir, '.claude', 'teams'),
@@ -154,7 +155,7 @@ function spaceCreateCli(home, name, opts) {
   console.log('  │   ├── settings.json');
   console.log('  │   ├── scheduled_tasks.json');
   console.log('  │   ├── agents/ (planner, coder, researcher, reviewer)');
-  console.log('  │   ├── skills/ (core-methodology, space-cli)');
+  console.log('  │   ├── skills/ (core-methodology, space-cli, schedule-manager)');
   console.log('  │   └── plugins/');
   console.log('  └── knowledge/');
   console.log('      └── logs/');

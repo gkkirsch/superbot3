@@ -230,6 +230,53 @@ function findLatestSession(projectsDir) {
   }
 }
 
+function findAllSessions(projectsDir) {
+  const allFiles = [];
+  try {
+    const dirs = fs.readdirSync(projectsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory());
+    for (const dir of dirs) {
+      const dirPath = path.join(projectsDir, dir.name);
+      const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.jsonl'));
+      for (const file of files) {
+        allFiles.push(path.join(dirPath, file));
+      }
+    }
+  } catch {}
+  return allFiles;
+}
+
+function parseAllConversations(projectsDir, { limit = 100, before = null } = {}) {
+  const sessionFiles = findAllSessions(projectsDir);
+  const allMessages = [];
+  for (const filePath of sessionFiles) {
+    const messages = parseConversation(filePath);
+    allMessages.push(...messages);
+  }
+  // Sort chronologically
+  allMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  // Deduplicate messages that appear in multiple sessions (same text + close timestamps)
+  const deduped = [];
+  for (const msg of allMessages) {
+    const isDupe = deduped.some(existing =>
+      existing.role === msg.role
+      && existing.text === msg.text
+      && Math.abs(new Date(existing.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 10000
+    );
+    if (!isDupe) {
+      deduped.push(msg);
+    }
+  }
+  // Apply before filter
+  let filtered = deduped;
+  if (before) {
+    const beforeTime = new Date(before).getTime();
+    filtered = deduped.filter(m => new Date(m.timestamp).getTime() < beforeTime);
+  }
+  // Return the N most recent messages
+  return filtered.slice(-limit);
+}
+
 // Strip <teammate-message> XML wrapper from inbox-delivered messages
 function unwrapTeammateMessage(text) {
   const match = text.match(/<teammate-message[^>]*>\n?([\s\S]*?)\n?<\/teammate-message>/);
@@ -315,15 +362,17 @@ app.get('/api/spaces/:name/conversation', (req, res) => {
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
   const projectsDir = path.join(config.claudeConfigDir, 'projects');
-  const sessionPath = findLatestSession(projectsDir);
-  const messages = parseConversation(sessionPath);
+  const limit = parseInt(req.query.limit) || 100;
+  const before = req.query.before || null;
+  const messages = parseAllConversations(projectsDir, { limit, before });
   res.json(messages);
 });
 
 app.get('/api/master/conversation', (req, res) => {
   const projectsDir = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'projects');
-  const sessionPath = findLatestSession(projectsDir);
-  const messages = parseConversation(sessionPath);
+  const limit = parseInt(req.query.limit) || 100;
+  const before = req.query.before || null;
+  const messages = parseAllConversations(projectsDir, { limit, before });
   res.json(messages);
 });
 
