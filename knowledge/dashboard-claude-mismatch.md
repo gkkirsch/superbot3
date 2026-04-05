@@ -1,7 +1,7 @@
 # Dashboard vs Claude Instance: Skill/Agent/Plugin Visibility Mismatch
 
 **Date:** 2026-04-04
-**Status:** Confirmed mismatch — needs fix
+**Status:** FIXED (dfa9d9b)
 
 ## Problem
 
@@ -44,17 +44,12 @@ But the broker API (`broker/server.js`) explicitly scans these user-level direct
 - nano-banana-pro installed at user-level (`~/.claude/plugins/`) but NOT in space's plugin dir
 - Space has claude-plugins-official marketplace cloned but no plugins installed or enabled
 
-## Fix Options
+## Fix Applied
 
-### Option A: Stop showing user-level items (accurate but less useful)
-Remove the user-level scans from the broker API. Only show what Claude can actually see.
+**Option A chosen:** Removed user-level scans from broker API. Now only shows:
+- Space skills/agents: `$CLAUDE_CONFIG_DIR/skills/` and `$CLAUDE_CONFIG_DIR/agents/`
+- Plugin skills/agents: from enabled plugins in the space's config
+- Project skills/agents: from `codeDir/.claude/skills/` and `codeDir/.claude/agents/` (if codeDir set)
+- Plugins: only from space's `installed_plugins.json` (no global fallback)
 
-### Option B: Symlink/copy user items into space (make Claude see them)
-When creating a space, symlink `~/.claude/skills/*` → `<space>/.claude/skills/`, same for agents.
-Downside: symlinks can break, copies get stale.
-
-### Option C: Show user items with a "not visible to Claude" badge
-Keep showing them in the dashboard but add a warning indicator that they're user-level and won't be seen by the space's Claude instance unless copied in.
-
-### Option D: Set both CLAUDE_CONFIG_DIR and a secondary env var
-If Claude Code supports a "user config" fallback when CLAUDE_CONFIG_DIR is set, use it. (Needs research — likely not supported.)
+**Remaining expected gap:** Claude also sees built-in skills (update-config, etc.) and project-level skills from parent directories (via CWD directory walking). These are internal to Claude Code and not filesystem-discoverable by the broker.
