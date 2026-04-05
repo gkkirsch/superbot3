@@ -51,6 +51,13 @@ space
     require('../src/commands/stop')(SUPERBOT3_HOME, name, opts);
   });
 
+space
+  .command('remove <name>')
+  .description('Stop a space and remove its directory')
+  .action((name) => {
+    require('../src/commands/space-remove')(SUPERBOT3_HOME, name);
+  });
+
 // start
 program
   .command('start')
@@ -65,6 +72,14 @@ program
   .description('Stop everything (all spaces + master + broker)')
   .action(() => {
     require('../src/commands/stop-all')(SUPERBOT3_HOME);
+  });
+
+// reload (broker only, spaces stay alive)
+program
+  .command('reload')
+  .description('Restart the broker/dashboard only — spaces and master stay alive')
+  .action(() => {
+    require('../src/commands/reload')(SUPERBOT3_HOME);
   });
 
 // message
@@ -89,6 +104,30 @@ program
   .description('Tail a space\'s daily log')
   .action((space) => {
     require('../src/commands/logs')(SUPERBOT3_HOME, space);
+  });
+
+// schedule commands
+const schedule = program.command('schedule').description('Manage space schedules');
+
+schedule
+  .command('add <space> <cron> <prompt>')
+  .description('Add a scheduled task to a space')
+  .action((space, cron, prompt) => {
+    require('../src/commands/schedule').add(SUPERBOT3_HOME, space, cron, prompt);
+  });
+
+schedule
+  .command('list <space>')
+  .description('List scheduled tasks for a space')
+  .action((space) => {
+    require('../src/commands/schedule').list(SUPERBOT3_HOME, space);
+  });
+
+schedule
+  .command('remove <space> <id>')
+  .description('Remove a scheduled task')
+  .action((space, id) => {
+    require('../src/commands/schedule').remove(SUPERBOT3_HOME, space, id);
   });
 
 program.parse();

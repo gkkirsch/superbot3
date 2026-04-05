@@ -31,7 +31,11 @@ async function writeToInbox(inboxPath, message) {
   });
 
   try {
-    const messages = JSON.parse(fs.readFileSync(inboxPath, 'utf-8'));
+    let messages = JSON.parse(fs.readFileSync(inboxPath, 'utf-8'));
+    if (!Array.isArray(messages)) {
+      // Recover from corrupted inbox (single object instead of array)
+      messages = [messages];
+    }
     messages.push({
       from: message.from || 'user',
       text: message.text,
