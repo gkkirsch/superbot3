@@ -159,7 +159,7 @@ module.exports = async function start(home) {
     console.log(`\nStarting ${activeSpaces.length} active space(s)...`);
 
     for (const space of activeSpaces) {
-      const spaceWorkDir = space.spaceDir;
+      const spaceWorkDir = space.codeDir || space.spaceDir;
 
       if (tmuxWindowExists('superbot3', space.slug)) {
         console.log(`  Space "${space.slug}" already has a window`);

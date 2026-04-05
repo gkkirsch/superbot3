@@ -85,6 +85,11 @@ module.exports = function spaceCreate(home, name, opts) {
   if (fs.existsSync(claudeMdPath)) {
     let content = fs.readFileSync(claudeMdPath, 'utf-8');
     content = content.replace(/\{\{SPACE_NAME\}\}/g, slug);
+    if (codeDir) {
+      content = content.replace(/\{\{CODE_DIR_SECTION\}\}/g, `Your code directory is \`${codeDir}\`. This is where your workers should make code changes. Your space directory (\`${spaceDir}\`) holds knowledge, config, and project state.`);
+    } else {
+      content = content.replace(/\n\{\{CODE_DIR_SECTION\}\}\n/g, '\n');
+    }
     fs.writeFileSync(claudeMdPath, content, 'utf-8');
   }
 
