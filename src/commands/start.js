@@ -89,6 +89,50 @@ function ensureTeamConfig(claudeConfigDir, teamName) {
   }
 }
 
+/**
+ * Find the newest JSONL session file in a space's projects directory.
+ * Returns { sessionId, filePath } or null.
+ */
+function findNewestSession(claudeConfigDir) {
+  const projectsDir = path.join(claudeConfigDir, 'projects');
+  try {
+    const dirs = fs.readdirSync(projectsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory());
+    let newest = null;
+    let newestMtime = 0;
+    for (const dir of dirs) {
+      const dirPath = path.join(projectsDir, dir.name);
+      const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.jsonl'));
+      for (const file of files) {
+        const filePath = path.join(dirPath, file);
+        const stat = fs.statSync(filePath);
+        if (stat.mtimeMs > newestMtime) {
+          newestMtime = stat.mtimeMs;
+          newest = { sessionId: file.replace('.jsonl', ''), filePath };
+        }
+      }
+    }
+    return newest;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Update space.json with the captured session ID.
+ */
+function updateSpaceSessionId(spaceDir, sessionId) {
+  const spaceJsonPath = path.join(spaceDir, 'space.json');
+  try {
+    const config = JSON.parse(fs.readFileSync(spaceJsonPath, 'utf-8'));
+    config.sessionId = sessionId;
+    fs.writeFileSync(spaceJsonPath, JSON.stringify(config, null, 2), 'utf-8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = async function start(home) {
   console.log('Starting superbot3...');
   console.log('');
@@ -199,7 +243,26 @@ module.exports = async function start(home) {
     console.log('\nNo active spaces to start.');
   }
 
-  // Step 4: Send startup prompts via inbox
+  // Step 4: Capture session IDs for --resume on next restart
+  // Wait briefly for Claude to create session JSONL files, then capture the session ID
+  if (activeSpaces.length > 0) {
+    console.log('\nCapturing session IDs...');
+    // Give Claude a moment to create the session file
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    for (const space of activeSpaces) {
+      const session = findNewestSession(space.claudeConfigDir);
+      if (session) {
+        if (updateSpaceSessionId(space.spaceDir, session.sessionId)) {
+          console.log(`  ${space.slug}: ${session.sessionId}`);
+        }
+      } else {
+        console.log(`  ${space.slug}: no session file yet (will capture on next start)`);
+      }
+    }
+  }
+
+  // Step 5: Send startup prompts via inbox
   // The inbox poller activates once Claude starts (team args enable it from boot).
   // We write to the inbox immediately — the poller picks them up once ready.
   console.log('\nSending startup prompts via inbox...');
