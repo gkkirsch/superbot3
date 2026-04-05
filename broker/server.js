@@ -612,13 +612,12 @@ app.get('/api/spaces/:name/plugins', (req, res) => {
 
   const marketplacePlugins = getMarketplacePlugins(config.claudeConfigDir);
   const spaceInstalled = getInstalledPlugins(config.claudeConfigDir);
-  const globalInstalled = getInstalledPlugins(path.join(require('os').homedir(), '.claude'));
   const enabled = getEnabledPlugins(config.claudeConfigDir);
 
-  // Build enriched plugin list
+  // Build enriched plugin list (space-only — no global fallback)
   const results = marketplacePlugins.map(mp => {
     const key = `${mp.name}@${mp.marketplace}`;
-    const installEntries = spaceInstalled[key] || globalInstalled[key] || [];
+    const installEntries = spaceInstalled[key] || [];
     const isInstalled = installEntries.length > 0;
     const hasFiles = resolvePluginDir(config.claudeConfigDir, mp.name, mp.marketplace) !== null;
     const isEnabled = enabled[key] === true;
@@ -664,28 +663,19 @@ function findLatestVersion(cacheDir) {
 }
 
 /** Resolve a plugin's directory on disk given its name and marketplace.
+ *  Space-isolated: only checks paths within the space's CLAUDE_CONFIG_DIR.
  *  Resolution order:
- *  1. Explicit installPath from installed_plugins.json (space-local, then global)
+ *  1. Explicit installPath from space's installed_plugins.json
  *  2. Space-local plugin cache (<space>/.claude/plugins/cache/)
- *  3. Global plugin cache (~/.claude/plugins/cache/)
- *  4. Space-local marketplace repo (external_plugins/ and plugins/)
- *  5. Global marketplace repo
+ *  3. Space-local marketplace repo (external_plugins/ and plugins/)
  */
 function resolvePluginDir(claudeConfigDir, pluginName, marketplace) {
   const key = `${pluginName}@${marketplace}`;
-  const homeDir = require('os').homedir();
 
-  // 1a. Check space installed_plugins.json for explicit installPath
+  // 1. Check space installed_plugins.json for explicit installPath
   const spaceIp = readJsonSafe(path.join(claudeConfigDir, 'plugins', 'installed_plugins.json'));
   if (spaceIp?.plugins?.[key]?.[0]?.installPath) {
     const ip = spaceIp.plugins[key][0].installPath;
-    if (fs.existsSync(ip)) return ip;
-  }
-
-  // 1b. Check global installed_plugins.json for explicit installPath
-  const globalIp = readJsonSafe(path.join(homeDir, '.claude', 'plugins', 'installed_plugins.json'));
-  if (globalIp?.plugins?.[key]?.[0]?.installPath) {
-    const ip = globalIp.plugins[key][0].installPath;
     if (fs.existsSync(ip)) return ip;
   }
 
@@ -694,22 +684,10 @@ function resolvePluginDir(claudeConfigDir, pluginName, marketplace) {
   const spaceVersion = findLatestVersion(spaceCacheDir);
   if (spaceVersion) return spaceVersion;
 
-  // 3. Global plugin cache
-  const globalCacheDir = path.join(homeDir, '.claude', 'plugins', 'cache', marketplace, pluginName);
-  const globalVersion = findLatestVersion(globalCacheDir);
-  if (globalVersion) return globalVersion;
-
-  // 4. Space-local marketplace (cloned repo with external_plugins/ and plugins/)
+  // 3. Space-local marketplace (cloned repo with external_plugins/ and plugins/)
   const spaceMpDir = path.join(claudeConfigDir, 'plugins', 'marketplaces', marketplace);
   for (const sub of ['external_plugins', 'plugins']) {
     const candidate = path.join(spaceMpDir, sub, pluginName);
-    if (fs.existsSync(candidate)) return candidate;
-  }
-
-  // 5. Global marketplace (cloned repo style)
-  const globalMpDir = path.join(homeDir, '.claude', 'plugins', 'marketplaces', marketplace);
-  for (const sub of ['external_plugins', 'plugins']) {
-    const candidate = path.join(globalMpDir, sub, pluginName);
     if (fs.existsSync(candidate)) return candidate;
   }
 
@@ -880,7 +858,6 @@ app.get('/api/spaces/:name/skills', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const homeDir = require('os').homedir();
   const allSkills = [];
 
   // 1. Space skills
@@ -910,18 +887,22 @@ app.get('/api/spaces/:name/skills', (req, res) => {
     }
   }
 
-  // 3. User skills (~/.claude/skills/)
-  const userSkillsDir = path.join(homeDir, '.claude', 'skills');
-  allSkills.push(...scanSkillsDir(userSkillsDir, 'user'));
+  // 3. Project skills — from codeDir's .claude/skills/ (if codeDir is set and different from spaceDir)
+  if (config.codeDir && config.codeDir !== config.spaceDir) {
+    const projectSkillsDir = path.join(config.codeDir, '.claude', 'skills');
+    allSkills.push(...scanSkillsDir(projectSkillsDir, 'project'));
+  }
 
   res.json(allSkills);
 });
 
 /** Resolve a skill directory given name and optional source query param */
 function resolveSkillDir(config, skillName, source) {
-  const homeDir = require('os').homedir();
-  if (source === 'user') {
-    return path.join(homeDir, '.claude', 'skills', skillName);
+  if (source === 'project') {
+    if (config.codeDir && config.codeDir !== config.spaceDir) {
+      return path.join(config.codeDir, '.claude', 'skills', skillName);
+    }
+    return null;
   }
   if (source && source.startsWith('plugin:')) {
     const pluginName = source.slice('plugin:'.length);
@@ -1067,7 +1048,6 @@ app.get('/api/spaces/:name/agents', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const homeDir = require('os').homedir();
   const allAgents = [];
 
   // 1. Space agents
@@ -1093,18 +1073,22 @@ app.get('/api/spaces/:name/agents', (req, res) => {
     }
   }
 
-  // 3. User agents (~/.claude/agents/)
-  const userAgentsDir = path.join(homeDir, '.claude', 'agents');
-  allAgents.push(...scanAgentsDir(userAgentsDir, 'user'));
+  // 3. Project agents — from codeDir's .claude/agents/ (if codeDir is set and different from spaceDir)
+  if (config.codeDir && config.codeDir !== config.spaceDir) {
+    const projectAgentsDir = path.join(config.codeDir, '.claude', 'agents');
+    allAgents.push(...scanAgentsDir(projectAgentsDir, 'project'));
+  }
 
   res.json(allAgents);
 });
 
 /** Resolve an agent file given filename and optional source */
 function resolveAgentFile(config, agentFilename, source) {
-  const homeDir = require('os').homedir();
-  if (source === 'user') {
-    return path.join(homeDir, '.claude', 'agents', agentFilename);
+  if (source === 'project') {
+    if (config.codeDir && config.codeDir !== config.spaceDir) {
+      return path.join(config.codeDir, '.claude', 'agents', agentFilename);
+    }
+    return null;
   }
   if (source && source.startsWith('plugin:')) {
     const pluginName = source.slice('plugin:'.length);
