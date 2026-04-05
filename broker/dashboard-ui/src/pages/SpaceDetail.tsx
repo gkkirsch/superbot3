@@ -4,11 +4,12 @@ import { ChatSection } from '@/features/ChatSection'
 import { KnowledgeTab } from '@/features/KnowledgeTab'
 import { SchedulesTab } from '@/features/SchedulesTab'
 import { PluginsTab } from '@/features/PluginsTab'
+import { SkillsTab } from '@/features/SkillsTab'
 import { SettingsTab } from '@/features/SettingsTab'
 import { useSpace, useSpaceMessages, useSpaceConversation } from '@/hooks/useSpaces'
 import { sendSpaceMessage } from '@/lib/api'
 import { usePanel } from '@/hooks/usePanel'
-import { PanelRight, X } from 'lucide-react'
+import { PanelRight, X, Puzzle, Blocks, FolderOpen, Clock, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function SpaceDetail() {
@@ -65,25 +66,38 @@ export function SpaceDetail() {
       )}>
         {panelOpen && (
           <>
-          <div className="flex items-center justify-end px-4 py-3 border-b border-border-custom shrink-0">
-            <button
-              onClick={closePanel}
-              className="p-1 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex-1 overflow-y-auto scrollbar-auto">
-            <Tabs defaultValue="plugins">
-              <TabsList className="mx-4 mt-3">
-                <TabsTrigger value="plugins">Plugins</TabsTrigger>
-                <TabsTrigger value="files">Files</TabsTrigger>
-                <TabsTrigger value="schedules">Schedules</TabsTrigger>
-                <TabsTrigger value="settings">Settings</TabsTrigger>
+          <Tabs defaultValue="plugins" className="flex flex-col h-full">
+            <div className="flex items-center gap-1 px-2 py-2 border-b border-border-custom shrink-0">
+              <TabsList className="flex-1 inline-flex h-auto items-center gap-1 rounded-none bg-transparent p-0">
+                <TabsTrigger value="plugins" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                  <Puzzle className="w-3.5 h-3.5" />Plugins
+                </TabsTrigger>
+                <TabsTrigger value="skills" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                  <Blocks className="w-3.5 h-3.5" />Skills
+                </TabsTrigger>
+                <TabsTrigger value="files" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                  <FolderOpen className="w-3.5 h-3.5" />Files
+                </TabsTrigger>
+                <TabsTrigger value="schedules" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                  <Clock className="w-3.5 h-3.5" />Schedules
+                </TabsTrigger>
+                <TabsTrigger value="settings" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                  <Settings className="w-3.5 h-3.5" />Settings
+                </TabsTrigger>
               </TabsList>
-
+              <button
+                onClick={closePanel}
+                className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-auto pb-8">
               <TabsContent value="plugins" className="px-4">
                 <PluginsTab slug={slug!} />
+              </TabsContent>
+              <TabsContent value="skills" className="px-4">
+                <SkillsTab slug={slug!} />
               </TabsContent>
               <TabsContent value="files" className="px-4">
                 <KnowledgeTab slug={slug!} />
@@ -94,8 +108,8 @@ export function SpaceDetail() {
               <TabsContent value="settings" className="px-4">
                 <SettingsTab space={space} />
               </TabsContent>
-            </Tabs>
-          </div>
+            </div>
+          </Tabs>
           </>
         )}
       </div>

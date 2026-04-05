@@ -611,14 +611,16 @@ app.get('/api/spaces/:name/plugins', (req, res) => {
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
   const marketplacePlugins = getMarketplacePlugins(config.claudeConfigDir);
-  const installed = getInstalledPlugins(config.claudeConfigDir);
+  const spaceInstalled = getInstalledPlugins(config.claudeConfigDir);
+  const globalInstalled = getInstalledPlugins(path.join(require('os').homedir(), '.claude'));
   const enabled = getEnabledPlugins(config.claudeConfigDir);
 
   // Build enriched plugin list
   const results = marketplacePlugins.map(mp => {
     const key = `${mp.name}@${mp.marketplace}`;
-    const installEntries = installed[key] || [];
+    const installEntries = spaceInstalled[key] || globalInstalled[key] || [];
     const isInstalled = installEntries.length > 0;
+    const hasFiles = resolvePluginDir(config.claudeConfigDir, mp.name, mp.marketplace) !== null;
     const isEnabled = enabled[key] === true;
     return {
       name: mp.name,
@@ -628,6 +630,7 @@ app.get('/api/spaces/:name/plugins', (req, res) => {
       homepage: mp.homepage || null,
       source: typeof mp.source === 'string' ? mp.source : (mp.source?.url || null),
       installed: isInstalled,
+      hasFiles: hasFiles,
       enabled: isEnabled,
       version: mp.version || installEntries[0]?.version || null,
       skills: mp.skills || null,
@@ -649,29 +652,62 @@ app.get('/api/spaces/:name/plugins', (req, res) => {
   res.json(results);
 });
 
-/** Resolve a plugin's directory on disk given its name and marketplace */
+/** Find latest version directory inside a cache dir */
+function findLatestVersion(cacheDir) {
+  try {
+    const versions = fs.readdirSync(cacheDir, { withFileTypes: true })
+      .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+      .map(e => e.name);
+    if (versions.length > 0) return path.join(cacheDir, versions[versions.length - 1]);
+  } catch { /* skip */ }
+  return null;
+}
+
+/** Resolve a plugin's directory on disk given its name and marketplace.
+ *  Resolution order:
+ *  1. Explicit installPath from installed_plugins.json (space-local, then global)
+ *  2. Space-local plugin cache (<space>/.claude/plugins/cache/)
+ *  3. Global plugin cache (~/.claude/plugins/cache/)
+ *  4. Space-local marketplace repo (external_plugins/ and plugins/)
+ *  5. Global marketplace repo
+ */
 function resolvePluginDir(claudeConfigDir, pluginName, marketplace) {
-  // 1. Check space-local marketplace (cloned repo with external_plugins/ and plugins/)
+  const key = `${pluginName}@${marketplace}`;
+  const homeDir = require('os').homedir();
+
+  // 1a. Check space installed_plugins.json for explicit installPath
+  const spaceIp = readJsonSafe(path.join(claudeConfigDir, 'plugins', 'installed_plugins.json'));
+  if (spaceIp?.plugins?.[key]?.[0]?.installPath) {
+    const ip = spaceIp.plugins[key][0].installPath;
+    if (fs.existsSync(ip)) return ip;
+  }
+
+  // 1b. Check global installed_plugins.json for explicit installPath
+  const globalIp = readJsonSafe(path.join(homeDir, '.claude', 'plugins', 'installed_plugins.json'));
+  if (globalIp?.plugins?.[key]?.[0]?.installPath) {
+    const ip = globalIp.plugins[key][0].installPath;
+    if (fs.existsSync(ip)) return ip;
+  }
+
+  // 2. Space-local plugin cache
+  const spaceCacheDir = path.join(claudeConfigDir, 'plugins', 'cache', marketplace, pluginName);
+  const spaceVersion = findLatestVersion(spaceCacheDir);
+  if (spaceVersion) return spaceVersion;
+
+  // 3. Global plugin cache
+  const globalCacheDir = path.join(homeDir, '.claude', 'plugins', 'cache', marketplace, pluginName);
+  const globalVersion = findLatestVersion(globalCacheDir);
+  if (globalVersion) return globalVersion;
+
+  // 4. Space-local marketplace (cloned repo with external_plugins/ and plugins/)
   const spaceMpDir = path.join(claudeConfigDir, 'plugins', 'marketplaces', marketplace);
   for (const sub of ['external_plugins', 'plugins']) {
     const candidate = path.join(spaceMpDir, sub, pluginName);
     if (fs.existsSync(candidate)) return candidate;
   }
 
-  // 2. Check global installed plugin cache
-  const cacheDir = path.join(require('os').homedir(), '.claude', 'plugins', 'cache', marketplace, pluginName);
-  if (fs.existsSync(cacheDir)) {
-    // Find latest version dir
-    try {
-      const versions = fs.readdirSync(cacheDir, { withFileTypes: true })
-        .filter(e => e.isDirectory() && !e.name.startsWith('.'))
-        .map(e => e.name);
-      if (versions.length > 0) return path.join(cacheDir, versions[versions.length - 1]);
-    } catch { /* skip */ }
-  }
-
-  // 3. Check global marketplace (cloned repo style)
-  const globalMpDir = path.join(require('os').homedir(), '.claude', 'plugins', 'marketplaces', marketplace);
+  // 5. Global marketplace (cloned repo style)
+  const globalMpDir = path.join(homeDir, '.claude', 'plugins', 'marketplaces', marketplace);
   for (const sub of ['external_plugins', 'plugins']) {
     const candidate = path.join(globalMpDir, sub, pluginName);
     if (fs.existsSync(candidate)) return candidate;
@@ -809,53 +845,136 @@ function parseFrontmatter(content) {
   return fm;
 }
 
+/** Scan a directory for skill subdirectories (each containing SKILL.md or SKILL.md.disabled) */
+function scanSkillsDir(skillsDir, source) {
+  const results = [];
+  try {
+    const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const dirPath = path.join(skillsDir, e.name);
+      const skillMd = path.join(dirPath, 'SKILL.md');
+      const disabledMd = path.join(dirPath, 'SKILL.md.disabled');
+      const hasActive = fs.existsSync(skillMd);
+      const hasDisabled = fs.existsSync(disabledMd);
+      if (!hasActive && !hasDisabled) continue;
+      let description = '';
+      const mdPath = hasActive ? skillMd : disabledMd;
+      const fm = parseFrontmatter(fs.readFileSync(mdPath, 'utf-8'));
+      description = fm.description || '';
+      results.push({
+        dirname: e.name,
+        name: fm.name || e.name,
+        description,
+        source,
+        path: dirPath,
+        hasFiles: true,
+        enabled: hasActive,
+      });
+    }
+  } catch { /* dir doesn't exist */ }
+  return results;
+}
+
 app.get('/api/spaces/:name/skills', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const skillsDir = path.join(config.claudeConfigDir, 'skills');
-  try {
-    const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-    const skills = entries
-      .filter(e => e.isDirectory())
-      .map(e => {
-        const skillMd = path.join(skillsDir, e.name, 'SKILL.md');
-        let description = '';
-        if (fs.existsSync(skillMd)) {
-          const fm = parseFrontmatter(fs.readFileSync(skillMd, 'utf-8'));
-          description = fm.description || '';
-        }
-        return { dirname: e.name, name: e.name, description };
-      });
-    res.json(skills);
-  } catch {
-    res.json([]);
+  const homeDir = require('os').homedir();
+  const allSkills = [];
+
+  // 1. Space skills
+  const spaceSkillsDir = path.join(config.claudeConfigDir, 'skills');
+  allSkills.push(...scanSkillsDir(spaceSkillsDir, 'space'));
+
+  // 2. Plugin skills — for each enabled plugin, scan its .claude-plugin/skills/ dir
+  const enabled = getEnabledPlugins(config.claudeConfigDir);
+  for (const [pluginKey, isEnabled] of Object.entries(enabled)) {
+    if (!isEnabled) continue;
+    const atIdx = pluginKey.lastIndexOf('@');
+    if (atIdx <= 0) continue;
+    const pluginName = pluginKey.slice(0, atIdx);
+    const marketplace = pluginKey.slice(atIdx + 1);
+    const pluginDir = resolvePluginDir(config.claudeConfigDir, pluginName, marketplace);
+    if (!pluginDir) continue;
+    // Check both .claude-plugin/skills/ and skills/ (different plugin layouts)
+    for (const sub of ['.claude-plugin/skills', 'skills']) {
+      const pluginSkillsDir = path.join(pluginDir, sub);
+      if (fs.existsSync(pluginSkillsDir)) {
+        const pluginSkills = scanSkillsDir(pluginSkillsDir, `plugin:${pluginName}`);
+        // Plugin skills are always enabled (controlled by plugin toggle)
+        pluginSkills.forEach(s => { s.enabled = true; });
+        allSkills.push(...pluginSkills);
+        break; // use first found layout
+      }
+    }
   }
+
+  // 3. User skills (~/.claude/skills/)
+  const userSkillsDir = path.join(homeDir, '.claude', 'skills');
+  allSkills.push(...scanSkillsDir(userSkillsDir, 'user'));
+
+  res.json(allSkills);
 });
+
+/** Resolve a skill directory given name and optional source query param */
+function resolveSkillDir(config, skillName, source) {
+  const homeDir = require('os').homedir();
+  if (source === 'user') {
+    return path.join(homeDir, '.claude', 'skills', skillName);
+  }
+  if (source && source.startsWith('plugin:')) {
+    const pluginName = source.slice('plugin:'.length);
+    const enabled = getEnabledPlugins(config.claudeConfigDir);
+    for (const [pluginKey, isEnabled] of Object.entries(enabled)) {
+      if (!isEnabled) continue;
+      const atIdx = pluginKey.lastIndexOf('@');
+      if (atIdx <= 0) continue;
+      const pName = pluginKey.slice(0, atIdx);
+      if (pName !== pluginName) continue;
+      const marketplace = pluginKey.slice(atIdx + 1);
+      const pluginDir = resolvePluginDir(config.claudeConfigDir, pName, marketplace);
+      if (!pluginDir) continue;
+      for (const sub of ['.claude-plugin/skills', 'skills']) {
+        const candidate = path.join(pluginDir, sub, skillName);
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    }
+    return null;
+  }
+  // Default: space skill
+  return path.join(config.claudeConfigDir, 'skills', skillName);
+}
 
 app.get('/api/spaces/:name/skills/:skill', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const skillDir = path.join(config.claudeConfigDir, 'skills', req.params.skill);
-  if (!fs.existsSync(skillDir)) return res.status(404).json({ error: 'Skill not found' });
+  const source = req.query.source || 'space';
+  const skillDir = resolveSkillDir(config, req.params.skill, source);
+  if (!skillDir || !fs.existsSync(skillDir)) return res.status(404).json({ error: 'Skill not found' });
 
-  const skillMd = path.join(skillDir, 'SKILL.md');
+  // Check both SKILL.md and SKILL.md.disabled
+  let skillMdPath = path.join(skillDir, 'SKILL.md');
+  if (!fs.existsSync(skillMdPath)) {
+    skillMdPath = path.join(skillDir, 'SKILL.md.disabled');
+  }
   let content = '', frontmatter = {};
-  if (fs.existsSync(skillMd)) {
-    content = fs.readFileSync(skillMd, 'utf-8');
+  if (fs.existsSync(skillMdPath)) {
+    content = fs.readFileSync(skillMdPath, 'utf-8');
     frontmatter = parseFrontmatter(content);
   }
   const files = listFilesRecursive(skillDir);
-  res.json({ name: req.params.skill, content, frontmatter, files });
+  res.json({ name: req.params.skill, content, frontmatter, files, source });
 });
 
 app.get('/api/spaces/:name/skills/:skill/file', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const skillDir = path.join(config.claudeConfigDir, 'skills', req.params.skill);
-  if (!fs.existsSync(skillDir)) return res.status(404).json({ error: 'Skill not found' });
+  const source = req.query.source || 'space';
+  const skillDir = resolveSkillDir(config, req.params.skill, source);
+  if (!skillDir || !fs.existsSync(skillDir)) return res.status(404).json({ error: 'Skill not found' });
 
   const relPath = req.query.path;
   if (!relPath) return res.status(400).json({ error: 'path query param required' });
@@ -892,42 +1011,134 @@ app.post('/api/spaces/:name/skills', (req, res) => {
   res.json({ ok: true, name: safeName });
 });
 
-// ── Agents ───────────────────────────────────────────────────────────────────
-
-app.get('/api/spaces/:name/agents', (req, res) => {
+/** Toggle a space skill enabled/disabled by renaming SKILL.md <-> SKILL.md.disabled */
+app.post('/api/spaces/:name/skills/:skill/toggle', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const agentsDir = path.join(config.claudeConfigDir, 'agents');
+  const { enabled } = req.body;
+  const skillDir = path.join(config.claudeConfigDir, 'skills', req.params.skill);
+  if (!fs.existsSync(skillDir)) return res.status(404).json({ error: 'Skill not found' });
+
+  const activePath = path.join(skillDir, 'SKILL.md');
+  const disabledPath = path.join(skillDir, 'SKILL.md.disabled');
+
+  if (enabled) {
+    // Enable: rename .disabled -> active
+    if (fs.existsSync(disabledPath)) {
+      fs.renameSync(disabledPath, activePath);
+    }
+  } else {
+    // Disable: rename active -> .disabled
+    if (fs.existsSync(activePath)) {
+      fs.renameSync(activePath, disabledPath);
+    }
+  }
+
+  res.json({ ok: true, enabled: !!enabled });
+});
+
+// ── Agents ───────────────────────────────────────────────────────────────────
+
+/** Scan a directory for agent .md files */
+function scanAgentsDir(agentsDir, source) {
+  const results = [];
   try {
     const entries = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'));
-    const agents = entries.map(f => {
-      const content = fs.readFileSync(path.join(agentsDir, f), 'utf-8');
+    for (const f of entries) {
+      const filePath = path.join(agentsDir, f);
+      const content = fs.readFileSync(filePath, 'utf-8');
       const fm = parseFrontmatter(content);
-      return {
+      results.push({
         filename: f,
         name: fm.name || f.replace('.md', ''),
         description: fm.description || '',
         model: fm.model || null,
         permissionMode: fm.permissionMode || null,
-      };
-    });
-    res.json(agents);
-  } catch {
-    res.json([]);
+        source,
+        path: filePath,
+      });
+    }
+  } catch { /* dir doesn't exist */ }
+  return results;
+}
+
+app.get('/api/spaces/:name/agents', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const homeDir = require('os').homedir();
+  const allAgents = [];
+
+  // 1. Space agents
+  const spaceAgentsDir = path.join(config.claudeConfigDir, 'agents');
+  allAgents.push(...scanAgentsDir(spaceAgentsDir, 'space'));
+
+  // 2. Plugin agents — for each enabled plugin, scan its agents/ dir
+  const enabled = getEnabledPlugins(config.claudeConfigDir);
+  for (const [pluginKey, isEnabled] of Object.entries(enabled)) {
+    if (!isEnabled) continue;
+    const atIdx = pluginKey.lastIndexOf('@');
+    if (atIdx <= 0) continue;
+    const pluginName = pluginKey.slice(0, atIdx);
+    const marketplace = pluginKey.slice(atIdx + 1);
+    const pluginDir = resolvePluginDir(config.claudeConfigDir, pluginName, marketplace);
+    if (!pluginDir) continue;
+    for (const sub of ['.claude-plugin/agents', 'agents']) {
+      const pluginAgentsDir = path.join(pluginDir, sub);
+      if (fs.existsSync(pluginAgentsDir)) {
+        allAgents.push(...scanAgentsDir(pluginAgentsDir, `plugin:${pluginName}`));
+        break;
+      }
+    }
   }
+
+  // 3. User agents (~/.claude/agents/)
+  const userAgentsDir = path.join(homeDir, '.claude', 'agents');
+  allAgents.push(...scanAgentsDir(userAgentsDir, 'user'));
+
+  res.json(allAgents);
 });
+
+/** Resolve an agent file given filename and optional source */
+function resolveAgentFile(config, agentFilename, source) {
+  const homeDir = require('os').homedir();
+  if (source === 'user') {
+    return path.join(homeDir, '.claude', 'agents', agentFilename);
+  }
+  if (source && source.startsWith('plugin:')) {
+    const pluginName = source.slice('plugin:'.length);
+    const enabled = getEnabledPlugins(config.claudeConfigDir);
+    for (const [pluginKey, isEnabled] of Object.entries(enabled)) {
+      if (!isEnabled) continue;
+      const atIdx = pluginKey.lastIndexOf('@');
+      if (atIdx <= 0) continue;
+      const pName = pluginKey.slice(0, atIdx);
+      if (pName !== pluginName) continue;
+      const marketplace = pluginKey.slice(atIdx + 1);
+      const pluginDir = resolvePluginDir(config.claudeConfigDir, pName, marketplace);
+      if (!pluginDir) continue;
+      for (const sub of ['.claude-plugin/agents', 'agents']) {
+        const candidate = path.join(pluginDir, sub, agentFilename);
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    }
+    return null;
+  }
+  return path.join(config.claudeConfigDir, 'agents', agentFilename);
+}
 
 app.get('/api/spaces/:name/agents/:agent', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const agentFile = path.join(config.claudeConfigDir, 'agents', req.params.agent);
-  if (!fs.existsSync(agentFile)) return res.status(404).json({ error: 'Agent not found' });
+  const source = req.query.source || 'space';
+  const agentFile = resolveAgentFile(config, req.params.agent, source);
+  if (!agentFile || !fs.existsSync(agentFile)) return res.status(404).json({ error: 'Agent not found' });
 
   const content = fs.readFileSync(agentFile, 'utf-8');
   const frontmatter = parseFrontmatter(content);
-  res.json({ filename: req.params.agent, content, frontmatter });
+  res.json({ filename: req.params.agent, content, frontmatter, source });
 });
 
 // ── WebSocket for real-time updates ──────────────────────────────────────────

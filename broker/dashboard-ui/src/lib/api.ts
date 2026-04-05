@@ -98,18 +98,21 @@ export const fetchPluginFileContent = (space: string, marketplace: string, plugi
 export const fetchSkills = (name: string) =>
   fetchJson<SkillDef[]>(`/api/spaces/${name}/skills`)
 
+export const toggleSkill = (name: string, skill: string, enabled: boolean) =>
+  postJson<{ ok: boolean; enabled: boolean }>(`/api/spaces/${name}/skills/${encodeURIComponent(skill)}/toggle`, { enabled })
+
 // Agents
 export const fetchAgents = (name: string) =>
   fetchJson<AgentDef[]>(`/api/spaces/${name}/agents`)
-export const fetchAgentDetail = (name: string, agent: string) =>
-  fetchJson<AgentDetail>(`/api/spaces/${name}/agents/${agent}`)
+export const fetchAgentDetail = (name: string, agent: string, source?: string) =>
+  fetchJson<AgentDetail>(`/api/spaces/${name}/agents/${agent}${source ? `?source=${encodeURIComponent(source)}` : ''}`)
 
 // Skill detail
-export const fetchSkillDetail = (name: string, skill: string) =>
-  fetchJson<SkillDetail>(`/api/spaces/${name}/skills/${skill}`)
-export const fetchSkillFileContent = (space: string, skill: string, filePath: string) =>
+export const fetchSkillDetail = (name: string, skill: string, source?: string) =>
+  fetchJson<SkillDetail>(`/api/spaces/${name}/skills/${skill}${source ? `?source=${encodeURIComponent(source)}` : ''}`)
+export const fetchSkillFileContent = (space: string, skill: string, filePath: string, source?: string) =>
   fetchJson<{ content: string | null; size: number; path: string; error?: string }>(
-    `/api/spaces/${space}/skills/${skill}/file?path=${encodeURIComponent(filePath)}`
+    `/api/spaces/${space}/skills/${skill}/file?path=${encodeURIComponent(filePath)}${source ? `&source=${encodeURIComponent(source)}` : ''}`
   )
 
 // Conversation logs (Claude's session JSONL)

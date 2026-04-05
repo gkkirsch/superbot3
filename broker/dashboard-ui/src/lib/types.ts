@@ -45,12 +45,18 @@ export interface AgentDef {
   description?: string
   model?: string | null
   permissionMode?: string | null
+  source?: string
+  path?: string
 }
 
 export interface SkillDef {
   name: string
   dirname: string
   description?: string
+  source?: string
+  path?: string
+  hasFiles?: boolean
+  enabled?: boolean
 }
 
 export interface SkillDetail {
@@ -80,6 +86,7 @@ export interface PluginInfo {
   homepage: string | null
   source: string | null
   installed: boolean
+  hasFiles: boolean
   enabled: boolean
   version: string | null
   skills: string[] | null
