@@ -91,6 +91,21 @@ function createSpace(home, name, codeDir) {
   const claudeConfigDir = path.join(spaceDir, '.claude');
   setupConfigDir(claudeConfigDir, spaceDir, codeDir);
 
+  // Create team config.json so Claude Code's isTeamLead() returns true.
+  // Without this, the inbox poller won't activate and the space can't receive messages.
+  const teamDir = path.join(spaceDir, '.claude', 'teams', slug);
+  ensureDir(teamDir);
+  const teamConfigPath = path.join(teamDir, 'config.json');
+  if (!fs.existsSync(teamConfigPath)) {
+    fs.writeFileSync(teamConfigPath, JSON.stringify({
+      name: slug,
+      description: `Space orchestrator team for ${slug}`,
+      createdAt: Date.now(),
+      leadAgentId: `team-lead@${slug}`,
+      members: [],
+    }, null, 2), 'utf-8');
+  }
+
   // Ensure scheduled_tasks.json exists (empty — no default schedules)
   const schedulePath = path.join(spaceDir, '.claude', 'scheduled_tasks.json');
   if (!fs.existsSync(schedulePath)) {

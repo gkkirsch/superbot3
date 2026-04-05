@@ -69,6 +69,26 @@ function ensureInbox(claudeConfigDir, teamName, agentName) {
   }
 }
 
+/**
+ * Ensure team config.json exists so Claude Code's isTeamLead() returns true.
+ * Without this file, the inbox poller won't activate and the space can't
+ * properly function as a team lead (can't receive messages, spawn teammates, etc).
+ */
+function ensureTeamConfig(claudeConfigDir, teamName) {
+  const teamDir = path.join(claudeConfigDir, 'teams', teamName);
+  fs.mkdirSync(teamDir, { recursive: true });
+  const configPath = path.join(teamDir, 'config.json');
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, JSON.stringify({
+      name: teamName,
+      description: `Space orchestrator team for ${teamName}`,
+      createdAt: Date.now(),
+      leadAgentId: `team-lead@${teamName}`,
+      members: [],
+    }, null, 2), 'utf-8');
+  }
+}
+
 module.exports = async function start(home) {
   console.log('Starting superbot3...');
   console.log('');
@@ -168,6 +188,7 @@ module.exports = async function start(home) {
 
       // Set up team args so the inbox poller is active from startup
       const spaceTeamArgs = { agentId: `team-lead@${space.slug}`, agentName: 'team-lead', teamName: space.slug };
+      ensureTeamConfig(space.claudeConfigDir, space.slug);
       ensureInbox(space.claudeConfigDir, space.slug, 'team-lead');
 
       const spaceScript = writeLaunchScript(space.slug, spaceWorkDir, model, space.sessionId, space.claudeConfigDir, spaceTeamArgs);
