@@ -90,82 +90,60 @@ app.get('/api/spaces/:name', (req, res) => {
   res.json(config);
 });
 
-app.post('/api/spaces', (req, res) => {
+app.post('/api/spaces', async (req, res) => {
   const { name, codeDir } = req.body;
   if (!name) return res.status(400).json({ error: 'Name is required' });
 
   try {
-    const spaceCreate = require(path.join(SUPERBOT3_HOME, '..', 'superbot3', 'src', 'commands', 'space-create'));
-    // Inline the creation logic rather than requiring the module (which calls process.exit)
-    const slug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-');
-    const spaceDir = path.join(SUPERBOT3_HOME, 'spaces', slug);
+    const { createSpace } = require(path.join(__dirname, '..', 'src', 'commands', 'space-create'));
+    const resolvedCodeDir = codeDir ? path.resolve(codeDir) : null;
+    const spaceConfig = createSpace(SUPERBOT3_HOME, name, resolvedCodeDir);
 
-    if (fs.existsSync(path.join(spaceDir, 'space.json'))) {
-      return res.status(409).json({ error: `Space "${slug}" already exists` });
-    }
-
-    if (codeDir && !fs.existsSync(codeDir)) {
-      return res.status(400).json({ error: `Code directory does not exist: ${codeDir}` });
-    }
-
-    // Create directories
-    const dirs = [
-      path.join(spaceDir, '.claude', 'skills'),
-      path.join(spaceDir, '.claude', 'agents'),
-      path.join(spaceDir, '.claude', 'plugins'),
-      path.join(spaceDir, '.claude', 'teams', slug, 'inboxes'),
-      path.join(spaceDir, 'knowledge'),
-    ];
-    dirs.forEach(d => fs.mkdirSync(d, { recursive: true }));
-
-    // Copy templates
-    const templateDir = path.join(SUPERBOT3_HOME, 'templates', 'default');
-    if (fs.existsSync(templateDir)) {
-      copyDirRecursive(templateDir, spaceDir);
-    }
-
-    // Write space.json
-    const spaceConfig = {
-      $schema: 'superbot3-space-v1',
-      name: slug, slug, codeDir: codeDir || null,
-      spaceDir, claudeConfigDir: path.join(spaceDir, '.claude'),
-      active: true, created: new Date().toISOString(),
-      sessionId: null, browser: { maxConcurrent: 1, cdpPort: 9222 },
-    };
-    fs.writeFileSync(path.join(spaceDir, 'space.json'), JSON.stringify(spaceConfig, null, 2));
-
-    // Customize CLAUDE.md
-    const claudeMdPath = path.join(spaceDir, '.claude', 'CLAUDE.md');
-    if (fs.existsSync(claudeMdPath)) {
-      let content = fs.readFileSync(claudeMdPath, 'utf-8');
-      content = content.replace(/\{\{SPACE_NAME\}\}/g, slug);
-      fs.writeFileSync(claudeMdPath, content);
-    }
-
-    // Setup auth
+    // Auto-start the space if tmux session exists
     try {
-      const { setupConfigDir } = require(path.join(__dirname, '..', 'src', 'auth'));
-      setupConfigDir(path.join(spaceDir, '.claude'), spaceDir);
-    } catch {}
+      const config = JSON.parse(fs.readFileSync(path.join(SUPERBOT3_HOME, 'config.json'), 'utf-8'));
+      const model = config.model || 'claude-opus-4-6';
+      const spaceWorkDir = spaceConfig.codeDir || spaceConfig.spaceDir;
+
+      // Ensure inbox exists
+      const inboxDir = path.join(spaceConfig.claudeConfigDir, 'teams', spaceConfig.slug, 'inboxes');
+      fs.mkdirSync(inboxDir, { recursive: true });
+      const inboxPath = path.join(inboxDir, 'team-lead.json');
+      if (!fs.existsSync(inboxPath)) {
+        fs.writeFileSync(inboxPath, '[]', 'utf-8');
+      }
+
+      // Write launch script
+      const scriptDir = path.join(SUPERBOT3_HOME, '.tmp');
+      fs.mkdirSync(scriptDir, { recursive: true });
+      const scriptPath = path.join(scriptDir, `launch-${spaceConfig.slug}.sh`);
+      const teamArgs = `--agent-id 'team-lead@${spaceConfig.slug}' --agent-name 'team-lead' --team-name '${spaceConfig.slug}'`;
+      const script = `#!/bin/bash\ncd "${spaceWorkDir}"\nexport CLAUDE_CONFIG_DIR="${spaceConfig.claudeConfigDir}"\nexport CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\nexec claude --dangerously-skip-permissions --model ${model} ${teamArgs}\n`;
+      fs.writeFileSync(scriptPath, script, { mode: 0o755 });
+
+      // Launch in tmux if session exists
+      if (isWindowRunning('master') || isWindowRunning(spaceConfig.slug)) {
+        execSync(`tmux new-window -t superbot3 -n ${spaceConfig.slug} "bash ${scriptPath}"`, { timeout: 5000 });
+        // Send startup prompt
+        const startupPrompt = 'Read your CLAUDE.md. Scan knowledge/ for context. Report your identity, skills, agents, and knowledge files.';
+        await writeToInbox(inboxPath, { from: 'superbot3', text: startupPrompt });
+      }
+    } catch (startErr) {
+      // Space was created successfully but auto-start failed — not fatal
+      console.log(`Note: Space created but auto-start failed: ${startErr.message}`);
+    }
 
     res.json(spaceConfig);
   } catch (err) {
+    if (err.message.includes('already exists')) {
+      return res.status(409).json({ error: err.message });
+    }
+    if (err.message.includes('does not exist')) {
+      return res.status(400).json({ error: err.message });
+    }
     res.status(500).json({ error: err.message });
   }
 });
-
-function copyDirRecursive(src, dest) {
-  fs.mkdirSync(dest, { recursive: true });
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      copyDirRecursive(srcPath, destPath);
-    } else if (!fs.existsSync(destPath)) {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-}
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 

@@ -23,27 +23,21 @@ function copyTemplate(templateDir, targetDir) {
   }
 }
 
-module.exports = function spaceCreate(home, name, opts) {
-  // Validate name (slug format)
+/**
+ * Core space creation logic. Returns the spaceConfig object on success.
+ * Throws on error instead of calling process.exit (safe for both CLI and server).
+ */
+function createSpace(home, name, codeDir) {
   const slug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
   const spaceDir = path.join(home, 'spaces', slug);
 
   if (fs.existsSync(path.join(spaceDir, 'space.json'))) {
-    console.error(`Error: Space "${slug}" already exists at ${spaceDir}`);
-    process.exit(1);
+    throw new Error(`Space "${slug}" already exists at ${spaceDir}`);
   }
 
-  // Resolve code dir
-  let codeDir = null;
-  if (opts.codeDir) {
-    codeDir = path.resolve(opts.codeDir);
-    if (!fs.existsSync(codeDir)) {
-      console.error(`Error: Code directory does not exist: ${codeDir}`);
-      process.exit(1);
-    }
+  if (codeDir && !fs.existsSync(codeDir)) {
+    throw new Error(`Code directory does not exist: ${codeDir}`);
   }
-
-  console.log(`Creating space "${slug}"...`);
 
   // Create space directory structure
   const dirs = [
@@ -67,7 +61,7 @@ module.exports = function spaceCreate(home, name, opts) {
     $schema: 'superbot3-space-v1',
     name: slug,
     slug: slug,
-    codeDir: codeDir,
+    codeDir: codeDir || null,
     spaceDir: spaceDir,
     claudeConfigDir: path.join(spaceDir, '.claude'),
     active: true,
@@ -80,7 +74,7 @@ module.exports = function spaceCreate(home, name, opts) {
   };
   fs.writeFileSync(path.join(spaceDir, 'space.json'), JSON.stringify(spaceConfig, null, 2), 'utf-8');
 
-  // Customize CLAUDE.md with space name
+  // Customize CLAUDE.md with space name and code dir
   const claudeMdPath = path.join(spaceDir, '.claude', 'CLAUDE.md');
   if (fs.existsSync(claudeMdPath)) {
     let content = fs.readFileSync(claudeMdPath, 'utf-8');
@@ -95,9 +89,7 @@ module.exports = function spaceCreate(home, name, opts) {
 
   // Set up auth (credentials + config) so CLAUDE_CONFIG_DIR works
   const claudeConfigDir = path.join(spaceDir, '.claude');
-  if (setupConfigDir(claudeConfigDir, spaceDir, codeDir)) {
-    console.log('  Auth configured from default keychain');
-  }
+  setupConfigDir(claudeConfigDir, spaceDir, codeDir);
 
   // Ensure scheduled_tasks.json exists (empty — no default schedules)
   const schedulePath = path.join(spaceDir, '.claude', 'scheduled_tasks.json');
@@ -105,14 +97,40 @@ module.exports = function spaceCreate(home, name, opts) {
     fs.writeFileSync(schedulePath, JSON.stringify({ tasks: [] }, null, 2), 'utf-8');
   }
 
-  console.log('');
-  console.log(`Space "${slug}" created successfully!`);
-  console.log('');
-  console.log(`  Space dir:  ${spaceDir}`);
-  if (codeDir) {
-    console.log(`  Code dir:   ${codeDir}`);
+  return spaceConfig;
+}
+
+/**
+ * CLI entry point — wraps createSpace with console output and process.exit on error.
+ */
+function spaceCreateCli(home, name, opts) {
+  let codeDir = null;
+  if (opts.codeDir) {
+    codeDir = path.resolve(opts.codeDir);
   }
-  console.log(`  Config dir: ${path.join(spaceDir, '.claude')}`);
+
+  console.log(`Creating space "${name}"...`);
+
+  let spaceConfig;
+  try {
+    spaceConfig = createSpace(home, name, codeDir);
+  } catch (err) {
+    console.error(`Error: ${err.message}`);
+    process.exit(1);
+  }
+
+  if (codeDir) {
+    console.log('  Auth configured from default keychain');
+  }
+
+  console.log('');
+  console.log(`Space "${spaceConfig.slug}" created successfully!`);
+  console.log('');
+  console.log(`  Space dir:  ${spaceConfig.spaceDir}`);
+  if (spaceConfig.codeDir) {
+    console.log(`  Code dir:   ${spaceConfig.codeDir}`);
+  }
+  console.log(`  Config dir: ${spaceConfig.claudeConfigDir}`);
   console.log('');
   console.log('Contents:');
   console.log('  ├── space.json');
@@ -125,4 +143,8 @@ module.exports = function spaceCreate(home, name, opts) {
   console.log('  │   └── plugins/');
   console.log('  └── knowledge/');
   console.log('      └── logs/');
-};
+}
+
+// Export both — CLI uses the default export, server uses createSpace
+module.exports = spaceCreateCli;
+module.exports.createSpace = createSpace;
