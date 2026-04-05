@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { usePlugins, useSkills, useAgents } from '@/hooks/useSpaces'
 import {
-  togglePlugin, fetchPluginFiles, fetchPluginFileContent,
+  togglePlugin, toggleSkill, fetchPluginFiles, fetchPluginFileContent,
   fetchSkillDetail, fetchSkillFileContent, fetchAgentDetail,
 } from '@/lib/api'
 import type { PluginFile } from '@/lib/api'
@@ -28,6 +28,19 @@ const CATEGORY_LABELS: Record<string, string> = {
   testing: 'Testing', deployment: 'Deployment', monitoring: 'Monitoring',
   automation: 'Automation', design: 'Design', learning: 'Learning',
   location: 'Location', math: 'Math', migration: 'Migration', other: 'Other',
+}
+
+// ── Source Badge ─────────────────────────────────────────────────────────────
+
+function SourceBadge({ source }: { source?: string }) {
+  if (!source) return null
+  if (source === 'space') return <Badge variant="outline" className="text-[9px] text-sand border-sand/30">Space</Badge>
+  if (source === 'user') return <Badge variant="outline" className="text-[9px] text-stone border-stone/30">User</Badge>
+  if (source.startsWith('plugin:')) {
+    const pluginName = source.slice('plugin:'.length)
+    return <Badge variant="outline" className="text-[9px] text-moss border-moss/30">Plugin: {pluginName}</Badge>
+  }
+  return null
 }
 
 // ── Shared ───────────────────────────────────────────────────────────────────
@@ -73,15 +86,35 @@ function PluginCard({ plugin, slug, onClick, compact }: { plugin: PluginInfo; sl
   )
 }
 
-function SkillCard({ skill, onClick }: { skill: SkillDef; onClick: () => void }) {
+function SkillCard({ skill, slug, onClick }: { skill: SkillDef; slug: string; onClick: () => void }) {
+  const [toggling, setToggling] = useState(false)
+  const queryClient = useQueryClient()
+  const isSpace = skill.source === 'space'
+  const isDisabled = skill.enabled === false
+
+  async function handleToggle() {
+    setToggling(true)
+    try {
+      await toggleSkill(slug, skill.dirname, !skill.enabled)
+      queryClient.invalidateQueries({ queryKey: ['skills', slug] })
+    } finally { setToggling(false) }
+  }
+
   return (
-    <Card className="cursor-pointer hover:border-border-custom/80 transition-colors" onClick={onClick}>
+    <Card className={cn('cursor-pointer hover:border-border-custom/80 transition-colors', isDisabled && 'opacity-50')} onClick={onClick}>
       <CardContent className="p-2.5 flex items-center gap-2.5">
-        <Blocks className="w-3.5 h-3.5 text-sand/70 shrink-0" />
+        <Blocks className={cn('w-3.5 h-3.5 shrink-0', isDisabled ? 'text-stone/40' : 'text-sand/70')} />
         <div className="flex-1 min-w-0">
-          <span className="text-xs font-medium text-parchment">{skill.name}</span>
+          <div className="flex items-center gap-1.5">
+            <span className={cn('text-xs font-medium', isDisabled ? 'text-stone' : 'text-parchment')}>{skill.name}</span>
+            <SourceBadge source={skill.source} />
+            {isDisabled && <Badge variant="outline" className="text-[9px] text-stone/50 border-stone/20">Disabled</Badge>}
+          </div>
           {skill.description && <p className="text-[10px] text-stone mt-0.5 line-clamp-1">{skill.description}</p>}
         </div>
+        {isSpace && (
+          <Switch checked={skill.enabled !== false} onCheckedChange={handleToggle} disabled={toggling} onClick={(e) => e.stopPropagation()} />
+        )}
         <ChevronRight className="w-3 h-3 text-stone/30 shrink-0" />
       </CardContent>
     </Card>
@@ -94,7 +127,10 @@ function AgentCard({ agent, onClick }: { agent: AgentDef; onClick: () => void })
       <CardContent className="p-2.5 flex items-center gap-2.5">
         <Bot className="w-3.5 h-3.5 text-sand/70 shrink-0" />
         <div className="flex-1 min-w-0">
-          <span className="text-xs font-medium text-parchment">{agent.name || agent.filename}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-medium text-parchment">{agent.name || agent.filename}</span>
+            <SourceBadge source={agent.source} />
+          </div>
           {agent.description && <p className="text-[10px] text-stone mt-0.5 line-clamp-1">{agent.description}</p>}
         </div>
         <ChevronRight className="w-3 h-3 text-stone/30 shrink-0" />
@@ -330,9 +366,12 @@ function PluginDetailView({ plugin, slug, onBack }: { plugin: PluginInfo; slug: 
 
 // ── Skill Detail ─────────────────────────────────────────────────────────────
 
-function SkillDetailView({ skillName, slug, source, onBack }: { skillName: string; slug: string; source?: string; onBack: () => void }) {
+function SkillDetailView({ skillName, slug, source, skillEnabled, onBack }: { skillName: string; slug: string; source?: string; skillEnabled?: boolean; onBack: () => void }) {
   const [detail, setDetail] = useState<SkillDetail | null>(null)
   const [loading, setLoading] = useState(true)
+  const [toggling, setToggling] = useState(false)
+  const queryClient = useQueryClient()
+  const isSpace = source === 'space'
 
   useEffect(() => {
     let cancelled = false
@@ -344,6 +383,14 @@ function SkillDetailView({ skillName, slug, source, onBack }: { skillName: strin
     return () => { cancelled = true }
   }, [slug, skillName, source])
 
+  async function handleToggle() {
+    setToggling(true)
+    try {
+      await toggleSkill(slug, skillName, !skillEnabled)
+      queryClient.invalidateQueries({ queryKey: ['skills', slug] })
+    } finally { setToggling(false) }
+  }
+
   if (loading) return <><BackButton onClick={onBack} label="Back" /><p className="text-xs text-stone">Loading...</p></>
 
   if (!detail) return <><BackButton onClick={onBack} label="Back" /><p className="text-xs text-stone">Skill not found.</p></>
@@ -353,15 +400,27 @@ function SkillDetailView({ skillName, slug, source, onBack }: { skillName: strin
   return (
     <div className="space-y-4">
       <BackButton onClick={onBack} label="Back" />
-      <div className="flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-sand/15">
-          <Blocks className="w-4 h-4 text-sand" />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', skillEnabled !== false ? 'bg-sand/15' : 'bg-stone/10')}>
+            <Blocks className={cn('w-4 h-4', skillEnabled !== false ? 'text-sand' : 'text-stone/50')} />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-parchment">{fm.name || skillName}</h3>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <SourceBadge source={source} />
+              {fm['user-invocable'] && <Badge variant="outline" className="text-[10px]">user-invocable</Badge>}
+              {skillEnabled === false && <Badge variant="outline" className="text-[9px] text-stone/50 border-stone/20">Disabled</Badge>}
+            </div>
+          </div>
         </div>
-        <div>
-          <h3 className="text-sm font-semibold text-parchment">{fm.name || skillName}</h3>
-          {fm['user-invocable'] && <Badge variant="outline" className="text-[10px] mt-0.5">user-invocable</Badge>}
-        </div>
+        {isSpace && (
+          <Switch checked={skillEnabled !== false} onCheckedChange={handleToggle} disabled={toggling} />
+        )}
       </div>
+      {!isSpace && source?.startsWith('plugin:') && (
+        <p className="text-[10px] text-stone/60">This skill comes from a plugin. To disable it, toggle the plugin off.</p>
+      )}
       {fm.description && <p className="text-xs text-stone leading-relaxed">{fm.description}</p>}
       {fm['allowed-tools'] && (
         <div>
@@ -419,8 +478,14 @@ function AgentDetailView({ agentFilename, slug, source, onBack }: { agentFilenam
         </div>
         <div>
           <h3 className="text-sm font-semibold text-parchment">{fm.name || agentFilename.replace('.md', '')}</h3>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <SourceBadge source={source} />
+          </div>
         </div>
       </div>
+      {source?.startsWith('plugin:') && (
+        <p className="text-[10px] text-stone/60">This agent comes from a plugin. It is read-only.</p>
+      )}
       <div className="flex flex-wrap gap-1.5">
         {fm.model && <Badge variant="outline" className="text-[10px]">{fm.model}</Badge>}
         {fm.permissionMode && <Badge variant="secondary" className="text-[10px]">{fm.permissionMode}</Badge>}
@@ -645,9 +710,9 @@ function BrowseView({ slug, plugins, onBack, onSelect, onNavigate }: {
 
 // ── Home View ────────────────────────────────────────────────────────────────
 
-function HomeView({ slug, plugins, skills, agents, onBrowse, onSelectPlugin, onSelectSkill, onSelectAgent }: {
+function HomeView({ slug, plugins, skills, agents, onBrowse, onSelectPlugin, onSelectSkill, onSelectAgent, onAddSkill }: {
   slug: string; plugins: PluginInfo[]; skills: SkillDef[]; agents: AgentDef[]
-  onBrowse: () => void; onSelectPlugin: (p: PluginInfo) => void; onSelectSkill: (s: SkillDef) => void; onSelectAgent: (a: AgentDef) => void
+  onBrowse: () => void; onSelectPlugin: (p: PluginInfo) => void; onSelectSkill: (s: SkillDef) => void; onSelectAgent: (a: AgentDef) => void; onAddSkill: () => void
 }) {
   const enabledPlugins = plugins.filter(p => p.enabled)
   const totalAvailable = plugins.filter(p => !p.enabled).length
@@ -662,16 +727,24 @@ function HomeView({ slug, plugins, skills, agents, onBrowse, onSelectPlugin, onS
           <div className="space-y-1">{enabledPlugins.map(p => <PluginCard key={`${p.name}@${p.marketplace}`} plugin={p} slug={slug} onClick={() => onSelectPlugin(p)} compact />)}</div>
         </CollapsibleSection>
       )}
-      {skills.length > 0 && (
-        <CollapsibleSection title="Skills" count={skills.length} defaultOpen={true}>
-          <div className="space-y-1">{skills.map(s => <SkillCard key={s.dirname} skill={s} onClick={() => onSelectSkill(s)} />)}</div>
-        </CollapsibleSection>
-      )}
-      {agents.length > 0 && (
-        <CollapsibleSection title="Agents" count={agents.length} defaultOpen={true}>
-          <div className="space-y-1">{agents.map(a => <AgentCard key={a.filename} agent={a} onClick={() => onSelectAgent(a)} />)}</div>
-        </CollapsibleSection>
-      )}
+      <CollapsibleSection title="Skills" count={skills.length} defaultOpen={true}>
+        {skills.length > 0 ? (
+          <div className="space-y-1">{skills.map(s => <SkillCard key={`${s.source}:${s.dirname}`} skill={s} slug={slug} onClick={() => onSelectSkill(s)} />)}</div>
+        ) : (
+          <p className="text-xs text-stone mb-2">No skills found.</p>
+        )}
+        <button onClick={onAddSkill}
+          className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 text-[11px] text-stone hover:text-parchment border border-dashed border-border-custom rounded-md hover:bg-ink/30 transition-colors">
+          <FolderPlus className="w-3 h-3" />Add skill
+        </button>
+      </CollapsibleSection>
+      <CollapsibleSection title="Agents" count={agents.length} defaultOpen={true}>
+        {agents.length > 0 ? (
+          <div className="space-y-1">{agents.map(a => <AgentCard key={`${a.source}:${a.filename}`} agent={a} onClick={() => onSelectAgent(a)} />)}</div>
+        ) : (
+          <p className="text-xs text-stone">No agents found.</p>
+        )}
+      </CollapsibleSection>
       <button onClick={onBrowse} className="w-full flex items-center justify-between px-3 py-2.5 border border-border-custom rounded-md hover:bg-ink/30 transition-colors group">
         <div className="flex items-center gap-2.5">
           <Store className="w-3.5 h-3.5 text-stone group-hover:text-sand transition-colors" />
@@ -701,7 +774,7 @@ export function PluginsTab({ slug }: { slug: string }) {
   const { data: agents, isLoading: loadingAgents } = useAgents(slug)
   const [view, setView] = useState<View>('home')
   const [selectedPlugin, setSelectedPlugin] = useState<PluginInfo | null>(null)
-  const [selectedSkill, setSelectedSkill] = useState<{ name: string; source?: string } | null>(null)
+  const [selectedSkill, setSelectedSkill] = useState<{ name: string; source?: string; enabled?: boolean } | null>(null)
   const [selectedAgent, setSelectedAgent] = useState<{ filename: string; source?: string } | null>(null)
   const [prevView, setPrevView] = useState<View>('home')
 
@@ -732,7 +805,7 @@ export function PluginsTab({ slug }: { slug: string }) {
   const allAgents = (agents || []) as AgentDef[]
 
   if (view === 'plugin-detail' && currentPlugin) return <PluginDetailView plugin={currentPlugin} slug={slug} onBack={goBack} />
-  if (view === 'skill-detail' && selectedSkill) return <SkillDetailView skillName={selectedSkill.name} slug={slug} source={selectedSkill.source} onBack={goBack} />
+  if (view === 'skill-detail' && selectedSkill) return <SkillDetailView skillName={selectedSkill.name} slug={slug} source={selectedSkill.source} skillEnabled={selectedSkill.enabled} onBack={goBack} />
   if (view === 'agent-detail' && selectedAgent) return <AgentDetailView agentFilename={selectedAgent.filename} slug={slug} source={selectedAgent.source} onBack={goBack} />
   if (view === 'add-marketplace') return <AddMarketplaceView slug={slug} onBack={goBack} />
   if (view === 'add-skill') return <AddSkillView slug={slug} onBack={goBack} />
@@ -743,7 +816,8 @@ export function PluginsTab({ slug }: { slug: string }) {
   return <HomeView slug={slug} plugins={allPlugins} skills={allSkills} agents={allAgents}
     onBrowse={() => navigateTo('browse')}
     onSelectPlugin={(p) => { setSelectedPlugin(p); navigateTo('plugin-detail') }}
-    onSelectSkill={(s) => { setSelectedSkill({ name: s.dirname, source: s.source }); navigateTo('skill-detail') }}
+    onSelectSkill={(s) => { setSelectedSkill({ name: s.dirname, source: s.source, enabled: s.enabled }); navigateTo('skill-detail') }}
     onSelectAgent={(a) => { setSelectedAgent({ filename: a.filename, source: a.source }); navigateTo('agent-detail') }}
+    onAddSkill={() => navigateTo('add-skill')}
   />
 }
