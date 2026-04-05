@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
-import { usePlugins, useSkills, useAgents } from '@/hooks/useSpaces'
+import { usePlugins, useSkills, useAgents, usePluginCredentials } from '@/hooks/useSpaces'
 import {
   togglePlugin, toggleSkill, fetchPluginFiles, fetchPluginFileContent,
   fetchSkillDetail, fetchSkillFileContent, fetchAgentDetail,
+  savePluginCredential, deletePluginCredential,
 } from '@/lib/api'
 import type { PluginFile } from '@/lib/api'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,11 +13,11 @@ import {
   Puzzle, Blocks, Bot, Search, ExternalLink,
   ChevronDown, ChevronRight, ArrowLeft,
   Server, Tag, Code2, Store, FolderPlus,
-  File, Folder, X,
+  File, Folder, X, Key, Check, AlertTriangle, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
-import type { PluginInfo, SkillDetail, AgentDetail, SkillDef, AgentDef } from '@/lib/types'
+import type { PluginInfo, SkillDetail, AgentDetail, SkillDef, AgentDef, CredentialDeclaration } from '@/lib/types'
 
 type View = 'home' | 'browse' | 'plugin-detail' | 'skill-detail' | 'agent-detail' | 'add-marketplace' | 'add-skill'
 
@@ -264,6 +265,121 @@ function FilesPanel({ files, loading, fetchContent }: {
   )
 }
 
+// ── Credential Form ─────────────────────────────────────────────────────────
+
+function CredentialForm({ pluginName, slug }: { pluginName: string; slug: string }) {
+  const { data: credStatus, refetch } = usePluginCredentials(slug, pluginName)
+  const [values, setValues] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [feedback, setFeedback] = useState<Record<string, { type: 'saved' | 'validated' | 'invalid' | 'error'; message?: string } | null>>({})
+  const queryClient = useQueryClient()
+
+  if (!credStatus || credStatus.credentials.length === 0) return null
+
+  async function handleSave(cred: CredentialDeclaration) {
+    const val = values[cred.key]
+    if (!val?.trim()) return
+    setSaving(s => ({ ...s, [cred.key]: true }))
+    setFeedback(f => ({ ...f, [cred.key]: null }))
+    try {
+      const result = await savePluginCredential(slug, pluginName, cred.key, val.trim())
+      if (result.validation) {
+        if (result.validation.valid) {
+          setFeedback(f => ({ ...f, [cred.key]: { type: 'validated' } }))
+        } else {
+          setFeedback(f => ({ ...f, [cred.key]: { type: 'invalid', message: result.validation!.error } }))
+        }
+      } else {
+        setFeedback(f => ({ ...f, [cred.key]: { type: 'saved' } }))
+      }
+      setValues(v => ({ ...v, [cred.key]: '' }))
+      refetch()
+      queryClient.invalidateQueries({ queryKey: ['plugins', slug] })
+      queryClient.invalidateQueries({ queryKey: ['skills', slug] })
+      setTimeout(() => setFeedback(f => ({ ...f, [cred.key]: null })), 5000)
+    } catch {
+      setFeedback(f => ({ ...f, [cred.key]: { type: 'error' } }))
+    } finally {
+      setSaving(s => ({ ...s, [cred.key]: false }))
+    }
+  }
+
+  async function handleDelete(cred: CredentialDeclaration) {
+    setSaving(s => ({ ...s, [cred.key]: true }))
+    try {
+      await deletePluginCredential(slug, pluginName, cred.key)
+      refetch()
+      queryClient.invalidateQueries({ queryKey: ['plugins', slug] })
+      queryClient.invalidateQueries({ queryKey: ['skills', slug] })
+    } catch {
+      setFeedback(f => ({ ...f, [cred.key]: { type: 'error' } }))
+    } finally {
+      setSaving(s => ({ ...s, [cred.key]: false }))
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 mb-2">
+        <Key className="h-3.5 w-3.5 text-sand" />
+        <span className="text-xs font-medium text-parchment">Credentials</span>
+      </div>
+      {credStatus.credentials.map(cred => {
+        const isConfigured = credStatus.configured[cred.key]
+        return (
+          <div key={cred.key} className="rounded-lg bg-ink border border-border-custom p-3">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-parchment">{cred.label || cred.key}</span>
+                {cred.required && <span className="text-[10px] text-ember/70">required</span>}
+              </div>
+              {isConfigured ? (
+                <span className="flex items-center gap-1 text-[10px] text-green-400">
+                  <Check className="h-3 w-3" /> Configured
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[10px] text-amber-400">
+                  <AlertTriangle className="h-3 w-3" /> Not configured
+                </span>
+              )}
+            </div>
+            {cred.description && <p className="text-[11px] text-stone mb-2">{cred.description}</p>}
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={values[cred.key] || ''}
+                onChange={e => setValues(v => ({ ...v, [cred.key]: e.target.value }))}
+                placeholder={isConfigured ? '••••••••' : 'Enter value...'}
+                className="flex-1 px-2.5 py-1.5 text-xs bg-surface border border-border-custom rounded-md text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/40"
+              />
+              <button
+                onClick={() => handleSave(cred)}
+                disabled={saving[cred.key] || !values[cred.key]?.trim()}
+                className="px-3 py-1.5 text-xs rounded-md bg-sand/15 text-sand hover:bg-sand/25 transition-colors disabled:opacity-40"
+              >
+                {saving[cred.key] ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+              </button>
+              {isConfigured && (
+                <button
+                  onClick={() => handleDelete(cred)}
+                  disabled={saving[cred.key]}
+                  className="px-2 py-1.5 text-xs rounded-md text-ember/70 hover:bg-ember/10 transition-colors disabled:opacity-40"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            {feedback[cred.key]?.type === 'validated' && <p className="text-[10px] text-green-400 mt-1">Saved to Keychain — key verified</p>}
+            {feedback[cred.key]?.type === 'saved' && <p className="text-[10px] text-green-400 mt-1">Saved to Keychain</p>}
+            {feedback[cred.key]?.type === 'invalid' && <p className="text-[10px] text-amber-400 mt-1">Saved to Keychain — key appears invalid{feedback[cred.key]!.message ? `: ${feedback[cred.key]!.message}` : ''}</p>}
+            {feedback[cred.key]?.type === 'error' && <p className="text-[10px] text-ember mt-1">Failed to save</p>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Plugin Detail ────────────────────────────────────────────────────────────
 
 function PluginDetailView({ plugin, slug, onBack }: { plugin: PluginInfo; slug: string; onBack: () => void }) {
@@ -346,6 +462,7 @@ function PluginDetailView({ plugin, slug, onBack }: { plugin: PluginInfo; slug: 
           <ExternalLink className="w-3 h-3" /> Homepage
         </a>
       )}
+      {plugin.installed && <CredentialForm pluginName={plugin.name} slug={slug} />}
       {plugin.hasFiles ? (
         <FilesPanel files={files} loading={filesLoading}
           fetchContent={(p) => fetchPluginFileContent(slug, plugin.marketplace, plugin.name, p)} />

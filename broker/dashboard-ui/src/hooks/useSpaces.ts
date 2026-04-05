@@ -59,6 +59,14 @@ export function usePlugins(name: string) {
   })
 }
 
+export function usePluginCredentials(space: string, plugin: string) {
+  return useQuery({
+    queryKey: ['plugin-credentials', space, plugin],
+    queryFn: () => api.fetchPluginCredentials(space, plugin),
+    enabled: !!space && !!plugin,
+  })
+}
+
 export function useSkills(name: string) {
   return useQuery({
     queryKey: ['skills', name],

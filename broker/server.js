@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execSync, execFile } = require('child_process');
 const http = require('http');
 
 const app = express();
@@ -814,20 +814,68 @@ app.get('/api/spaces/:name/plugins/:marketplace/:plugin/file', (req, res) => {
   }
 });
 
-/** Toggle a plugin enabled/disabled in the space's settings.json */
-app.post('/api/spaces/:name/plugins/toggle', (req, res) => {
+/** Toggle a plugin enabled/disabled — runs claude plugin install/enable/disable with per-space CLAUDE_CONFIG_DIR */
+app.post('/api/spaces/:name/plugins/toggle', async (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
   const { pluginKey, enabled } = req.body;
   if (!pluginKey) return res.status(400).json({ error: 'pluginKey required' });
 
-  const settingsPath = path.join(config.claudeConfigDir, 'settings.json');
-  const settings = readJsonSafe(settingsPath) || { permissions: { allow: [], deny: [] } };
-  if (!settings.enabledPlugins) settings.enabledPlugins = {};
-  settings.enabledPlugins[pluginKey] = !!enabled;
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-  res.json({ ok: true, enabled: !!enabled });
+  const { execSync } = require('child_process');
+  const env = { ...process.env, CLAUDE_CONFIG_DIR: config.claudeConfigDir };
+
+  try {
+    if (enabled) {
+      // Ensure the marketplace is registered in the space before installing
+      const [, marketplace] = pluginKey.split('@');
+      if (marketplace && marketplace !== 'claude-plugins-official') {
+        const kmPath = path.join(config.claudeConfigDir, 'plugins', 'known_marketplaces.json');
+        const km = readJsonSafe(kmPath) || {};
+        if (!km[marketplace]) {
+          // Try to find marketplace URL from global config
+          const globalKm = readJsonSafe(path.join(require('os').homedir(), '.claude', 'plugins', 'known_marketplaces.json')) || {};
+          if (globalKm[marketplace] && globalKm[marketplace].source) {
+            const url = globalKm[marketplace].source.url || `https://superchargeclaudecode.com/api/marketplaces/${marketplace}/marketplace.json`;
+            try {
+              execSync(`claude plugin marketplace add "${url}"`, { env, stdio: 'pipe', timeout: 30000 });
+            } catch {}
+          }
+        }
+      }
+      // Install + enable the plugin into the space's config dir
+      try {
+        execSync(`claude plugin install "${pluginKey}" --scope user`, { env, stdio: 'pipe', timeout: 60000 });
+      } catch (installErr) {
+        // May already be installed — try enable anyway
+      }
+      try {
+        execSync(`claude plugin enable "${pluginKey}" --scope user`, { env, stdio: 'pipe', timeout: 30000 });
+      } catch (enableErr) {
+        // Fallback: write enabledPlugins directly if CLI fails
+        const settingsPath = path.join(config.claudeConfigDir, 'settings.json');
+        const settings = readJsonSafe(settingsPath) || { permissions: { allow: [], deny: [] } };
+        if (!settings.enabledPlugins) settings.enabledPlugins = {};
+        settings.enabledPlugins[pluginKey] = true;
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+      }
+    } else {
+      // Disable the plugin
+      try {
+        execSync(`claude plugin disable "${pluginKey}" --scope user`, { env, stdio: 'pipe', timeout: 30000 });
+      } catch (disableErr) {
+        // Fallback: write enabledPlugins directly
+        const settingsPath = path.join(config.claudeConfigDir, 'settings.json');
+        const settings = readJsonSafe(settingsPath) || { permissions: { allow: [], deny: [] } };
+        if (!settings.enabledPlugins) settings.enabledPlugins = {};
+        settings.enabledPlugins[pluginKey] = false;
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+      }
+    }
+    res.json({ ok: true, enabled: !!enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message, enabled: !!enabled });
+  }
 });
 
 /** Add a marketplace to the space's known_marketplaces.json */
@@ -1172,6 +1220,172 @@ app.get('/api/spaces/:name/agents/:agent', (req, res) => {
   const content = fs.readFileSync(agentFile, 'utf-8');
   const frontmatter = parseFrontmatter(content);
   res.json({ filename: req.params.agent, content, frontmatter, source });
+});
+
+// ── Plugin Credentials (macOS Keychain) ─────────────────────────────────────
+
+function keychainExec(args) {
+  return new Promise((resolve, reject) => {
+    execFile('security', args, (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr || err.message));
+      resolve(stdout.trim());
+    });
+  });
+}
+
+async function keychainSet(spaceSlug, pluginName, key, value) {
+  const service = `superbot3-${spaceSlug}`;
+  const account = `${pluginName}/${key}`;
+  await keychainExec(['add-generic-password', '-s', service, '-a', account, '-w', value, '-U']);
+}
+
+async function keychainGet(spaceSlug, pluginName, key) {
+  const service = `superbot3-${spaceSlug}`;
+  const account = `${pluginName}/${key}`;
+  try {
+    return await keychainExec(['find-generic-password', '-s', service, '-a', account, '-w']);
+  } catch {
+    return null;
+  }
+}
+
+async function keychainDelete(spaceSlug, pluginName, key) {
+  const service = `superbot3-${spaceSlug}`;
+  const account = `${pluginName}/${key}`;
+  try {
+    await keychainExec(['delete-generic-password', '-s', service, '-a', account]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function keychainHas(spaceSlug, pluginName, key) {
+  return (await keychainGet(spaceSlug, pluginName, key)) !== null;
+}
+
+/** Parse YAML frontmatter with nested structure support (for metadata.credentials) */
+function parseYamlFrontmatter(content) {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) return {};
+  try {
+    const yaml = require('js-yaml');
+    return yaml.load(match[1]) || {};
+  } catch {
+    return parseFrontmatter(content);
+  }
+}
+
+/** Read credential declarations from a plugin's skill SKILL.md files + credentials.json fallback */
+function getPluginCredentials(pluginDir) {
+  // 1. Check SKILL.md frontmatter in skills directories
+  for (const sub of ['.claude-plugin/skills', 'skills']) {
+    const skillsDir = path.join(pluginDir, sub);
+    try {
+      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const skillMd = path.join(skillsDir, entry.name, 'SKILL.md');
+        if (!fs.existsSync(skillMd)) continue;
+        try {
+          const content = fs.readFileSync(skillMd, 'utf-8');
+          const fm = parseYamlFrontmatter(content);
+          const creds = fm.metadata?.credentials ?? fm.credentials;
+          if (Array.isArray(creds) && creds.length > 0) return creds;
+        } catch { /* skip */ }
+      }
+    } catch { /* dir doesn't exist */ }
+  }
+
+  // 2. Fallback: .claude-plugin/credentials.json
+  const credJsonPath = path.join(pluginDir, '.claude-plugin', 'credentials.json');
+  try {
+    const data = JSON.parse(fs.readFileSync(credJsonPath, 'utf-8'));
+    if (Array.isArray(data) && data.length > 0) return data;
+  } catch { /* skip */ }
+
+  return [];
+}
+
+const CREDENTIAL_VALIDATORS = {
+  GEMINI_API_KEY: async (value) => {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(value)}`;
+      const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (response.ok) return { valid: true };
+      const body = await response.json().catch(() => ({}));
+      return { valid: false, error: body?.error?.message || `HTTP ${response.status}` };
+    } catch (err) {
+      return { valid: false, error: err.message || 'Network error' };
+    }
+  },
+};
+
+app.get('/api/spaces/:name/plugins/:plugin/credentials', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const pluginName = req.params.plugin;
+  // Find plugin dir — check all marketplaces
+  const marketplacePlugins = getMarketplacePlugins(config.claudeConfigDir);
+  const mp = marketplacePlugins.find(p => p.name === pluginName);
+  const marketplace = mp?.marketplace;
+  const pluginDir = marketplace ? resolvePluginDir(config.claudeConfigDir, pluginName, marketplace) : null;
+
+  if (!pluginDir) return res.json({ credentials: [], configured: {} });
+
+  const credentials = getPluginCredentials(pluginDir);
+  const slug = config.slug || req.params.name;
+
+  Promise.all(credentials.map(async (cred) => {
+    const has = await keychainHas(slug, pluginName, cred.key);
+    return [cred.key, has];
+  })).then(entries => {
+    const configured = {};
+    for (const [key, has] of entries) configured[key] = has;
+    res.json({ credentials, configured });
+  }).catch(err => {
+    res.status(500).json({ error: err.message });
+  });
+});
+
+app.post('/api/spaces/:name/plugins/:plugin/credentials', async (req, res) => {
+  try {
+    const config = getSpaceConfig(req.params.name);
+    if (!config) return res.status(404).json({ error: 'Space not found' });
+
+    const { key, value } = req.body;
+    if (!key || !value) return res.status(400).json({ error: 'key and value required' });
+
+    const pluginName = req.params.plugin;
+    const slug = config.slug || req.params.name;
+
+    await keychainSet(slug, pluginName, key, value);
+
+    const validator = CREDENTIAL_VALIDATORS[key];
+    if (validator) {
+      const validation = await validator(value);
+      return res.json({ ok: true, validation });
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/spaces/:name/plugins/:plugin/credentials/:key', async (req, res) => {
+  try {
+    const config = getSpaceConfig(req.params.name);
+    if (!config) return res.status(404).json({ error: 'Space not found' });
+
+    const pluginName = req.params.plugin;
+    const slug = config.slug || req.params.name;
+    const deleted = await keychainDelete(slug, pluginName, req.params.key);
+    res.json({ ok: deleted });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ── WebSocket for real-time updates ──────────────────────────────────────────

@@ -78,6 +78,13 @@ export interface WorkerInfo {
   status: string
 }
 
+export interface CredentialDeclaration {
+  key: string
+  label: string
+  description?: string
+  required?: boolean
+}
+
 export interface PluginInfo {
   name: string
   description: string

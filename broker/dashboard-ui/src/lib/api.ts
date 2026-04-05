@@ -1,4 +1,4 @@
-import type { Space, InboxMessage, ScheduledTask, KnowledgeFile, AgentDef, SkillDef, PluginInfo, SkillDetail, AgentDetail } from './types'
+import type { Space, InboxMessage, ScheduledTask, KnowledgeFile, AgentDef, SkillDef, PluginInfo, SkillDetail, AgentDetail, CredentialDeclaration } from './types'
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url)
@@ -95,6 +95,16 @@ export const fetchPluginFileContent = (space: string, marketplace: string, plugi
   fetchJson<{ content: string | null; size: number; path: string; error?: string }>(
     `/api/spaces/${space}/plugins/${marketplace}/${plugin}/file?path=${encodeURIComponent(filePath)}`
   )
+// Plugin Credentials
+export const fetchPluginCredentials = (space: string, plugin: string) =>
+  fetchJson<{ credentials: CredentialDeclaration[]; configured: Record<string, boolean> }>(`/api/spaces/${space}/plugins/${plugin}/credentials`)
+
+export const savePluginCredential = (space: string, plugin: string, key: string, value: string) =>
+  postJson<{ ok: boolean; validation?: { valid: boolean; error?: string } }>(`/api/spaces/${space}/plugins/${plugin}/credentials`, { key, value })
+
+export const deletePluginCredential = (space: string, plugin: string, key: string) =>
+  fetch(`/api/spaces/${space}/plugins/${plugin}/credentials/${key}`, { method: 'DELETE' }).then(r => r.json())
+
 export const fetchSkills = (name: string) =>
   fetchJson<SkillDef[]>(`/api/spaces/${name}/skills`)
 
