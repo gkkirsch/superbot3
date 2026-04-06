@@ -27,8 +27,15 @@ function copyTemplate(templateDir, targetDir) {
  * Core space creation logic. Returns the spaceConfig object on success.
  * Throws on error instead of calling process.exit (safe for both CLI and server).
  */
+function titleCase(str) {
+  return str.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function createSpace(home, name, codeDir) {
-  const slug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const slug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  // Use the original name as the friendly name (preserves casing/spaces)
+  // Fall back to title-cased slug if name is already a slug
+  const friendlyName = name.includes(' ') || name !== name.toLowerCase() ? name : titleCase(slug);
   const spaceDir = path.join(home, 'spaces', slug);
 
   if (fs.existsSync(path.join(spaceDir, 'space.json'))) {
@@ -44,9 +51,16 @@ function createSpace(home, name, codeDir) {
     path.join(spaceDir, '.claude', 'skills', 'core-methodology'),
     path.join(spaceDir, '.claude', 'skills', 'space-cli'),
     path.join(spaceDir, '.claude', 'skills', 'schedule-manager'),
+    path.join(spaceDir, '.claude', 'skills', 'knowledge-base'),
     path.join(spaceDir, '.claude', 'agents'),
     path.join(spaceDir, '.claude', 'plugins'),
     path.join(spaceDir, '.claude', 'teams'),
+    path.join(spaceDir, '.claude', 'scratchpad'),
+    path.join(spaceDir, 'knowledge', 'raw'),
+    path.join(spaceDir, 'knowledge', 'wiki', 'concepts'),
+    path.join(spaceDir, 'knowledge', 'wiki', 'summaries'),
+    path.join(spaceDir, 'knowledge', 'wiki', 'connections'),
+    path.join(spaceDir, 'knowledge', 'queries', 'reflections'),
     path.join(spaceDir, 'knowledge', 'logs'),
   ];
   dirs.forEach(ensureDir);
@@ -60,7 +74,7 @@ function createSpace(home, name, codeDir) {
   // Generate space.json
   const spaceConfig = {
     $schema: 'superbot3-space-v1',
-    name: slug,
+    name: friendlyName,
     slug: slug,
     codeDir: codeDir || null,
     spaceDir: spaceDir,
@@ -154,10 +168,13 @@ function spaceCreateCli(home, name, opts) {
   console.log('  │   ├── CLAUDE.md');
   console.log('  │   ├── settings.json');
   console.log('  │   ├── scheduled_tasks.json');
-  console.log('  │   ├── agents/ (planner, coder, researcher, reviewer)');
-  console.log('  │   ├── skills/ (core-methodology, space-cli, schedule-manager)');
+  console.log('  │   ├── agents/ (planner, coder, researcher, reviewer, knowledge-consolidator)');
+  console.log('  │   ├── skills/ (core-methodology, space-cli, schedule-manager, knowledge-base)');
   console.log('  │   └── plugins/');
   console.log('  └── knowledge/');
+  console.log('      ├── raw/');
+  console.log('      ├── wiki/ (concepts, summaries, connections)');
+  console.log('      ├── queries/ (reflections)');
   console.log('      └── logs/');
 }
 
