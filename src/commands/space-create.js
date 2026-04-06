@@ -54,6 +54,7 @@ function createSpace(home, name, codeDir) {
     path.join(spaceDir, '.claude', 'skills', 'knowledge-base'),
     path.join(spaceDir, '.claude', 'skills', 'memory'),
     path.join(spaceDir, '.claude', 'agents'),
+    path.join(spaceDir, '.claude', 'hooks'),
     path.join(spaceDir, '.claude', 'plugins'),
     path.join(spaceDir, '.claude', 'teams'),
     path.join(spaceDir, '.claude', 'scratchpad'),
@@ -92,6 +93,20 @@ function createSpace(home, name, codeDir) {
   };
   fs.writeFileSync(path.join(spaceDir, 'space.json'), JSON.stringify(spaceConfig, null, 2), 'utf-8');
 
+  // Copy SessionStart hook scripts into the space's .claude/hooks/
+  const hooksTemplateDir = path.join(__dirname, '..', 'templates', 'hooks');
+  const hooksTargetDir = path.join(spaceDir, '.claude', 'hooks');
+  if (fs.existsSync(hooksTemplateDir)) {
+    const hookFiles = fs.readdirSync(hooksTemplateDir);
+    for (const file of hookFiles) {
+      const src = path.join(hooksTemplateDir, file);
+      const dest = path.join(hooksTargetDir, file);
+      fs.copyFileSync(src, dest);
+      // Preserve executable bit
+      try { fs.chmodSync(dest, 0o755); } catch {}
+    }
+  }
+
   // Customize CLAUDE.md with space name and code dir
   const claudeMdPath = path.join(spaceDir, '.claude', 'CLAUDE.md');
   if (fs.existsSync(claudeMdPath)) {
@@ -108,6 +123,29 @@ function createSpace(home, name, codeDir) {
   // Set up auth (credentials + config) so CLAUDE_CONFIG_DIR works
   const claudeConfigDir = path.join(spaceDir, '.claude');
   setupConfigDir(claudeConfigDir, spaceDir, codeDir);
+
+  // Add SessionStart hooks to settings.json (memory + knowledge plugins)
+  const settingsPath = path.join(claudeConfigDir, 'settings.json');
+  let settings = {};
+  try { settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8')); } catch {}
+  if (!settings.hooks) settings.hooks = {};
+  settings.hooks.SessionStart = [
+    {
+      hooks: [
+        {
+          type: 'command',
+          command: 'bash .claude/hooks/session-start-memory.sh',
+          async: false,
+        },
+        {
+          type: 'command',
+          command: 'bash .claude/hooks/session-start-knowledge.sh',
+          async: false,
+        },
+      ],
+    },
+  ];
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 
   // Create team config.json so Claude Code's isTeamLead() returns true.
   // Without this, the inbox poller won't activate and the space can't receive messages.
@@ -178,6 +216,7 @@ function spaceCreateCli(home, name, opts) {
   console.log('  │   ├── scheduled_tasks.json');
   console.log('  │   ├── agents/ (planner, coder, researcher, reviewer, knowledge-consolidator, memory-consolidator)');
   console.log('  │   ├── skills/ (core-methodology, space-cli, schedule-manager, knowledge-base, memory)');
+  console.log('  │   ├── hooks/ (session-start-memory, session-start-knowledge)');
   console.log('  │   └── plugins/');
   console.log('  ├── memory/');
   console.log('  │   ├── MEMORY.md');

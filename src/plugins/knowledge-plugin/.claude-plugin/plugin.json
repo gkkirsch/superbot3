@@ -1,0 +1,14 @@
+{
+  "name": "superbot3-knowledge",
+  "displayName": "Knowledge Base (Karpathy-style)",
+  "description": "LLM-compiled knowledge wiki from raw sources. Ingest, compile, query, lint. Inspired by Andrej Karpathy's knowledge base approach.",
+  "version": "1.0.0",
+  "author": {
+    "name": "superbot2",
+    "email": "superbot2@superchargeclaudecode.com"
+  },
+  "keywords": ["knowledge", "wiki", "research", "karpathy"],
+  "skills": "./skills/",
+  "agents": "./agents/",
+  "hooks": "./hooks.json"
+}

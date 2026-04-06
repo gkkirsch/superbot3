@@ -1,0 +1,14 @@
+{
+  "name": "superbot3-memory",
+  "displayName": "Memory System",
+  "description": "Persistent memory for AI agents — remember, recall, reflect, consolidate. Nightly session rollup with topic-based organization.",
+  "version": "1.0.0",
+  "author": {
+    "name": "superbot2",
+    "email": "superbot2@superchargeclaudecode.com"
+  },
+  "keywords": ["memory", "persistence", "learning", "consolidation"],
+  "skills": "./skills/",
+  "agents": "./agents/",
+  "hooks": "./hooks.json"
+}
