@@ -64,9 +64,31 @@ Read the file, remove the task with the matching ID, write back.
 | First of month at 9am | `0 9 1 * *` |
 | Every 30 seconds | Not supported — minimum is 1 minute |
 
+## One-Time Schedules
+
+For tasks that should only run once, set `recurring: false` and include a self-cleanup instruction in the prompt:
+
+```json
+{
+  "id": "x1y2z3w4",
+  "cron": "0 14 * * *",
+  "prompt": "[ONE-TIME] Send the weekly report\n\nAfter completing this task, run: superbot3 schedule remove myspace x1y2z3w4",
+  "createdAt": 1712188800000,
+  "recurring": false,
+  "permanent": true
+}
+```
+
+When using the CLI, just pass `--once`:
+```bash
+superbot3 schedule add myspace "0 14 * * *" "Send the weekly report" --once
+```
+
+The CLI automatically prepends `[ONE-TIME]` and appends the cleanup command to the prompt.
+
 ## Important
 
-- ALWAYS set `permanent: true` and `recurring: true`
+- ALWAYS set `permanent: true` and `recurring: true` (unless using `--once`)
 - NEVER use the CronCreate, CronDelete, or CronList tools
 - Always use the Edit tool to modify the file (not Write) so changes are atomic
 - The file is at `.claude/scheduled_tasks.json` relative to the space's CLAUDE_CONFIG_DIR

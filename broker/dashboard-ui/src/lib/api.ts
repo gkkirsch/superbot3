@@ -125,6 +125,16 @@ export const fetchSkillFileContent = (space: string, skill: string, filePath: st
     `/api/spaces/${space}/skills/${skill}/file?path=${encodeURIComponent(filePath)}${source ? `&source=${encodeURIComponent(source)}` : ''}`
   )
 
+// Restart Space
+export const restartSpace = (name: string) =>
+  postJson<{ ok: boolean; message: string }>(`/api/spaces/${name}/restart`, {})
+
+// System Prompt (CLAUDE.md)
+export const fetchSystemPrompt = (name: string) =>
+  fetchJson<{ content: string; path: string }>(`/api/spaces/${name}/system-prompt`)
+export const saveSystemPrompt = (name: string, content: string) =>
+  putJson<{ ok: boolean }>(`/api/spaces/${name}/system-prompt`, { content })
+
 // Conversation logs (Claude's session JSONL)
 export interface ConversationMessage {
   from: string

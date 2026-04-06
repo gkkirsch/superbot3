@@ -112,8 +112,9 @@ const schedule = program.command('schedule').description('Manage space schedules
 schedule
   .command('add <space> <cron> <prompt>')
   .description('Add a scheduled task to a space')
-  .action((space, cron, prompt) => {
-    require('../src/commands/schedule').add(SUPERBOT3_HOME, space, cron, prompt);
+  .option('--once', 'One-time schedule that self-cleans after execution')
+  .action((space, cron, prompt, opts) => {
+    require('../src/commands/schedule').add(SUPERBOT3_HOME, space, cron, prompt, opts);
   });
 
 schedule

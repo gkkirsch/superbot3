@@ -1388,6 +1388,81 @@ app.delete('/api/spaces/:name/plugins/:plugin/credentials/:key', async (req, res
   }
 });
 
+// ── System Prompt (CLAUDE.md) ────────────────────────────────────────────────
+
+app.get('/api/spaces/:name/system-prompt', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+  const claudeMdPath = path.join(config.claudeConfigDir, 'CLAUDE.md');
+  try {
+    const content = fs.readFileSync(claudeMdPath, 'utf-8');
+    res.json({ content, path: claudeMdPath });
+  } catch {
+    res.json({ content: '', path: claudeMdPath });
+  }
+});
+
+app.put('/api/spaces/:name/system-prompt', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+  const { content } = req.body;
+  if (typeof content !== 'string') return res.status(400).json({ error: 'content required' });
+  const claudeMdPath = path.join(config.claudeConfigDir, 'CLAUDE.md');
+  fs.writeFileSync(claudeMdPath, content, 'utf-8');
+  res.json({ ok: true });
+});
+
+// ── Restart Space ────────────────────────────────────────────────────────────
+
+app.post('/api/spaces/:name/restart', async (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  try {
+    // Step 1: Kill existing tmux window
+    try {
+      execSync(`tmux kill-window -t superbot3:${config.slug} 2>/dev/null`);
+    } catch {
+      // Window may not exist — that's fine
+    }
+
+    // Step 2: Wait for cleanup
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Step 3: Re-launch the space
+    const globalConfig = JSON.parse(fs.readFileSync(path.join(SUPERBOT3_HOME, 'config.json'), 'utf-8'));
+    const model = globalConfig.model || 'claude-opus-4-6';
+    const spaceWorkDir = config.codeDir || config.spaceDir;
+
+    // Ensure inbox exists
+    const inboxDir = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes');
+    fs.mkdirSync(inboxDir, { recursive: true });
+    const inboxPath = path.join(inboxDir, 'team-lead.json');
+    if (!fs.existsSync(inboxPath)) {
+      fs.writeFileSync(inboxPath, '[]', 'utf-8');
+    }
+
+    // Write launch script
+    const scriptDir = path.join(SUPERBOT3_HOME, '.tmp');
+    fs.mkdirSync(scriptDir, { recursive: true });
+    const scriptPath = path.join(scriptDir, `launch-${config.slug}.sh`);
+    const teamArgs = `--agent-id 'team-lead@${config.slug}' --agent-name 'team-lead' --team-name '${config.slug}'`;
+    const script = `#!/bin/bash\ncd "${spaceWorkDir}"\nexport CLAUDE_CONFIG_DIR="${config.claudeConfigDir}"\nexport CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\nexec claude --dangerously-skip-permissions --model ${model} ${teamArgs}\n`;
+    fs.writeFileSync(scriptPath, script, { mode: 0o755 });
+
+    // Launch in tmux
+    execSync(`tmux new-window -t superbot3 -n ${config.slug} "bash ${scriptPath}"`, { timeout: 5000 });
+
+    // Send startup prompt
+    const startupPrompt = 'Read your CLAUDE.md. Scan knowledge/ for context. Report your identity, skills, agents, and knowledge files.';
+    await writeToInbox(inboxPath, { from: 'superbot3', text: startupPrompt });
+
+    res.json({ ok: true, message: `Space "${config.slug}" restarted` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── WebSocket for real-time updates ──────────────────────────────────────────
 
 let wss = null;

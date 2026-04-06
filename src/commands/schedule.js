@@ -44,7 +44,7 @@ function cronToHuman(cron) {
   return cron;
 }
 
-function add(home, spaceName, cron, prompt) {
+function add(home, spaceName, cron, prompt, opts = {}) {
   const spaceDir = path.join(home, 'spaces', spaceName);
   if (!fs.existsSync(path.join(spaceDir, 'space.json'))) {
     console.error(`Error: Space "${spaceName}" does not exist.`);
@@ -53,18 +53,22 @@ function add(home, spaceName, cron, prompt) {
   const filePath = getSchedulePath(home, spaceName);
   const data = readSchedule(filePath);
   const id = crypto.randomUUID().slice(0, 8);
+  const isOnce = opts.once === true;
+  const finalPrompt = isOnce
+    ? `[ONE-TIME] ${prompt}\n\nAfter completing this task, run: superbot3 schedule remove ${spaceName} ${id}`
+    : prompt;
   data.tasks.push({
     id,
     cron,
-    prompt,
+    prompt: finalPrompt,
     createdAt: Date.now(),
-    recurring: true,
+    recurring: !isOnce,
     permanent: true,
   });
   writeSchedule(filePath, data);
-  console.log(`Schedule created: ${id}`);
+  console.log(`Schedule created: ${id}${isOnce ? ' (one-time)' : ''}`);
   console.log(`  Cron: ${cron} (${cronToHuman(cron)})`);
-  console.log(`  Prompt: ${prompt}`);
+  console.log(`  Prompt: ${finalPrompt}`);
 }
 
 function list(home, spaceName) {
