@@ -68,20 +68,20 @@ export function SpaceDetail() {
           <>
           <Tabs defaultValue="plugins" className="flex flex-col h-full">
             <div className="flex items-center gap-1 px-2 py-2 border-b border-border-custom shrink-0">
-              <TabsList className="flex-1 inline-flex h-auto items-center gap-1 rounded-none bg-transparent p-0">
-                <TabsTrigger value="plugins" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+              <TabsList className="flex-1 inline-flex h-auto items-center gap-1 rounded-none bg-transparent p-0 overflow-x-auto scrollbar-none">
+                <TabsTrigger value="plugins" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand shrink-0">
                   <Puzzle className="w-3.5 h-3.5" />Plugins
                 </TabsTrigger>
-                <TabsTrigger value="files" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                <TabsTrigger value="files" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand shrink-0">
                   <FolderOpen className="w-3.5 h-3.5" />Files
                 </TabsTrigger>
-                <TabsTrigger value="memory" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                <TabsTrigger value="memory" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand shrink-0">
                   <Brain className="w-3.5 h-3.5" />Memory
                 </TabsTrigger>
-                <TabsTrigger value="schedules" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                <TabsTrigger value="schedules" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand shrink-0">
                   <Clock className="w-3.5 h-3.5" />Schedules
                 </TabsTrigger>
-                <TabsTrigger value="settings" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                <TabsTrigger value="settings" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand shrink-0">
                   <Settings className="w-3.5 h-3.5" />Settings
                 </TabsTrigger>
               </TabsList>
