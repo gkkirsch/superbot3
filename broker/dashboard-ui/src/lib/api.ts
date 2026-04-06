@@ -1,4 +1,4 @@
-import type { Space, InboxMessage, ScheduledTask, KnowledgeFile, AgentDef, SkillDef, PluginInfo, SkillDetail, AgentDetail, CredentialDeclaration, MemoryFile, MemoryStats } from './types'
+import type { Space, InboxMessage, ScheduledTask, KnowledgeFile, KnowledgeItem, AgentDef, SkillDef, PluginInfo, SkillDetail, AgentDetail, CredentialDeclaration, MemoryFile, MemoryStats } from './types'
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url)
@@ -65,7 +65,7 @@ export const deleteSchedule = (name: string, id: string) =>
 
 // Knowledge
 export const fetchKnowledge = (name: string) =>
-  fetchJson<KnowledgeFile[]>(`/api/spaces/${name}/knowledge`)
+  fetchJson<KnowledgeItem[]>(`/api/spaces/${name}/knowledge`)
 export const fetchKnowledgeFile = (name: string, file: string) =>
   fetchJson<{ content: string }>(`/api/spaces/${name}/knowledge/${encodeURIComponent(file)}`)
 export const saveKnowledgeFile = (name: string, file: string, content: string) =>

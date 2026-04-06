@@ -40,6 +40,14 @@ export interface KnowledgeFile {
   modified: string
 }
 
+export interface KnowledgeItem {
+  name: string       // relative path like "wiki/concepts/plugin-system.md"
+  type: 'file' | 'dir'
+  path?: string      // absolute path (for files)
+  size?: number      // file size (for files)
+  modified?: string  // ISO timestamp (for files)
+}
+
 export interface AgentDef {
   name: string
   filename: string
