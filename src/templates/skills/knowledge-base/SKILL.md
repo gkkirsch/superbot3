@@ -1,7 +1,7 @@
 ---
 name: knowledge-base
 description: Build and maintain a personal knowledge base using LLM-compiled markdown wikis. Inspired by Andrej Karpathy's approach to knowledge management.
-when-to-use: When the user asks to compile knowledge, query the wiki, ingest sources, lint the knowledge base, or reflect on learnings. Also use proactively after research tasks to file findings.
+when-to-use: When the user asks to compile knowledge, query the wiki, ingest sources, or lint the knowledge base. Also use proactively after research tasks to file findings.
 user-invocable: true
 ---
 

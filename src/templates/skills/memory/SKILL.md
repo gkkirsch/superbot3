@@ -19,9 +19,8 @@ memory/
 │                          # Format: - [topic-name.md]: one-line description
 ├── topics/                # Topic files with frontmatter
 │   └── {descriptive-name}.md
-├── sessions/              # Daily session summaries
-│   └── YYYY/MM/YYYY-MM-DD.md
-└── learnings.jsonl        # Structured learning entries
+└── sessions/              # Daily session summaries
+    └── YYYY/MM/YYYY-MM-DD.md
 ```
 
 ## Commands
@@ -83,13 +82,16 @@ Search memory and synthesize an answer.
 
 ### `/memory reflect`
 
-Self-improvement review based on recent sessions and learnings.
+Self-improvement review based on recent sessions and topic files.
 
 **Steps:**
 1. Read recent session files from `memory/sessions/` (last 7 days)
-2. Read `memory/learnings.jsonl` — parse all entries
-3. Group learnings by type (error, correction, knowledge_gap, better_practice, capability_request, task_review)
-4. Count occurrences — if a pattern appears 3+ times, flag it for promotion:
+2. Read all topic files from `memory/topics/`
+3. Look for recurring patterns across topics and sessions:
+   - Similar errors or corrections mentioned in multiple topics
+   - Repeated knowledge gaps
+   - Successful practices that appear consistently
+4. If a pattern appears 3+ times across topics/sessions, flag it for promotion:
    - Better practices → suggest adding to `knowledge/conventions.md` or creating a new skill
    - Errors → suggest adding a prevention note to a topic file or CLAUDE.md
    - Knowledge gaps → suggest creating a research task
@@ -99,7 +101,7 @@ Self-improvement review based on recent sessions and learnings.
    ---
    date: YYYY-MM-DD
    period: <start> to <end>
-   learnings-analyzed: <count>
+   topics-analyzed: <count>
    ---
 
    # Reflection — YYYY-MM-DD
@@ -145,16 +147,14 @@ Show memory system statistics.
 **Steps:**
 1. Count topic files in `memory/topics/`
 2. Count session files in `memory/sessions/` (recursively)
-3. Count entries in `memory/learnings.jsonl` (line count)
-4. Measure `memory/MEMORY.md` size (bytes and line count)
-5. List the 5 most recently modified topic files
-6. Display:
+3. Measure `memory/MEMORY.md` size (bytes and line count)
+4. List the 5 most recently modified topic files
+5. Display:
    ```
    Memory Status
    ─────────────
    Topics:     12 files
    Sessions:   30 files
-   Learnings:  145 entries
    MEMORY.md:  8.2KB / 25KB (142 / 200 lines)
 
    Recent topics:
@@ -163,30 +163,9 @@ Show memory system statistics.
    - feedback-testing.md (3 hours ago)
    ```
 
-## Learnings Format
+## Pattern Detection
 
-Append structured entries to `memory/learnings.jsonl` (one JSON object per line):
-
-```jsonl
-{"timestamp":"2026-04-05T10:00:00Z","type":"error","summary":"Forgot to check API rate limits","details":"Hit 429 on Stripe API during bulk sync.","count":1}
-{"timestamp":"2026-04-05T11:00:00Z","type":"better_practice","summary":"Test with curl before building UI","details":"Saved time by verifying API shape first.","count":1}
-```
-
-**Types:**
-| Type | When to log |
-|------|-------------|
-| `error` | Something went wrong, a mistake was made |
-| `correction` | User corrected your approach or understanding |
-| `knowledge_gap` | Discovered something you don't know and need to learn |
-| `better_practice` | Found a more effective way to do something |
-| `capability_request` | Identified a missing tool or capability |
-| `task_review` | Post-mortem notes on a completed task |
-
-**Incrementing count:** Before appending a new entry, grep `learnings.jsonl` for the summary. If a matching entry exists, update its count instead of creating a duplicate.
-
-## The 3-Occurrence Promotion Threshold
-
-When a learning appears 3+ times (count >= 3), it's a pattern. The `/memory reflect` command surfaces these automatically and suggests promotions.
+The consolidator and `/memory reflect` detect patterns by reading topic files directly. When a theme (e.g., a type of error, a repeated correction) appears across 3+ topic files, it's flagged for promotion. No separate tracking file needed — topic files ARE the learnings.
 
 ## Important
 

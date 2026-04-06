@@ -81,7 +81,6 @@ export function MemoryTab({ slug }: { slug: string }) {
         <div className="flex flex-wrap gap-3 text-[11px] text-stone">
           <span>{stats.topicCount} topics</span>
           <span>{stats.sessionCount} sessions</span>
-          <span>{stats.learningsCount} learnings</span>
           <span>MEMORY.md: {formatBytes(stats.memoryMdSize)}/{formatBytes(stats.memoryMdCap.bytes)} ({stats.memoryMdLines}/{stats.memoryMdCap.lines} lines)</span>
         </div>
       )}

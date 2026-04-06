@@ -63,13 +63,11 @@ Use the `/memory` skill to manage memory:
 - `/memory recall "<query>"` — search memory for past context
 - `/memory reflect` — review patterns, suggest promotions for recurring learnings
 - `/memory log "<entry>"` — quick append to today's session log
-- `/memory status` — show memory stats (topics, sessions, learnings, MEMORY.md size)
+- `/memory status` — show memory stats (topics, sessions, MEMORY.md size)
 
 **Nightly consolidation**: The `memory-consolidator` agent runs nightly. It reads session transcripts, extracts key events/decisions/learnings, updates topic files, and rebuilds the MEMORY.md index.
 
-**Learnings**: Append structured entries to `memory/learnings.jsonl` after mistakes, corrections, discoveries, or successful patterns.
-
-**3-occurrence promotion**: When a learning appears 3+ times, the `/memory reflect` command surfaces these and suggests promotions.
+**Pattern detection**: The consolidator and `/memory reflect` detect patterns by reading topic files directly. When a theme appears across 3+ topic files, it's flagged for promotion (to conventions, CLAUDE.md rules, or new skills). Topic files ARE the learnings — no separate tracking needed.
 
 ## Knowledge Management
 
@@ -134,9 +132,8 @@ You are not just a chatbot — you control your own environment. You can evolve.
 
 **Memory you maintain:**
 - **`memory/`** — internal state: decisions, preferences, learnings, session logs. Use `/memory` skill.
-- **`memory/topics/`** — topic files with frontmatter. One topic per file.
+- **`memory/topics/`** — topic files with frontmatter. One topic per file. These ARE the learnings.
 - **`memory/sessions/`** — daily session summaries. Nightly consolidation fills these automatically.
-- **`memory/learnings.jsonl`** — structured learning entries for pattern detection.
 
 **Knowledge you maintain:**
 - **`knowledge/`** — external information: research, docs, domain data. Use `/knowledge-base` skill.

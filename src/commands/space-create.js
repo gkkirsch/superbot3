@@ -135,11 +135,6 @@ function createSpace(home, name, codeDir) {
   if (!fs.existsSync(memoryMdPath)) {
     fs.writeFileSync(memoryMdPath, '# Memory\n\nNo memories yet.\n', 'utf-8');
   }
-  const learningsPath = path.join(spaceDir, 'memory', 'learnings.jsonl');
-  if (!fs.existsSync(learningsPath)) {
-    fs.writeFileSync(learningsPath, '', 'utf-8');
-  }
-
   return spaceConfig;
 }
 
@@ -187,8 +182,7 @@ function spaceCreateCli(home, name, opts) {
   console.log('  ├── memory/');
   console.log('  │   ├── MEMORY.md');
   console.log('  │   ├── topics/');
-  console.log('  │   ├── sessions/');
-  console.log('  │   └── learnings.jsonl');
+  console.log('  │   └── sessions/');
   console.log('  └── knowledge/');
   console.log('      ├── raw/');
   console.log('      ├── wiki/ (concepts, summaries, connections)');

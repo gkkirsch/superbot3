@@ -46,15 +46,7 @@ You are a memory consolidation agent. Your job is to process today's session tra
      - ...
      ```
 
-3. **Update learnings.jsonl**
-   - For each extracted learning, check if a similar entry already exists (grep for the summary)
-   - If it exists, increment its count
-   - If not, append a new entry:
-     ```jsonl
-     {"timestamp":"...","type":"error|correction|knowledge_gap|better_practice|capability_request|task_review","summary":"...","details":"...","count":1}
-     ```
-
-4. **Update topic files**
+3. **Update topic files**
    - For each extracted piece of information, determine which topic file it belongs to
    - Read existing topic files in `memory/topics/` to find matches
    - Update existing files (merge new info, resolve contradictions) or create new ones
@@ -67,17 +59,17 @@ You are a memory consolidation agent. Your job is to process today's session tra
      ---
      ```
 
-5. **Rebuild MEMORY.md index**
+4. **Rebuild MEMORY.md index**
    - Read all topic files in `memory/topics/`
    - Build the index with one line per topic: `- [filename](topics/filename) — description`
    - Keep under 200 lines / 25KB total
    - If over limit: merge related topics, remove stale entries
    - Organize semantically by type (user, feedback, project, reference)
 
-6. **Scan for promotion candidates**
-   - Read `memory/learnings.jsonl`
-   - Find entries with count >= 3
-   - For each, suggest a promotion:
+5. **Scan for promotion candidates**
+   - Read all topic files in `memory/topics/`
+   - Look for recurring patterns across topics (similar errors, repeated corrections, consistent practices)
+   - If a pattern appears across 3+ topic files, suggest a promotion:
      - `better_practice` → add to `knowledge/conventions.md` or create a skill
      - `error` → add prevention rule to a topic file
      - `knowledge_gap` → suggest research task

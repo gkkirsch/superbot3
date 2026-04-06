@@ -610,19 +610,12 @@ app.get('/api/spaces/:name/memory/stats', (req, res) => {
   const topicsDir = path.join(memoryDir, 'topics');
   const sessionsDir = path.join(memoryDir, 'sessions');
   const memoryMd = path.join(memoryDir, 'MEMORY.md');
-  const learningsPath = path.join(memoryDir, 'learnings.jsonl');
 
   let topicCount = 0;
   try { topicCount = fs.readdirSync(topicsDir).filter(f => f.endsWith('.md')).length; } catch {}
 
   let sessionCount = 0;
   try { sessionCount = walkDir(sessionsDir, sessionsDir).length; } catch {}
-
-  let learningsCount = 0;
-  try {
-    const content = fs.readFileSync(learningsPath, 'utf-8').trim();
-    if (content) learningsCount = content.split('\n').length;
-  } catch {}
 
   let memoryMdSize = 0;
   let memoryMdLines = 0;
@@ -635,7 +628,6 @@ app.get('/api/spaces/:name/memory/stats', (req, res) => {
   res.json({
     topicCount,
     sessionCount,
-    learningsCount,
     memoryMdSize,
     memoryMdLines,
     memoryMdCap: { bytes: 25600, lines: 200 },

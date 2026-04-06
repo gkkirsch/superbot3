@@ -96,7 +96,6 @@ export interface MemoryFile {
 export interface MemoryStats {
   topicCount: number
   sessionCount: number
-  learningsCount: number
   memoryMdSize: number
   memoryMdLines: number
   memoryMdCap: { bytes: number; lines: number }
