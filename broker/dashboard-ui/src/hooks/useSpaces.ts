@@ -43,6 +43,22 @@ export function useKnowledge(name: string) {
   })
 }
 
+export function useMemory(name: string) {
+  return useQuery({
+    queryKey: ['memory', name],
+    queryFn: () => api.fetchMemoryFiles(name),
+    enabled: !!name,
+  })
+}
+
+export function useMemoryStats(name: string) {
+  return useQuery({
+    queryKey: ['memory-stats', name],
+    queryFn: () => api.fetchMemoryStats(name),
+    enabled: !!name,
+  })
+}
+
 export function useWorkers(name: string) {
   return useQuery({
     queryKey: ['workers', name],

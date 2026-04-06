@@ -52,10 +52,13 @@ function createSpace(home, name, codeDir) {
     path.join(spaceDir, '.claude', 'skills', 'space-cli'),
     path.join(spaceDir, '.claude', 'skills', 'schedule-manager'),
     path.join(spaceDir, '.claude', 'skills', 'knowledge-base'),
+    path.join(spaceDir, '.claude', 'skills', 'memory'),
     path.join(spaceDir, '.claude', 'agents'),
     path.join(spaceDir, '.claude', 'plugins'),
     path.join(spaceDir, '.claude', 'teams'),
     path.join(spaceDir, '.claude', 'scratchpad'),
+    path.join(spaceDir, 'memory', 'topics'),
+    path.join(spaceDir, 'memory', 'sessions'),
     path.join(spaceDir, 'knowledge', 'raw'),
     path.join(spaceDir, 'knowledge', 'wiki', 'concepts'),
     path.join(spaceDir, 'knowledge', 'wiki', 'summaries'),
@@ -127,6 +130,16 @@ function createSpace(home, name, codeDir) {
     fs.writeFileSync(schedulePath, JSON.stringify({ tasks: [] }, null, 2), 'utf-8');
   }
 
+  // Create initial memory files
+  const memoryMdPath = path.join(spaceDir, 'memory', 'MEMORY.md');
+  if (!fs.existsSync(memoryMdPath)) {
+    fs.writeFileSync(memoryMdPath, '# Memory\n\nNo memories yet.\n', 'utf-8');
+  }
+  const learningsPath = path.join(spaceDir, 'memory', 'learnings.jsonl');
+  if (!fs.existsSync(learningsPath)) {
+    fs.writeFileSync(learningsPath, '', 'utf-8');
+  }
+
   return spaceConfig;
 }
 
@@ -168,9 +181,14 @@ function spaceCreateCli(home, name, opts) {
   console.log('  │   ├── CLAUDE.md');
   console.log('  │   ├── settings.json');
   console.log('  │   ├── scheduled_tasks.json');
-  console.log('  │   ├── agents/ (planner, coder, researcher, reviewer, knowledge-consolidator)');
-  console.log('  │   ├── skills/ (core-methodology, space-cli, schedule-manager, knowledge-base)');
+  console.log('  │   ├── agents/ (planner, coder, researcher, reviewer, knowledge-consolidator, memory-consolidator)');
+  console.log('  │   ├── skills/ (core-methodology, space-cli, schedule-manager, knowledge-base, memory)');
   console.log('  │   └── plugins/');
+  console.log('  ├── memory/');
+  console.log('  │   ├── MEMORY.md');
+  console.log('  │   ├── topics/');
+  console.log('  │   ├── sessions/');
+  console.log('  │   └── learnings.jsonl');
   console.log('  └── knowledge/');
   console.log('      ├── raw/');
   console.log('      ├── wiki/ (concepts, summaries, connections)');

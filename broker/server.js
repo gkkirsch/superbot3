@@ -574,6 +574,108 @@ app.delete('/api/spaces/:name/knowledge/:file', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Memory ───────────────────────────────────────────────────────────────────
+
+function walkDir(dir, base) {
+  const results = [];
+  if (!fs.existsSync(dir)) return results;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    const relPath = path.relative(base, fullPath);
+    if (entry.isDirectory()) {
+      results.push(...walkDir(fullPath, base));
+    } else {
+      const stat = fs.statSync(fullPath);
+      results.push({ name: relPath, path: fullPath, size: stat.size, modified: stat.mtime.toISOString() });
+    }
+  }
+  return results;
+}
+
+app.get('/api/spaces/:name/memory', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const memoryDir = path.join(config.spaceDir, 'memory');
+  const files = walkDir(memoryDir, memoryDir);
+  res.json(files);
+});
+
+app.get('/api/spaces/:name/memory/stats', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const memoryDir = path.join(config.spaceDir, 'memory');
+  const topicsDir = path.join(memoryDir, 'topics');
+  const sessionsDir = path.join(memoryDir, 'sessions');
+  const memoryMd = path.join(memoryDir, 'MEMORY.md');
+  const learningsPath = path.join(memoryDir, 'learnings.jsonl');
+
+  let topicCount = 0;
+  try { topicCount = fs.readdirSync(topicsDir).filter(f => f.endsWith('.md')).length; } catch {}
+
+  let sessionCount = 0;
+  try { sessionCount = walkDir(sessionsDir, sessionsDir).length; } catch {}
+
+  let learningsCount = 0;
+  try {
+    const content = fs.readFileSync(learningsPath, 'utf-8').trim();
+    if (content) learningsCount = content.split('\n').length;
+  } catch {}
+
+  let memoryMdSize = 0;
+  let memoryMdLines = 0;
+  try {
+    const content = fs.readFileSync(memoryMd, 'utf-8');
+    memoryMdSize = Buffer.byteLength(content, 'utf-8');
+    memoryMdLines = content.split('\n').length;
+  } catch {}
+
+  res.json({
+    topicCount,
+    sessionCount,
+    learningsCount,
+    memoryMdSize,
+    memoryMdLines,
+    memoryMdCap: { bytes: 25600, lines: 200 },
+  });
+});
+
+app.get('/api/spaces/:name/memory/file/*', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const relPath = req.params[0];
+  const filePath = path.join(config.spaceDir, 'memory', relPath);
+
+  // Prevent path traversal
+  if (!filePath.startsWith(path.join(config.spaceDir, 'memory'))) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
+
+  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found' });
+  const content = fs.readFileSync(filePath, 'utf-8');
+  res.json({ content });
+});
+
+app.put('/api/spaces/:name/memory/file/*', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const relPath = req.params[0];
+  const filePath = path.join(config.spaceDir, 'memory', relPath);
+
+  // Prevent path traversal
+  if (!filePath.startsWith(path.join(config.spaceDir, 'memory'))) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
+
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.writeFileSync(filePath, req.body.content, 'utf-8');
+  res.json({ ok: true });
+});
+
 // ── Plugins ──────────────────────────────────────────────────────────────────
 
 /** Read plugins from a single marketplace directory (cloned repo or flat JSON) */
@@ -1543,6 +1645,134 @@ try {
     console.log(`Home: ${SUPERBOT3_HOME}`);
   });
 }
+
+// ── Broker-Side Cron Scheduler ───────────────────────────────────────────────
+// Claude Code's built-in scheduler is feature-gated (AGENT_TRIGGERS) and may not fire.
+// This scheduler reads scheduled_tasks.json for each space and sends prompts via inbox.
+
+// writeToInbox and getSpaceInboxPath already imported at top of file
+const inboxModule = require(path.join(__dirname, '..', 'src', 'inbox'));
+const schedWriteToInbox = inboxModule.writeToInbox;
+const schedGetSpaceInboxPath = inboxModule.getSpaceInboxPath;
+
+function parseCronFields(expr) {
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length !== 5) return null;
+
+  function expand(field, min, max) {
+    const values = new Set();
+    for (const part of field.split(',')) {
+      const stepMatch = part.match(/^\*(?:\/(\d+))?$/);
+      if (stepMatch) {
+        const step = stepMatch[1] ? parseInt(stepMatch[1]) : 1;
+        for (let i = min; i <= max; i += step) values.add(i);
+        continue;
+      }
+      const rangeMatch = part.match(/^(\d+)-(\d+)(?:\/(\d+))?$/);
+      if (rangeMatch) {
+        const lo = parseInt(rangeMatch[1]), hi = parseInt(rangeMatch[2]);
+        const step = rangeMatch[3] ? parseInt(rangeMatch[3]) : 1;
+        for (let i = lo; i <= hi; i += step) values.add(i);
+        continue;
+      }
+      const num = parseInt(part);
+      if (!isNaN(num) && num >= min && num <= max) values.add(num);
+    }
+    return values;
+  }
+
+  return {
+    minute: expand(parts[0], 0, 59),
+    hour: expand(parts[1], 0, 23),
+    dom: expand(parts[2], 1, 31),
+    month: expand(parts[3], 1, 12),
+    dow: expand(parts[4], 0, 6),
+    domWild: parts[2] === '*',
+    dowWild: parts[4] === '*',
+  };
+}
+
+function cronMatches(fields, date) {
+  if (!fields.minute.has(date.getMinutes())) return false;
+  if (!fields.hour.has(date.getHours())) return false;
+  if (!fields.month.has(date.getMonth() + 1)) return false;
+  const dayMatch = fields.domWild && fields.dowWild ? true
+    : fields.domWild ? fields.dow.has(date.getDay())
+    : fields.dowWild ? fields.dom.has(date.getDate())
+    : fields.dom.has(date.getDate()) || fields.dow.has(date.getDay());
+  return dayMatch;
+}
+
+// Track last-fired per task to prevent double-firing
+const lastFiredMap = new Map();
+
+function runSchedulerTick() {
+  const now = new Date();
+  const nowMinuteKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
+
+  try {
+    const spacesDir = path.join(SUPERBOT3_HOME, 'spaces');
+    if (!fs.existsSync(spacesDir)) return;
+
+    const spaceSlugs = fs.readdirSync(spacesDir).filter(s => {
+      return fs.existsSync(path.join(spacesDir, s, 'space.json'));
+    });
+
+    for (const slug of spaceSlugs) {
+      const tasksPath = path.join(spacesDir, slug, '.claude', 'scheduled_tasks.json');
+      let data;
+      try {
+        data = JSON.parse(fs.readFileSync(tasksPath, 'utf-8'));
+      } catch { continue; }
+
+      if (!data.tasks || !Array.isArray(data.tasks)) continue;
+
+      for (const task of data.tasks) {
+        const fields = parseCronFields(task.cron);
+        if (!fields) continue;
+
+        const taskKey = `${slug}:${task.id}:${nowMinuteKey}`;
+        if (lastFiredMap.has(taskKey)) continue;
+
+        if (cronMatches(fields, now)) {
+          lastFiredMap.set(taskKey, true);
+          console.log(`[scheduler] Firing task ${task.id} for space ${slug}: ${task.prompt.slice(0, 60)}`);
+
+          // Send the prompt to the space's inbox
+          const configDir = path.join(spacesDir, slug, '.claude');
+          const inboxPath = schedGetSpaceInboxPath(configDir, slug);
+
+          schedWriteToInbox(inboxPath, {
+            from: 'scheduler',
+            text: task.prompt,
+            summary: `Scheduled: ${task.prompt.slice(0, 50)}`,
+          }).catch(err => {
+            console.error(`[scheduler] Failed to send to ${slug}: ${err.message}`);
+          });
+
+          // Update lastFiredAt in the file
+          task.lastFiredAt = Date.now();
+          try {
+            fs.writeFileSync(tasksPath, JSON.stringify(data, null, 2) + '\n', 'utf-8');
+          } catch {}
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`[scheduler] Tick error: ${err.message}`);
+  }
+
+  // Clean old entries from lastFiredMap (keep last 10 minutes only)
+  if (lastFiredMap.size > 1000) {
+    lastFiredMap.clear();
+  }
+}
+
+// Run scheduler check every 30 seconds
+setInterval(runSchedulerTick, 30000);
+// Also run immediately on startup
+setTimeout(runSchedulerTick, 5000);
+console.log('[scheduler] Broker-side cron scheduler started (30s tick)');
 
 // ── SPA fallback ─────────────────────────────────────────────────────────────
 

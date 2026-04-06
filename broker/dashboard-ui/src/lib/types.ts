@@ -86,6 +86,22 @@ export interface CredentialDeclaration {
   required?: boolean
 }
 
+export interface MemoryFile {
+  name: string
+  path: string
+  size: number
+  modified: string
+}
+
+export interface MemoryStats {
+  topicCount: number
+  sessionCount: number
+  learningsCount: number
+  memoryMdSize: number
+  memoryMdLines: number
+  memoryMdCap: { bytes: number; lines: number }
+}
+
 export interface PluginInfo {
   name: string
   description: string

@@ -1,4 +1,4 @@
-import type { Space, InboxMessage, ScheduledTask, KnowledgeFile, AgentDef, SkillDef, PluginInfo, SkillDetail, AgentDetail, CredentialDeclaration } from './types'
+import type { Space, InboxMessage, ScheduledTask, KnowledgeFile, AgentDef, SkillDef, PluginInfo, SkillDetail, AgentDetail, CredentialDeclaration, MemoryFile, MemoryStats } from './types'
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url)
@@ -75,6 +75,16 @@ export const deleteKnowledgeFile = (name: string, file: string) =>
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
     return r.json() as Promise<{ ok: boolean }>
   })
+
+// Memory
+export const fetchMemoryFiles = (name: string) =>
+  fetchJson<MemoryFile[]>(`/api/spaces/${name}/memory`)
+export const fetchMemoryStats = (name: string) =>
+  fetchJson<MemoryStats>(`/api/spaces/${name}/memory/stats`)
+export const fetchMemoryFile = (name: string, filePath: string) =>
+  fetchJson<{ content: string }>(`/api/spaces/${name}/memory/file/${encodeURIComponent(filePath)}`)
+export const saveMemoryFile = (name: string, filePath: string, content: string) =>
+  putJson<{ ok: boolean }>(`/api/spaces/${name}/memory/file/${encodeURIComponent(filePath)}`, { content })
 
 // Plugins & Skills
 export const fetchPlugins = (name: string) =>

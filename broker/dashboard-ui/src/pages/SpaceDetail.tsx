@@ -2,13 +2,14 @@ import { useParams } from 'react-router-dom'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ChatSection } from '@/features/ChatSection'
 import { KnowledgeTab } from '@/features/KnowledgeTab'
+import { MemoryTab } from '@/features/MemoryTab'
 import { SchedulesTab } from '@/features/SchedulesTab'
 import { PluginsTab } from '@/features/PluginsTab'
 import { SettingsTab } from '@/features/SettingsTab'
 import { useSpace, useSpaceMessages, useSpaceConversation } from '@/hooks/useSpaces'
 import { sendSpaceMessage } from '@/lib/api'
 import { usePanel } from '@/hooks/usePanel'
-import { PanelRight, X, Puzzle, FolderOpen, Clock, Settings } from 'lucide-react'
+import { PanelRight, X, Puzzle, FolderOpen, Clock, Settings, Brain } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function SpaceDetail() {
@@ -32,7 +33,7 @@ export function SpaceDetail() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 shrink-0">
-          <h1 className="text-base font-semibold text-parchment">{space.slug}</h1>
+          <h1 className="text-base font-semibold text-parchment">{space.name || space.slug}</h1>
           {space.codeDir && (
             <span className="text-xs text-stone font-mono">{space.codeDir}</span>
           )}
@@ -74,6 +75,9 @@ export function SpaceDetail() {
                 <TabsTrigger value="files" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
                   <FolderOpen className="w-3.5 h-3.5" />Files
                 </TabsTrigger>
+                <TabsTrigger value="memory" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                  <Brain className="w-3.5 h-3.5" />Memory
+                </TabsTrigger>
                 <TabsTrigger value="schedules" className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
                   <Clock className="w-3.5 h-3.5" />Schedules
                 </TabsTrigger>
@@ -94,6 +98,9 @@ export function SpaceDetail() {
               </TabsContent>
               <TabsContent value="files" className="px-4">
                 <KnowledgeTab slug={slug!} />
+              </TabsContent>
+              <TabsContent value="memory" className="px-4">
+                <MemoryTab slug={slug!} />
               </TabsContent>
               <TabsContent value="schedules" className="px-4">
                 <SchedulesTab slug={slug!} />

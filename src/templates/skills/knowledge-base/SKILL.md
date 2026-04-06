@@ -22,13 +22,11 @@ knowledge/
 │   ├── summaries/    # Source document summaries
 │   ├── connections/  # Cross-references, relationship maps
 │   └── index.md      # Auto-maintained master index
-├── logs/             # Daily activity logs (append-only)
-│   └── YYYY/MM/YYYY-MM-DD.md
-├── queries/          # Filed-back Q&A outputs
-│   ├── reflections/  # Self-improvement reflections
-│   └── (query results that enhance the wiki)
-└── learnings.jsonl   # Structured learning entries
+└── queries/          # Filed-back Q&A outputs
+    └── (query results that enhance the wiki)
 ```
+
+> **Note:** Daily logs, learnings, and reflections now live in `memory/` — use the `/memory` skill for those.
 
 ## Commands
 
@@ -192,87 +190,11 @@ type: article
 ---
 ```
 
-### `/knowledge-base reflect`
-
-Self-improvement review based on recent activity and learnings.
-
-**Steps:**
-1. Read recent daily logs from `knowledge/logs/` (last 7 days)
-2. Read `knowledge/learnings.jsonl` — parse all entries
-3. Group learnings by type (error, correction, knowledge_gap, better_practice, etc.)
-4. Count occurrences — if a pattern appears 3+ times, flag it for promotion
-5. Identify:
-   - What worked well (better_practice entries)
-   - What failed (error, correction entries)
-   - Knowledge gaps (knowledge_gap entries)
-   - Capability requests (capability_request entries)
-6. Write reflection to `knowledge/queries/reflections/<date>-reflection.md`:
-
-```markdown
----
-date: 2026-04-05
-period: 2026-03-29 to 2026-04-05
-learnings-analyzed: 15
----
-
-# Reflection — <date>
-
-## What Worked
-- ...
-
-## What Failed
-- ...
-
-## Knowledge Gaps
-- ...
-
-## Patterns for Promotion (3+ occurrences)
-- "<pattern>" appeared X times → suggest adding to CLAUDE.md / creating a skill
-
-## Action Items
-- [ ] ...
-```
-
-## Learnings Format
-
-Append structured entries to `knowledge/learnings.jsonl` (one JSON object per line):
-
-```jsonl
-{"timestamp":"2026-04-05T10:00:00Z","type":"error","summary":"Forgot to check API rate limits","details":"Hit 429 on Stripe API during bulk sync. Should check rate limit headers.","count":1}
-{"timestamp":"2026-04-05T11:00:00Z","type":"better_practice","summary":"Always test with curl before building UI","details":"Saved 30 min by verifying API response shape before coding the component.","count":1}
-{"timestamp":"2026-04-05T12:00:00Z","type":"knowledge_gap","summary":"Don't know how Claude Code handles hook priorities","details":"Need to research whether hooks run in order or parallel.","count":1}
-```
-
-**Types:**
-| Type | When to log |
-|------|-------------|
-| `error` | Something went wrong, a mistake was made |
-| `correction` | User corrected your approach or understanding |
-| `knowledge_gap` | Discovered something you don't know and need to learn |
-| `better_practice` | Found a more effective way to do something |
-| `capability_request` | Identified a missing tool or capability |
-| `task_review` | Post-mortem notes on a completed task |
-
-**Incrementing count:** Before appending a new entry, grep `learnings.jsonl` for the summary. If a matching entry exists, update its count instead of creating a duplicate.
-
-## The 3-Occurrence Promotion Threshold
-
-When a learning appears 3+ times (count >= 3), it's no longer a one-off — it's a pattern. Promote it:
-
-1. **Better practices** → Add to `knowledge/conventions.md` or create a skill
-2. **Errors** → Add a prevention rule to CLAUDE.md or a pre-commit check
-3. **Knowledge gaps** → Research and write a wiki article
-4. **Corrections** → Add to CLAUDE.md as a behavioral rule
-
-The `/knowledge-base reflect` command surfaces these automatically.
-
 ## Integration with Daily Work
 
 - After any research task: file findings into `raw/` and run compile
-- After resolving a tricky bug: add a learning entry
-- After user corrections: add a correction learning
-- Weekly: run reflect to review patterns
 - When starting a new topic: query the wiki first to see what you already know
+- For learnings, reflections, and session logs: use the `/memory` skill instead
 
 ## Important
 
