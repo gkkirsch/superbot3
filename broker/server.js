@@ -1412,6 +1412,24 @@ app.put('/api/spaces/:name/system-prompt', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Model ────────────────────────────────────────────────────────────────────
+
+app.post('/api/spaces/:name/model', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+  const { model } = req.body;
+  if (!model || typeof model !== 'string') return res.status(400).json({ error: 'model required' });
+  const spaceJsonPath = path.join(SUPERBOT3_HOME, 'spaces', req.params.name, 'space.json');
+  try {
+    const spaceJson = JSON.parse(fs.readFileSync(spaceJsonPath, 'utf-8'));
+    spaceJson.model = model;
+    fs.writeFileSync(spaceJsonPath, JSON.stringify(spaceJson, null, 2), 'utf-8');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Restart Space ────────────────────────────────────────────────────────────
 
 app.post('/api/spaces/:name/restart', async (req, res) => {
@@ -1431,7 +1449,7 @@ app.post('/api/spaces/:name/restart', async (req, res) => {
 
     // Step 3: Re-launch the space
     const globalConfig = JSON.parse(fs.readFileSync(path.join(SUPERBOT3_HOME, 'config.json'), 'utf-8'));
-    const model = globalConfig.model || 'claude-opus-4-6';
+    const model = config.model || globalConfig.model || 'claude-opus-4-6';
     const spaceWorkDir = config.codeDir || config.spaceDir;
 
     // Ensure inbox exists

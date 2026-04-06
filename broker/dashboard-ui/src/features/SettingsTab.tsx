@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Space } from '@/lib/types'
-import { fetchSystemPrompt, saveSystemPrompt, restartSpace } from '@/lib/api'
+import { fetchSystemPrompt, saveSystemPrompt, restartSpace, setSpaceModel } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, Save, RotateCcw, Loader2, Check, AlertTriangle, RefreshCw } from 'lucide-react'
+import { FileText, Save, RotateCcw, Loader2, Check, AlertTriangle, RefreshCw, Cpu } from 'lucide-react'
 
 export function SettingsTab({ space }: { space: Space }) {
   const queryClient = useQueryClient()
@@ -18,6 +18,9 @@ export function SettingsTab({ space }: { space: Space }) {
   const [feedback, setFeedback] = useState<'saved' | 'error' | null>(null)
   const [restarting, setRestarting] = useState(false)
   const [restartFeedback, setRestartFeedback] = useState<'restarted' | 'error' | null>(null)
+  const [selectedModel, setSelectedModel] = useState(space.model || 'claude-opus-4-6')
+  const [modelSaving, setModelSaving] = useState(false)
+  const [modelFeedback, setModelFeedback] = useState<'saved' | 'error' | null>(null)
 
   useEffect(() => {
     if (promptData?.content) setContent(promptData.content)
@@ -61,6 +64,29 @@ export function SettingsTab({ space }: { space: Space }) {
     }
   }
 
+  async function handleModelChange(model: string) {
+    setSelectedModel(model)
+    setModelSaving(true)
+    setModelFeedback(null)
+    try {
+      await setSpaceModel(space.slug, model)
+      queryClient.invalidateQueries({ queryKey: ['space', space.slug] })
+      setModelFeedback('saved')
+      setTimeout(() => setModelFeedback(null), 3000)
+    } catch {
+      setModelFeedback('error')
+    } finally {
+      setModelSaving(false)
+    }
+  }
+
+  const models = [
+    { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
+    { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+    { value: 'claude-sonnet-4-5-20250514', label: 'Claude Sonnet 4.5' },
+    { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+  ]
+
   const items = [
     { label: 'Name', value: space.name },
     { label: 'Slug', value: space.slug },
@@ -88,6 +114,51 @@ export function SettingsTab({ space }: { space: Space }) {
               </div>
             ))}
           </dl>
+        </CardContent>
+      </Card>
+
+      {/* Model Selector */}
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <Cpu className="h-4 w-4 text-sand" />
+            <CardTitle className="text-sm">Model</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedModel}
+              onChange={(e) => handleModelChange(e.target.value)}
+              disabled={modelSaving}
+              className="flex-1 bg-ink border border-border-custom rounded px-2 py-1.5 text-xs text-parchment font-mono focus:outline-none focus:border-sand/40 disabled:opacity-50"
+            >
+              {models.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            {modelSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-stone" />}
+            {modelFeedback === 'saved' && (
+              <span className="flex items-center gap-1 text-[10px] text-green-400">
+                <Check className="h-3 w-3" /> Saved —{' '}
+                <button
+                  onClick={handleRestart}
+                  disabled={restarting}
+                  className="underline hover:text-green-300 transition-colors"
+                >
+                  {restarting ? 'restarting...' : 'restart to apply'}
+                </button>
+              </span>
+            )}
+            {modelFeedback === 'error' && (
+              <span className="flex items-center gap-1 text-[10px] text-ember">
+                <AlertTriangle className="h-3 w-3" /> Failed
+              </span>
+            )}
+          </div>
+          <p className="text-[10px] text-stone/50 mt-2">
+            The Claude model used by this space. Restart the space to apply changes.
+          </p>
         </CardContent>
       </Card>
 

@@ -125,6 +125,10 @@ export const fetchSkillFileContent = (space: string, skill: string, filePath: st
     `/api/spaces/${space}/skills/${skill}/file?path=${encodeURIComponent(filePath)}${source ? `&source=${encodeURIComponent(source)}` : ''}`
   )
 
+// Model
+export const setSpaceModel = (name: string, model: string) =>
+  postJson<{ ok: boolean }>(`/api/spaces/${name}/model`, { model })
+
 // Restart Space
 export const restartSpace = (name: string) =>
   postJson<{ ok: boolean; message: string }>(`/api/spaces/${name}/restart`, {})

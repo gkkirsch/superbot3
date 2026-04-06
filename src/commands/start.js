@@ -235,7 +235,8 @@ module.exports = async function start(home) {
       ensureTeamConfig(space.claudeConfigDir, space.slug);
       ensureInbox(space.claudeConfigDir, space.slug, 'team-lead');
 
-      const spaceScript = writeLaunchScript(space.slug, spaceWorkDir, model, space.sessionId, space.claudeConfigDir, spaceTeamArgs);
+      const spaceModel = space.model || model;
+      const spaceScript = writeLaunchScript(space.slug, spaceWorkDir, spaceModel, space.sessionId, space.claudeConfigDir, spaceTeamArgs);
       execSync(`tmux new-window -t superbot3 -n ${space.slug} "bash ${spaceScript}"`);
       console.log(`  Started space "${space.slug}" (cwd: ${spaceWorkDir})`);
     }

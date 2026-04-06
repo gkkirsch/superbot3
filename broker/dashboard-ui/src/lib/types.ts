@@ -7,6 +7,7 @@ export interface Space {
   active: boolean
   created: string
   sessionId: string | null
+  model?: string
   browser?: { maxConcurrent: number; cdpPort: number }
   lastStopped?: string
   running?: boolean
