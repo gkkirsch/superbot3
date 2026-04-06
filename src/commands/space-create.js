@@ -112,6 +112,7 @@ function createSpace(home, name, codeDir) {
   if (fs.existsSync(claudeMdPath)) {
     let content = fs.readFileSync(claudeMdPath, 'utf-8');
     content = content.replace(/\{\{SPACE_NAME\}\}/g, slug);
+    content = content.replace(/\{\{SPACE_DIR\}\}/g, spaceDir);
     if (codeDir) {
       content = content.replace(/\{\{CODE_DIR_SECTION\}\}/g, `Your code directory is \`${codeDir}\`. This is where your workers should make code changes. Your space directory (\`${spaceDir}\`) holds knowledge, config, and project state.`);
     } else {

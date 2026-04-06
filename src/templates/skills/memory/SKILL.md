@@ -169,7 +169,8 @@ The consolidator and `/memory reflect` detect patterns by reading topic files di
 
 ## Important
 
-- ALL writes go to `memory/` — never to `.claude/`
+- ALL writes go to `memory/` (peer to `knowledge/` at the space root) — NEVER to `.claude/` or `.claude/projects/*/memory/`
+- Do NOT use the built-in Claude Code auto-memory system — use this skill's `memory/` directory instead
 - MEMORY.md must stay under 200 lines / 25KB — it's always loaded into the system prompt
 - Keep topic files focused — one topic per file
 - Update existing topics rather than creating duplicates

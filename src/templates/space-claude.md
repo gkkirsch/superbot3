@@ -54,6 +54,8 @@ Workers check in at phase boundaries (Orient, Plan, Execute, Verify, Report). Wh
 
 ## Memory
 
+**CRITICAL: All memory files MUST be written to `{{SPACE_DIR}}/memory/` (the `memory/` directory peer to `knowledge/`). NEVER write to `.claude/projects/*/memory/` or any `.claude/` subdirectory.** The built-in Claude Code auto-memory uses a different path — ignore it. Always use absolute paths starting with `{{SPACE_DIR}}/memory/` when writing memory files.
+
 Memory is your internal state — decisions made, preferences learned, errors encountered, patterns discovered. MEMORY.md is always loaded into your prompt via `@memory/MEMORY.md`.
 
 Use the `/memory` skill to manage memory:
