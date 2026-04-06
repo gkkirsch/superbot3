@@ -6,6 +6,8 @@ import {
   savePluginCredential, deletePluginCredential,
 } from '@/lib/api'
 import type { PluginFile } from '@/lib/api'
+import { FileExplorer } from '@/components/FileExplorer'
+import type { FileItem } from '@/components/FileExplorer'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
@@ -13,7 +15,7 @@ import {
   Puzzle, Blocks, Bot, Search, ExternalLink,
   ChevronDown, ChevronRight, ArrowLeft,
   Server, Tag, Code2, Store, FolderPlus,
-  File, Folder, X, Key, Check, AlertTriangle, Loader2,
+  Key, Check, AlertTriangle, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
@@ -108,7 +110,6 @@ function SkillCard({ skill, slug, onClick }: { skill: SkillDef; slug: string; on
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className={cn('text-xs font-medium', isDisabled ? 'text-stone' : 'text-parchment')}>{skill.name}</span>
-            <SourceBadge source={skill.source} />
             {isDisabled && <Badge variant="outline" className="text-[9px] text-stone/50 border-stone/20">Disabled</Badge>}
           </div>
           {skill.description && <p className="text-[10px] text-stone mt-0.5 line-clamp-1">{skill.description}</p>}
@@ -130,7 +131,6 @@ function AgentCard({ agent, onClick }: { agent: AgentDef; onClick: () => void })
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-parchment">{agent.name || agent.filename}</span>
-            <SourceBadge source={agent.source} />
           </div>
           {agent.description && <p className="text-[10px] text-stone mt-0.5 line-clamp-1">{agent.description}</p>}
         </div>
@@ -152,115 +152,6 @@ function CollapsibleSection({ title, count, defaultOpen, children }: {
         <span className="text-[10px] text-stone/50">({count})</span>
       </button>
       {open && children}
-    </div>
-  )
-}
-
-// ── File Tree + Code Viewer (shared by plugin & skill detail) ────────────────
-
-function FileTree({ files, onSelect, selectedPath }: { files: PluginFile[]; onSelect: (p: string) => void; selectedPath: string | null }) {
-  const topLevel = files.filter(f => !f.path.includes('/'))
-  const childrenOf = (dirPath: string) => files.filter(f => {
-    const parent = f.path.substring(0, f.path.lastIndexOf('/'))
-    return parent === dirPath
-  })
-
-  function renderEntry(entry: PluginFile, depth: number) {
-    const indent = depth * 12
-    if (entry.type === 'dir') {
-      return (
-        <div key={entry.path}>
-          <div className="flex items-center gap-1.5 py-0.5 text-stone/70" style={{ paddingLeft: indent }}>
-            <Folder className="w-3 h-3 text-sand/40 shrink-0" />
-            <span className="text-[11px]">{entry.path.split('/').pop()}</span>
-          </div>
-          {childrenOf(entry.path).map(c => renderEntry(c, depth + 1))}
-        </div>
-      )
-    }
-    return (
-      <button key={entry.path} onClick={() => onSelect(entry.path)}
-        className={cn('flex items-center gap-1.5 py-0.5 w-full text-left rounded-sm transition-colors',
-          selectedPath === entry.path ? 'bg-sand/10 text-sand' : 'text-stone hover:text-parchment hover:bg-ink/30'
-        )} style={{ paddingLeft: indent }}>
-        <File className="w-3 h-3 shrink-0" />
-        <span className="text-[11px] truncate">{entry.path.split('/').pop()}</span>
-        {entry.size !== undefined && entry.size > 1024 && (
-          <span className="text-[9px] text-stone/30 ml-auto pr-1">{(entry.size / 1024).toFixed(0)}k</span>
-        )}
-      </button>
-    )
-  }
-
-  return <div>{topLevel.map(e => renderEntry(e, 0))}</div>
-}
-
-function FilesPanel({ files, loading, fetchContent }: {
-  files: PluginFile[] | null
-  loading: boolean
-  fetchContent: (path: string) => Promise<{ content: string | null; error?: string }>
-}) {
-  const [expanded, setExpanded] = useState(true)
-  const [selectedFile, setSelectedFile] = useState<string | null>(null)
-  const [fileContent, setFileContent] = useState<string | null>(null)
-  const [fileLoading, setFileLoading] = useState(false)
-  const [fileError, setFileError] = useState<string | null>(null)
-
-  async function selectFile(filePath: string) {
-    if (selectedFile === filePath) { setSelectedFile(null); setFileContent(null); return }
-    setSelectedFile(filePath)
-    setFileContent(null)
-    setFileError(null)
-    setFileLoading(true)
-    try {
-      const data = await fetchContent(filePath)
-      if (data.error) { setFileError(data.error); setFileContent(null) }
-      else { setFileContent(data.content) }
-    } catch { setFileError('Failed to load file') }
-    finally { setFileLoading(false) }
-  }
-
-  const fileCount = files ? files.filter(f => f.type === 'file').length : 0
-
-  return (
-    <div>
-      <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-1.5 w-full text-left mb-2">
-        {expanded ? <ChevronDown className="w-3 h-3 text-stone" /> : <ChevronRight className="w-3 h-3 text-stone" />}
-        <Code2 className="w-3 h-3 text-stone" />
-        <span className="text-[10px] font-medium text-stone uppercase tracking-wider">Files</span>
-        {files && <span className="text-[10px] text-stone/50">({fileCount})</span>}
-        {loading && <span className="text-[10px] text-stone/40 ml-1">loading...</span>}
-      </button>
-      {expanded && files && (
-        <div className="border border-border-custom rounded-md overflow-hidden">
-          {files.length === 0 ? (
-            <p className="text-xs text-stone/50 p-3">No files found on disk.</p>
-          ) : (
-            <>
-              <div className="p-2 max-h-48 overflow-y-auto bg-ink/20">
-                <FileTree files={files} onSelect={selectFile} selectedPath={selectedFile} />
-              </div>
-              {selectedFile && (
-                <div className="border-t border-border-custom">
-                  <div className="flex items-center justify-between px-2.5 py-1.5 bg-ink/30">
-                    <span className="text-[10px] text-stone font-mono truncate">{selectedFile}</span>
-                    <button onClick={() => { setSelectedFile(null); setFileContent(null) }} className="p-0.5 text-stone/50 hover:text-parchment transition-colors">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <div className="max-h-80 overflow-auto">
-                    {fileLoading && <p className="text-xs text-stone/50 p-3">Loading...</p>}
-                    {fileError && <p className="text-xs text-stone/50 p-3">{fileError}</p>}
-                    {fileContent !== null && (
-                      <pre className="text-[11px] leading-relaxed text-parchment/80 p-3 font-mono whitespace-pre overflow-x-auto">{fileContent}</pre>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
     </div>
   )
 }
@@ -464,8 +355,20 @@ function PluginDetailView({ plugin, slug, onBack }: { plugin: PluginInfo; slug: 
       )}
       {plugin.installed && <CredentialForm pluginName={plugin.name} slug={slug} />}
       {plugin.hasFiles ? (
-        <FilesPanel files={files} loading={filesLoading}
-          fetchContent={(p) => fetchPluginFileContent(slug, plugin.marketplace, plugin.name, p)} />
+        filesLoading ? (
+          <p className="text-xs text-stone">Loading files...</p>
+        ) : files && files.length > 0 ? (
+          <FileExplorer
+            items={files.map((f): FileItem => ({ name: f.path, type: f.type, size: f.size }))}
+            onFileRead={async (path) => {
+              const data = await fetchPluginFileContent(slug, plugin.marketplace, plugin.name, path)
+              return { content: data.content || '' }
+            }}
+            title={`${plugin.name} files`}
+          />
+        ) : (
+          <p className="text-xs text-stone/50">No files found on disk.</p>
+        )
       ) : (
         <div className="border border-border-custom rounded-md p-3">
           <p className="text-xs text-stone/60">Plugin files not available locally. Run <code className="text-[10px] bg-ink/40 px-1 py-0.5 rounded font-mono">claude plugins install {plugin.name}</code> to download.</p>
@@ -558,8 +461,16 @@ function SkillDetailView({ skillName, slug, source, skillEnabled, onBack }: { sk
           </pre>
         </div>
       )}
-      <FilesPanel files={detail.files} loading={false}
-        fetchContent={(p) => fetchSkillFileContent(slug, skillName, p, source)} />
+      {detail.files && detail.files.length > 0 && (
+        <FileExplorer
+          items={detail.files.map((f): FileItem => ({ name: f.path, type: f.type, size: f.size }))}
+          onFileRead={async (path) => {
+            const data = await fetchSkillFileContent(slug, skillName, path, source)
+            return { content: data.content || '' }
+          }}
+          title={`${skillName} files`}
+        />
+      )}
     </div>
   )
 }
