@@ -44,6 +44,7 @@ export function TabsTrigger({ value, className, ...props }: TabsTriggerProps) {
   const active = ctx.value === value
   return (
     <button
+      data-state={active ? 'active' : 'inactive'}
       className={cn(
         'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all',
         active ? 'bg-surface text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',

@@ -163,10 +163,31 @@ function createSpace(home, name, codeDir) {
     }, null, 2), 'utf-8');
   }
 
-  // Ensure scheduled_tasks.json exists (empty — no default schedules)
+  // Pre-seed scheduled_tasks.json with nightly consolidation crons
   const schedulePath = path.join(spaceDir, '.claude', 'scheduled_tasks.json');
   if (!fs.existsSync(schedulePath)) {
-    fs.writeFileSync(schedulePath, JSON.stringify({ tasks: [] }, null, 2), 'utf-8');
+    const now = Date.now();
+    const defaultSchedule = {
+      tasks: [
+        {
+          id: 'mem-nightly',
+          cron: '0 3 * * *',
+          prompt: 'Run memory consolidation: spawn the memory-consolidator agent to review today\'s session transcripts, extract key decisions/learnings/preferences, update topic files in memory/topics/, and rebuild memory/MEMORY.md index.',
+          createdAt: now,
+          recurring: true,
+          permanent: true,
+        },
+        {
+          id: 'kb-nightly',
+          cron: '0 4 * * *',
+          prompt: 'Run knowledge consolidation: spawn the knowledge-consolidator agent to check knowledge/raw/ for unprocessed sources, compile them into knowledge/wiki/ (summaries, concepts, connections), and update knowledge/wiki/index.md.',
+          createdAt: now,
+          recurring: true,
+          permanent: true,
+        },
+      ],
+    };
+    fs.writeFileSync(schedulePath, JSON.stringify(defaultSchedule, null, 2) + '\n', 'utf-8');
   }
 
   // Create initial memory files
@@ -214,7 +235,7 @@ function spaceCreateCli(home, name, opts) {
   console.log('  ├── .claude/');
   console.log('  │   ├── CLAUDE.md');
   console.log('  │   ├── settings.json');
-  console.log('  │   ├── scheduled_tasks.json');
+  console.log('  │   ├── scheduled_tasks.json (nightly memory + knowledge consolidation)');
   console.log('  │   ├── agents/ (planner, coder, researcher, reviewer, knowledge-consolidator, memory-consolidator)');
   console.log('  │   ├── skills/ (core-methodology, space-cli, schedule-manager, knowledge-base, memory)');
   console.log('  │   ├── hooks/ (session-start-memory, session-start-knowledge)');

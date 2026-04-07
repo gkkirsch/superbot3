@@ -36,11 +36,11 @@ export function CreateSpace() {
           <input
             value={name}
             onChange={e => setName(e.target.value)}
-            placeholder="my-project"
+            placeholder="HostReply AI"
             className="w-full bg-muted rounded-md px-3 py-2 text-sm text-foreground placeholder:text-stone outline-none focus:ring-1 focus:ring-sand/50"
           />
           {name && (
-            <div className="text-xs text-stone mt-1">Slug: {slug}</div>
+            <div className="text-xs text-stone mt-1">Directory: {slug}</div>
           )}
         </div>
 

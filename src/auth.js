@@ -122,13 +122,28 @@ function setupConfigDir(configDir, workDir, codeDir) {
     'utf-8'
   );
 
-  // 3. Merge skipDangerousModePermissionPrompt into settings.json
+  // 3. Merge skipDangerousModePermissionPrompt + permission allow rules into settings.json
   const settingsPath = path.join(configDir, 'settings.json');
   let settings = {};
   try {
     settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
   } catch {}
   settings.skipDangerousModePermissionPrompt = true;
+  // Ensure .claude/ directory is allowed for edits (teammates may not inherit bypass mode)
+  if (!settings.permissions) settings.permissions = { allow: [], deny: [] };
+  if (!settings.permissions.allow) settings.permissions.allow = [];
+  const allowRules = [
+    'Edit(.claude/**)',
+    'Write(.claude/**)',
+    'Read(.claude/**)',
+    'Bash(cat .claude/**)',
+    'Bash(ls .claude/**)',
+  ];
+  for (const rule of allowRules) {
+    if (!settings.permissions.allow.includes(rule)) {
+      settings.permissions.allow.push(rule);
+    }
+  }
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 
   return success;

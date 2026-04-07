@@ -59,14 +59,15 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
     // Add inbox messages not yet in the conversation (pending pickup)
     for (const msg of messages) {
       const isFromUser = msg.from === 'user' || msg.from === 'dashboard' || msg.from === 'superbot3-cli'
-      if (!isFromUser) continue
+      const isFromScheduler = msg.from === 'scheduler'
+      if (!isFromUser && !isFromScheduler) continue
+      const role = isFromScheduler ? 'system' as const : 'user' as const
       const alreadyInConvo = all.some(c =>
-        c.role === 'user'
-        && Math.abs(new Date(c.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 10000
+        Math.abs(new Date(c.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 10000
         && c.text.includes(msg.text.slice(0, 40))
       )
       if (!alreadyInConvo) {
-        all.push({ from: msg.from, text: msg.text, timestamp: msg.timestamp, role: 'user' })
+        all.push({ from: msg.from, text: msg.text, timestamp: msg.timestamp, role })
       }
     }
 
@@ -127,30 +128,41 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
         {merged.slice(-visibleCount).map((msg, i) => {
           const isUser = msg.role === 'user'
           const isAssistant = msg.role === 'assistant'
+          const isScheduled = msg.role === 'system' || msg.from === 'scheduler'
           return (
             <div
               key={`${msg.timestamp}-${i}`}
               className={cn(
                 'animate-fade-up',
-                isUser ? 'flex justify-end' : ''
+                isUser && !isScheduled ? 'flex justify-end' : ''
               )}
             >
-              <div
-                className={cn(
-                  'rounded-2xl text-[0.9375rem] leading-relaxed',
-                  isUser
-                    ? 'bg-sand/15 text-parchment px-5 py-3 max-w-md'
-                    : 'text-parchment px-5 py-3'
-                )}
-              >
-                {isAssistant ? (
-                  <div className="markdown-compact">
-                    <Markdown remarkPlugins={[remarkGfm]}>{msg.text}</Markdown>
+              {isScheduled ? (
+                <div className="flex items-start gap-2 px-5 py-2 my-1 rounded-lg bg-surface/60 border border-border-custom/50">
+                  <span className="text-stone/60 text-xs mt-0.5">⏱</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] font-medium text-stone/50 uppercase tracking-wider">Scheduled</span>
+                    <p className="text-xs text-stone leading-relaxed mt-0.5">{msg.text}</p>
                   </div>
-                ) : (
-                  <div className="whitespace-pre-wrap break-words">{msg.text}</div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div
+                  className={cn(
+                    'rounded-2xl text-[0.9375rem] leading-relaxed',
+                    isUser
+                      ? 'bg-sand/15 text-parchment px-5 py-3 max-w-md'
+                      : 'text-parchment px-5 py-3'
+                  )}
+                >
+                  {isAssistant ? (
+                    <div className="markdown-compact">
+                      <Markdown remarkPlugins={[remarkGfm]}>{msg.text}</Markdown>
+                    </div>
+                  ) : (
+                    <div className="whitespace-pre-wrap break-words">{msg.text}</div>
+                  )}
+                </div>
+              )}
             </div>
           )
         })}

@@ -100,13 +100,13 @@ export function Sidebar() {
               collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-1.5',
               isActive(`/spaces/${space.slug}`) ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-surface'
             )}
-            title={collapsed ? space.slug : undefined}
+            title={collapsed ? (space.name || space.slug) : undefined}
           >
             {collapsed ? (
-              <span className="text-[11px] font-medium">{space.slug[0].toUpperCase()}</span>
+              <span className="text-[11px] font-medium">{(space.name || space.slug)[0].toUpperCase()}</span>
             ) : (
               <>
-                <span className="truncate flex-1">{space.slug}</span>
+                <span className="truncate flex-1">{space.name || space.slug}</span>
                 <button
                   onClick={(e) => toggleStar(space.slug, e)}
                   className={cn(
