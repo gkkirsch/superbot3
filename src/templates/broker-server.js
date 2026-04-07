@@ -4,7 +4,7 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.SUPERBOT3_BROKER_PORT || 3100;
-const SUPERBOT3_HOME = process.env.SUPERBOT3_HOME || path.join(require('os').homedir(), 'superbot3');
+const SUPERBOT3_HOME = process.env.SUPERBOT3_HOME || path.join(require('os').homedir(), '.superbot3');
 
 app.use(express.json());
 

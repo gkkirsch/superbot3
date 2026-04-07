@@ -20,8 +20,7 @@ module.exports = function init(home) {
 
   // Create directory structure
   const dirs = [
-    path.join(home, 'bin'),
-    path.join(home, 'broker'),
+    path.join(home, '.tmp'),
     path.join(home, 'orchestrator', '.claude', 'skills', 'master-cli'),
     path.join(home, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes'),
     path.join(home, 'spaces'),
@@ -117,12 +116,6 @@ module.exports = function init(home) {
     console.log('  Auth configured for orchestrator');
   }
 
-  // Broker server.js (minimal /health for now)
-  writeIfNotExists(
-    path.join(home, 'broker', 'server.js'),
-    fs.readFileSync(path.join(__dirname, '..', 'templates', 'broker-server.js'), 'utf-8')
-  );
-
   // Default space template files
   const templateDir = path.join(home, 'templates', 'default');
 
@@ -173,7 +166,6 @@ module.exports = function init(home) {
   console.log('Directory structure:');
   console.log(`  ${home}/`);
   console.log('  ├── config.json');
-  console.log('  ├── broker/');
   console.log('  ├── orchestrator/.claude/');
   console.log('  ├── spaces/');
   console.log('  └── templates/default/');

@@ -58,7 +58,7 @@ Workers get BOTH:
 ## Directory Structure
 
 ```
-~/superbot3/
+~/.superbot3/
 ├── config.json                          # Global config
 ├── package.json                         # Node dependencies
 ├── bin/superbot3                        # CLI entrypoint
@@ -115,7 +115,7 @@ Workers get BOTH:
 
 | Command | What it does |
 |---------|-------------|
-| `superbot3 init` | Creates ~/superbot3/ skeleton |
+| `superbot3 init` | Creates `~/.superbot3/` skeleton |
 | `superbot3 start` | Boots broker + master + all active spaces |
 | `superbot3 stop` | Shuts down everything |
 | `superbot3 space create <name> [--code-dir <path>]` | Creates a space |
@@ -188,13 +188,13 @@ All internals source is at: `~/dev/claude-code-internals-main/src/`
 ### Terminal verification
 ```bash
 # Check space files
-superbot3 space create test && ls -la ~/superbot3/spaces/test/.claude/
+superbot3 space create test && ls -la ~/.superbot3/spaces/test/.claude/
 
 # Check running status
 superbot3 start && tmux list-panes -t superbot3 -a
 
 # Check messaging
-superbot3 message test "hello" && cat ~/superbot3/spaces/test/.claude/teams/test/inboxes/team-lead.json
+superbot3 message test "hello" && cat ~/.superbot3/spaces/test/.claude/teams/test/inboxes/team-lead.json
 
 # Check broker
 curl localhost:3100/health
@@ -202,8 +202,8 @@ curl localhost:3100/api/spaces
 curl localhost:3100/api/spaces/test/skills
 
 # Check auth
-cat ~/superbot3/spaces/test/.claude/.credentials.json | head -5
-cat ~/superbot3/spaces/test/.claude/.claude.json
+cat ~/.superbot3/spaces/test/.claude/.credentials.json | head -5
+cat ~/.superbot3/spaces/test/.claude/.claude.json
 ```
 
 ### Browser verification
@@ -224,16 +224,16 @@ cat ~/superbot3/spaces/test/.claude/.claude.json
 tmux capture-pane -t superbot3:{space} -p | tail -50
 
 # Check inbox state
-cat ~/superbot3/spaces/{name}/.claude/teams/{name}/inboxes/team-lead.json | python3 -m json.tool
+cat ~/.superbot3/spaces/{name}/.claude/teams/{name}/inboxes/team-lead.json | python3 -m json.tool
 
 # Check if broker is serving dashboard
 curl -I localhost:3100
 
 # Rebuild dashboard
-cd ~/superbot3/broker/dashboard-ui && npm run build
+cd ~/.superbot3/broker/dashboard-ui && npm run build
 
 # Check conversation log
-ls ~/superbot3/spaces/{name}/.claude/projects/
+ls ~/.superbot3/spaces/{name}/.claude/projects/
 ```
 
 ## Known Gaps (as of Phase 2)

@@ -6,7 +6,7 @@ const http = require('http');
 
 const app = express();
 const PORT = process.env.SUPERBOT3_BROKER_PORT || 3100;
-const SUPERBOT3_HOME = process.env.SUPERBOT3_HOME || path.join(require('os').homedir(), 'superbot3');
+const SUPERBOT3_HOME = process.env.SUPERBOT3_HOME || path.join(require('os').homedir(), '.superbot3');
 
 app.use(express.json());
 
@@ -528,15 +528,28 @@ app.get('/api/spaces/:name/knowledge', (req, res) => {
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
   const knowledgeDir = path.join(config.spaceDir, 'knowledge');
+
+  function scanDir(dir, prefix) {
+    const results = [];
+    try {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const e of entries) {
+        const relPath = prefix ? `${prefix}/${e.name}` : e.name;
+        const fullPath = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          results.push({ name: relPath, type: 'dir' });
+          results.push(...scanDir(fullPath, relPath));
+        } else {
+          const stat = fs.statSync(fullPath);
+          results.push({ name: relPath, type: 'file', path: fullPath, size: stat.size, modified: stat.mtime.toISOString() });
+        }
+      }
+    } catch {}
+    return results;
+  }
+
   try {
-    const entries = fs.readdirSync(knowledgeDir, { withFileTypes: true });
-    const files = entries
-      .filter(e => e.isFile() && e.name.endsWith('.md'))
-      .map(e => {
-        const stat = fs.statSync(path.join(knowledgeDir, e.name));
-        return { name: e.name, path: path.join(knowledgeDir, e.name), size: stat.size, modified: stat.mtime.toISOString() };
-      });
-    res.json(files);
+    res.json(scanDir(knowledgeDir, ''));
   } catch {
     res.json([]);
   }
@@ -634,11 +647,12 @@ app.get('/api/spaces/:name/memory/stats', (req, res) => {
   });
 });
 
-app.get('/api/spaces/:name/memory/file/*', (req, res) => {
+app.get('/api/spaces/:name/memory/file', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const relPath = req.params[0];
+  const relPath = req.query.path;
+  if (!relPath) return res.status(400).json({ error: 'path query param required' });
   const filePath = path.join(config.spaceDir, 'memory', relPath);
 
   // Prevent path traversal
@@ -651,11 +665,12 @@ app.get('/api/spaces/:name/memory/file/*', (req, res) => {
   res.json({ content });
 });
 
-app.put('/api/spaces/:name/memory/file/*', (req, res) => {
+app.put('/api/spaces/:name/memory/file', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const relPath = req.params[0];
+  const relPath = req.query.path || req.body.path;
+  if (!relPath) return res.status(400).json({ error: 'path required' });
   const filePath = path.join(config.spaceDir, 'memory', relPath);
 
   // Prevent path traversal

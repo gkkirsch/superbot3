@@ -10,7 +10,7 @@ description: "Space orchestrator management: message master, manage workers, cro
 To send a message to the master orchestrator:
 ```bash
 # Write to master's inbox
-# Path: ~/superbot3/orchestrator/.claude/teams/superbot3/inboxes/team-lead.json
+# Path: ~/.superbot3/orchestrator/.claude/teams/superbot3/inboxes/team-lead.json
 # Format: JSON array of messages, append with read: false
 ```
 

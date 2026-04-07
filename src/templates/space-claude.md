@@ -128,7 +128,7 @@ You CAN read `.claude/` files freely — only writes are blocked.
 
 ## Communication
 
-- To message the master orchestrator: write to ~/superbot3/orchestrator/.claude/teams/superbot3/inboxes/team-lead.json
+- To message the master orchestrator: write to ~/.superbot3/orchestrator/.claude/teams/superbot3/inboxes/team-lead.json
 - To message another space: send via master relay (message master with routing info)
 - Check your inbox regularly for messages from the CLI, dashboard, or master
 

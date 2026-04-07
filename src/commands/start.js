@@ -29,7 +29,7 @@ function tmuxWindowExists(session, windowName) {
  * Auth works via .credentials.json fallback (copied from default keychain during init/space-create).
  */
 function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, teamArgs) {
-  const scriptDir = path.join(require('os').homedir(), 'superbot3', '.tmp');
+  const scriptDir = path.join(require('os').homedir(), '.superbot3', '.tmp');
   fs.mkdirSync(scriptDir, { recursive: true });
 
   const scriptPath = path.join(scriptDir, `launch-${name}.sh`);
@@ -147,9 +147,10 @@ module.exports = async function start(home) {
 
   // Step 1: Start broker
   console.log('Starting broker...');
-  const brokerScript = path.join(home, 'broker', 'server.js');
+  // Broker lives in the code directory (relative to this file), not the data directory
+  const brokerScript = path.resolve(__dirname, '..', '..', 'broker', 'server.js');
   if (!fs.existsSync(brokerScript)) {
-    console.error('Error: Broker server.js not found. Run superbot3 init first.');
+    console.error('Error: Broker server.js not found.');
     process.exit(1);
   }
 
@@ -173,7 +174,9 @@ module.exports = async function start(home) {
       },
     });
     broker.unref();
-    fs.writeFileSync(path.join(home, 'broker', 'broker.pid'), String(broker.pid), 'utf-8');
+    const pidDir = path.join(home, '.tmp');
+    fs.mkdirSync(pidDir, { recursive: true });
+    fs.writeFileSync(path.join(pidDir, 'broker.pid'), String(broker.pid), 'utf-8');
 
     let ready = false;
     for (let i = 0; i < 20; i++) {
@@ -268,7 +271,7 @@ module.exports = async function start(home) {
   // We write to the inbox immediately — the poller picks them up once ready.
   console.log('\nSending startup prompts via inbox...');
 
-  const masterStartup = 'Scan ~/superbot3/spaces/*/space.json to discover all spaces. Report what spaces you find and their status.';
+  const masterStartup = 'Scan ~/.superbot3/spaces/*/space.json to discover all spaces. Report what spaces you find and their status.';
   const masterInboxPath = path.join(home, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
   try {
     await writeToInbox(masterInboxPath, { from: 'superbot3', text: masterStartup });

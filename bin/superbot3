@@ -3,7 +3,7 @@
 const { program } = require('commander');
 const path = require('path');
 
-const SUPERBOT3_HOME = process.env.SUPERBOT3_HOME || path.join(require('os').homedir(), 'superbot3');
+const SUPERBOT3_HOME = process.env.SUPERBOT3_HOME || path.join(require('os').homedir(), '.superbot3');
 
 program
   .name('superbot3')
@@ -13,7 +13,7 @@ program
 // init
 program
   .command('init')
-  .description('Create ~/superbot3/ skeleton')
+  .description('Create ~/.superbot3/ skeleton')
   .action(() => {
     require('../src/commands/init')(SUPERBOT3_HOME);
   });
@@ -72,6 +72,14 @@ program
   .description('Stop everything (all spaces + master + broker)')
   .action(() => {
     require('../src/commands/stop-all')(SUPERBOT3_HOME);
+  });
+
+// update
+program
+  .command('update')
+  .description('Pull latest code, install deps, rebuild dashboard')
+  .action(() => {
+    require('../src/commands/update')();
   });
 
 // reload (broker only, spaces stay alive)

@@ -34,7 +34,7 @@ module.exports = async function stopAll(home) {
   }
 
   // Stop broker
-  const pidFile = path.join(home, 'broker', 'broker.pid');
+  const pidFile = path.join(home, '.tmp', 'broker.pid');
   if (fs.existsSync(pidFile)) {
     const pid = fs.readFileSync(pidFile, 'utf-8').trim();
     try {

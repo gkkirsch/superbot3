@@ -9,7 +9,7 @@ description: "Space lifecycle management: start, stop, health check, message rou
 
 Scan for spaces:
 ```bash
-ls ~/superbot3/spaces/*/space.json 2>/dev/null
+ls ~/.superbot3/spaces/*/space.json 2>/dev/null
 ```
 
 Read each space.json to get: name, slug, codeDir, active status, sessionId.
@@ -20,13 +20,13 @@ To start a space, create a new tmux window and launch Claude with the space's CL
 
 ```bash
 # Read space config
-cat ~/superbot3/spaces/<slug>/space.json
+cat ~/.superbot3/spaces/<slug>/space.json
 
 # Create tmux window for the space
 tmux new-window -t superbot3 -n <slug>
 
 # Launch Claude in the space's window
-tmux send-keys -t superbot3:<slug> "cd <codeDir> && env CLAUDECODE=1 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 CLAUDE_CONFIG_DIR=$HOME/superbot3/spaces/<slug>/.claude claude --dangerously-skip-permissions --model claude-opus-4-6" Enter
+tmux send-keys -t superbot3:<slug> "cd <codeDir> && env CLAUDECODE=1 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 CLAUDE_CONFIG_DIR=$HOME/.superbot3/spaces/<slug>/.claude claude --dangerously-skip-permissions --model claude-opus-4-6" Enter
 ```
 
 After starting, update space.json with the session ID (you'll need to check the Claude process for this).
@@ -36,7 +36,7 @@ After starting, update space.json with the session ID (you'll need to check the 
 1. Write a shutdown message to the space's inbox:
    ```bash
    # The space inbox is at:
-   # ~/superbot3/spaces/<slug>/.claude/teams/<slug>/inboxes/team-lead.json
+   # ~/.superbot3/spaces/<slug>/.claude/teams/<slug>/inboxes/team-lead.json
    ```
 2. Wait up to 30 seconds for graceful shutdown
 3. If no response, kill the tmux window:
@@ -61,7 +61,7 @@ When triggered by the heartbeat cron:
 When you receive a message intended for a space:
 1. Identify the target space from the message
 2. Write to the space's inbox using the inbox protocol:
-   - Inbox path: `~/superbot3/spaces/<slug>/.claude/teams/<slug>/inboxes/team-lead.json`
+   - Inbox path: `~/.superbot3/spaces/<slug>/.claude/teams/<slug>/inboxes/team-lead.json`
    - Read current messages, append new one, write back
    - Use proper-lockfile if available, or atomic write
 
@@ -75,10 +75,10 @@ When a space sends you a message for another space:
 When asked for status:
 ```bash
 # List all space directories
-ls ~/superbot3/spaces/
+ls ~/.superbot3/spaces/
 
 # Check each space.json
-cat ~/superbot3/spaces/*/space.json
+cat ~/.superbot3/spaces/*/space.json
 
 # Check tmux windows
 tmux list-windows -t superbot3 -F "#{window_name} #{window_active}"
