@@ -10,7 +10,7 @@ NC='\033[0m'
 APP_DIR="$HOME/.superbot3-app"
 DATA_DIR="$HOME/.superbot3"
 REPO_URL="https://github.com/gkkirsch/superbot3.git"
-BIN_LINK="/usr/local/bin/superbot3"
+BIN_LINK=""  # Set below after checking write permissions
 
 echo ""
 echo "  ╔═══════════════════════════╗"
@@ -85,11 +85,26 @@ fi
 
 # Symlink to PATH
 echo "Adding to PATH..."
+chmod +x "$APP_DIR/bin/superbot3"
+
+# Try /usr/local/bin first, fall back to ~/.local/bin
+if [ -w /usr/local/bin ]; then
+  BIN_LINK="/usr/local/bin/superbot3"
+else
+  BIN_LINK="$HOME/.local/bin/superbot3"
+  mkdir -p "$HOME/.local/bin"
+  # Ensure ~/.local/bin is in PATH
+  if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
+    echo -e "${YELLOW}Note: Add ~/.local/bin to your PATH:${NC}"
+    echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+    echo ""
+  fi
+fi
+
 if [ -L "$BIN_LINK" ] || [ -f "$BIN_LINK" ]; then
   rm -f "$BIN_LINK"
 fi
 ln -sf "$APP_DIR/bin/superbot3" "$BIN_LINK"
-chmod +x "$APP_DIR/bin/superbot3"
 
 # Initialize data directory
 echo "Initializing..."

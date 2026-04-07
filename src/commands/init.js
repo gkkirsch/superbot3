@@ -38,7 +38,7 @@ module.exports = function init(home) {
     version: '0.1.0',
     home: home,
     broker: {
-      port: 3000,
+      port: 3100,
       host: 'localhost',
     },
     model: 'claude-opus-4-6',
