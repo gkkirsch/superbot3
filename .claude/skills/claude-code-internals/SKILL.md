@@ -210,6 +210,20 @@ Files closer to cwd have higher priority (loaded later, model pays more attentio
 - Body: becomes the system prompt (replaces default)
 - `omitClaudeMd: true` in frontmatter skips loading CLAUDE.md hierarchy (saves tokens for read-only agents)
 
+## Custom System Prompts in superbot3
+
+superbot3 uses `--system-prompt-file` to completely replace the default Claude Code system prompt:
+- Master: `~/.superbot3/orchestrator/system-prompt.md`
+- Spaces: `~/.superbot3/spaces/<slug>/system-prompt.md`
+
+These files are:
+- Generated from templates during `init` (master) and `space create` (spaces)
+- Editable via dashboard API: `GET/PUT /api/master/system-prompt` and `GET/PUT /api/spaces/:name/system-prompt`
+- Self-editable by the orchestrators themselves (they can Read/Edit their own file)
+- Changes take effect on next restart (the file is read at launch time)
+
+CLAUDE.md still works alongside the system prompt — it's loaded as user context/instructions. The system prompt defines the core identity; CLAUDE.md adds project-specific rules.
+
 ## Things Still Unknown
 
 - How `--resume <sessionId>` interacts with `CLAUDE_CONFIG_DIR` (does it look in the config dir's projects/ for the session file?)
