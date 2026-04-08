@@ -179,6 +179,37 @@ File: `{CLAUDE_CONFIG_DIR}/scheduled_tasks.json`
 
 When Claude launches in a directory, it shows "Is this a project you created or one you trust?" The `--dangerously-skip-permissions` flag should bypass this, but if the trust check fires before the flag is processed, it can still appear. This is a known edge case with tmux `send-keys` launches vs script launches.
 
+## System Prompt Architecture
+
+**Source**: `src/utils/systemPrompt.ts`, `src/utils/claudemd.ts`, `src/main.tsx`
+
+The system prompt is built from multiple sources in priority order:
+
+1. **`overrideSystemPrompt`** — completely replaces everything (used by loop mode)
+2. **Agent definition body** — if `mainThreadAgentDefinition` is set, its `getSystemPrompt()` output REPLACES the default. Custom agents (`.claude/agents/*.md`) use the markdown body as the prompt.
+3. **`--system-prompt` / `--system-prompt-file`** CLI flag — replaces default if no agent
+4. **Default system prompt** — the standard Claude Code prompt (built-in)
+5. **`--append-system-prompt` / `--append-system-prompt-file`** — always APPENDED at the end (even with agents)
+6. **Teammate addendum** — if running as a swarm teammate, extra instructions are appended
+
+**CLAUDE.md is NOT the system prompt.** It's loaded separately as user context/instructions. The hierarchy:
+- `/etc/claude-code/CLAUDE.md` — managed/enterprise (lowest priority)
+- `~/.claude/CLAUDE.md` — user global
+- `CLAUDE.md` / `.claude/CLAUDE.md` — project root (discovered by walking up from cwd)
+- `CLAUDE.local.md` — local project overrides (highest priority)
+- `.claude/rules/*.md` — additional rule files
+
+Files closer to cwd have higher priority (loaded later, model pays more attention).
+
+**`@include` directive**: CLAUDE.md files can include other files with `@path` syntax.
+
+**For superbot3**: The master and space orchestrators use `CLAUDE.md` for their identity/instructions. This is the right mechanism — it's the standard way to give Claude persistent instructions. For stronger control, use `--append-system-prompt-file` in the launch script to inject instructions that are part of the actual system prompt (harder to ignore than CLAUDE.md context).
+
+**Agent definitions** (`.claude/agents/*.md`):
+- Frontmatter: `permissionMode`, `model`, `tools`, `disallowedTools`, `skills`, `mcpServers`, `hooks`, `maxTurns`, `memory`, `isolation`, `effort`
+- Body: becomes the system prompt (replaces default)
+- `omitClaudeMd: true` in frontmatter skips loading CLAUDE.md hierarchy (saves tokens for read-only agents)
+
 ## Things Still Unknown
 
 - How `--resume <sessionId>` interacts with `CLAUDE_CONFIG_DIR` (does it look in the config dir's projects/ for the session file?)
