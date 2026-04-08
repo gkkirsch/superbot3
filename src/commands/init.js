@@ -73,14 +73,14 @@ module.exports = function init(home) {
     }, null, 2)
   );
 
-  // Master scheduled_tasks.json (heartbeat cron — 60s PID check)
+  // Master scheduled_tasks.json (heartbeat cron — hourly PID check)
   writeIfNotExists(
     path.join(home, 'orchestrator', '.claude', 'scheduled_tasks.json'),
     JSON.stringify({
       tasks: [
         {
           id: 'heartbeat-pid-check',
-          cron: '* * * * *',
+          cron: '0 * * * *',
           prompt: 'Run a health check: scan all spaces, verify each running space has a live tmux pane. If any space is dead, restart it with --resume using the sessionId from space.json. Report any issues.',
           createdAt: Date.now(),
           recurring: true,
