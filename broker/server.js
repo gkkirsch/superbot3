@@ -610,13 +610,13 @@ app.put('/api/spaces/:name/system-prompt', (req, res) => {
 
 // Get/set master system prompt
 app.get('/api/master/system-prompt', (req, res) => {
-  const filePath = path.join(HOME, 'orchestrator', 'system-prompt.md');
+  const filePath = path.join(SUPERBOT3_HOME, 'orchestrator', 'system-prompt.md');
   if (!fs.existsSync(filePath)) return res.json({ content: '' });
   res.json({ content: fs.readFileSync(filePath, 'utf-8') });
 });
 
 app.put('/api/master/system-prompt', (req, res) => {
-  const filePath = path.join(HOME, 'orchestrator', 'system-prompt.md');
+  const filePath = path.join(SUPERBOT3_HOME, 'orchestrator', 'system-prompt.md');
   fs.writeFileSync(filePath, req.body.content, 'utf-8');
   res.json({ ok: true });
 });
