@@ -587,6 +587,40 @@ app.delete('/api/spaces/:name/knowledge/:file', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── System Prompt ───────────────────────────────────────────────────────────
+
+// Get/set space system prompt
+app.get('/api/spaces/:name/system-prompt', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const filePath = path.join(config.spaceDir, 'system-prompt.md');
+  if (!fs.existsSync(filePath)) return res.json({ content: '' });
+  res.json({ content: fs.readFileSync(filePath, 'utf-8') });
+});
+
+app.put('/api/spaces/:name/system-prompt', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const filePath = path.join(config.spaceDir, 'system-prompt.md');
+  fs.writeFileSync(filePath, req.body.content, 'utf-8');
+  res.json({ ok: true });
+});
+
+// Get/set master system prompt
+app.get('/api/master/system-prompt', (req, res) => {
+  const filePath = path.join(HOME, 'orchestrator', 'system-prompt.md');
+  if (!fs.existsSync(filePath)) return res.json({ content: '' });
+  res.json({ content: fs.readFileSync(filePath, 'utf-8') });
+});
+
+app.put('/api/master/system-prompt', (req, res) => {
+  const filePath = path.join(HOME, 'orchestrator', 'system-prompt.md');
+  fs.writeFileSync(filePath, req.body.content, 'utf-8');
+  res.json({ ok: true });
+});
+
 // ── Memory ───────────────────────────────────────────────────────────────────
 
 function walkDir(dir, base) {

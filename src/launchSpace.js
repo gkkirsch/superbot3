@@ -10,7 +10,7 @@ const path = require('path');
  * Write a launcher script that starts Claude in interactive mode.
  * Sets CLAUDE_CONFIG_DIR for full isolation.
  */
-function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, teamArgs) {
+function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, teamArgs, opts = {}) {
   const scriptDir = path.join(require('os').homedir(), '.superbot3', '.tmp');
   fs.mkdirSync(scriptDir, { recursive: true });
 
@@ -24,6 +24,10 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
     claudeArgs.push(`--agent-id '${teamArgs.agentId}'`);
     claudeArgs.push(`--agent-name '${teamArgs.agentName}'`);
     claudeArgs.push(`--team-name '${teamArgs.teamName}'`);
+  }
+  // Custom system prompt file replaces the entire default Claude Code system prompt
+  if (opts.systemPromptFile && fs.existsSync(opts.systemPromptFile)) {
+    claudeArgs.push(`--system-prompt-file '${opts.systemPromptFile}'`);
   }
 
   const script = `#!/bin/bash
@@ -121,7 +125,11 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
 
   // Write launch script with correct agent-id (just 'team-lead', no @suffix)
   const teamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: slug };
-  const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, teamArgs);
+  // Look for system-prompt.md in the space directory
+  const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
+  const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, teamArgs, {
+    systemPromptFile: fs.existsSync(systemPromptFile) ? systemPromptFile : null,
+  });
 
   // Create tmux window and run the launch script
   execSync(`tmux new-window -t ${tmuxSession} -n ${slug} "bash ${scriptPath}"`);

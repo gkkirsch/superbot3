@@ -50,6 +50,12 @@ module.exports = function init(home) {
     fs.readFileSync(path.join(__dirname, '..', 'templates', 'master-claude.md'), 'utf-8')
   );
 
+  // Master system prompt (replaces default Claude Code system prompt)
+  writeIfNotExists(
+    path.join(home, 'orchestrator', 'system-prompt.md'),
+    fs.readFileSync(path.join(__dirname, '..', 'templates', 'master-system-prompt.md'), 'utf-8')
+  );
+
   // Master settings.json
   writeIfNotExists(
     path.join(home, 'orchestrator', '.claude', 'settings.json'),

@@ -196,6 +196,16 @@ function createSpace(home, name, codeDir) {
   if (!fs.existsSync(memoryMdPath)) {
     fs.writeFileSync(memoryMdPath, '# Memory\n\nNo memories yet.\n', 'utf-8');
   }
+
+  // Space system prompt (replaces default Claude Code system prompt)
+  const systemPromptPath = path.join(spaceDir, 'system-prompt.md');
+  if (!fs.existsSync(systemPromptPath)) {
+    const templatePath = path.join(__dirname, '..', 'templates', 'space-system-prompt.md');
+    if (fs.existsSync(templatePath)) {
+      fs.copyFileSync(templatePath, systemPromptPath);
+    }
+  }
+
   return spaceConfig;
 }
 

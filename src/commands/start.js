@@ -127,17 +127,23 @@ module.exports = async function start(home) {
   const masterTeamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: masterTeamName };
   ensureInbox(masterConfigDir, masterTeamName, 'team-lead');
 
+  // Master system prompt file (replaces default Claude Code prompt)
+  const masterSystemPromptFile = path.join(home, 'orchestrator', 'system-prompt.md');
+  const masterLaunchOpts = {
+    systemPromptFile: fs.existsSync(masterSystemPromptFile) ? masterSystemPromptFile : null,
+  };
+
   if (tmuxSessionExists('superbot3')) {
     console.log('  tmux session "superbot3" already exists');
     if (!tmuxWindowExists('superbot3', 'master')) {
-      const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir, masterTeamArgs);
+      const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir, masterTeamArgs, masterLaunchOpts);
       execSync(`tmux new-window -t superbot3 -n master "bash ${masterScript}"`);
       console.log('  Master orchestrator launched in new window');
     } else {
       console.log('  Master window already exists');
     }
   } else {
-    const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir, masterTeamArgs);
+    const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir, masterTeamArgs, masterLaunchOpts);
     execSync(`tmux new-session -d -s superbot3 -n master "bash ${masterScript}"`);
     console.log('  Created tmux session with master orchestrator');
   }
