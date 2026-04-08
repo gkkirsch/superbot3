@@ -224,6 +224,45 @@ These files are:
 
 CLAUDE.md still works alongside the system prompt — it's loaded as user context/instructions. The system prompt defines the core identity; CLAUDE.md adds project-specific rules.
 
+## WebFetch Tool
+
+**Source**: `src/tools/WebFetchTool/`
+
+How it works:
+1. `axios.get()` the URL (arraybuffer, 60s timeout, 10MB max)
+2. HTML → markdown via `turndown` library
+3. Truncate to 100K chars
+4. Run through Haiku with user's prompt to summarize/extract
+5. Cache result in LRU (15min TTL, 50MB max)
+
+Key details:
+- **Preapproved hosts**: ~80 code-related domains (react.dev, docs.python.org, kubernetes.io, etc.) skip permission prompt. See `preapproved.ts` for full list.
+- **Domain blocklist preflight**: Before fetching, checks `api.anthropic.com/api/web/domain_info?domain=X`. Skip with `skipWebFetchPreflight: true` in settings.
+- **Redirects**: Same-host only (www ↔ non-www). Cross-host redirects return info to Claude to re-fetch.
+- **Binary content**: PDFs etc. saved to disk with proper extension. Claude can read the saved file.
+- **Permission rules**: Per-domain `allow`/`deny`/`ask` rules stored in settings. Format: `domain:hostname`.
+- **User-Agent**: Custom agent string from `getWebFetchUserAgent()`.
+
+## WebSearch Tool
+
+**Source**: `src/tools/WebSearchTool/`
+
+Uses Anthropic's built-in `web_search_20250305` server-side tool — NOT a third-party API.
+
+How it works:
+1. Creates a new API call with the user's query + `web_search` tool schema
+2. Claude server-side executes the search
+3. Returns `server_tool_use` + `web_search_tool_result` blocks with titles/URLs
+4. Claude synthesizes results into text with citations
+
+Key details:
+- Max 8 searches per call (`max_uses: 8`)
+- Supports `allowed_domains` and `blocked_domains` filtering
+- Only works with: firstParty API, Vertex (Claude 4.0+), Foundry
+- Uses Haiku by default (feature flag `tengu_plum_vx3`), falls back to main model
+- No permission prompt — uses `passthrough` behavior (always asks)
+- Results include both search hits (title + URL) and text summaries
+
 ## Things Still Unknown
 
 - How `--resume <sessionId>` interacts with `CLAUDE_CONFIG_DIR` (does it look in the config dir's projects/ for the session file?)
