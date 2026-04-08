@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { setupConfigDir } = require('../auth');
+const { tmuxSessionExists, launchSpace } = require('../launchSpace');
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -249,6 +250,17 @@ function spaceCreateCli(home, name, opts) {
   console.log('      ├── wiki/ (concepts, summaries, connections)');
   console.log('      ├── queries/ (reflections)');
   console.log('      └── logs/');
+
+  // Auto-launch if superbot3 is already running
+  if (tmuxSessionExists('superbot3')) {
+    console.log('');
+    const config = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf-8'));
+    const model = config.model || 'claude-opus-4-6';
+    const launched = launchSpace(spaceConfig, model);
+    if (launched) {
+      console.log(`  Started "${spaceConfig.slug}" in tmux window superbot3:${spaceConfig.slug}`);
+    }
+  }
 }
 
 // Export both — CLI uses the default export, server uses createSpace

@@ -72,7 +72,7 @@ When a space sends you a message for another space:
 
 ## Creating a Space
 
-To create a new space, use the superbot3 CLI:
+To create a new space, use the superbot3 CLI. It handles everything — directory structure, config, auth, AND auto-launches in a tmux window if superbot3 is running:
 
 ```bash
 superbot3 space create "<name>"
@@ -80,17 +80,9 @@ superbot3 space create "<name>"
 superbot3 space create "<name>" --code-dir /path/to/project
 ```
 
-After creating, start the space:
-```bash
-# Create tmux window
-tmux new-window -t superbot3 -n <slug>
+That's it. The space is created AND started automatically. No manual tmux or launch steps needed.
 
-# Launch Claude in the space (read space.json for claudeConfigDir and codeDir)
-cat ~/.superbot3/spaces/<slug>/space.json
-tmux send-keys -t superbot3:<slug> "cd <codeDir> && env CLAUDECODE=1 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 CLAUDE_CONFIG_DIR=$HOME/.superbot3/spaces/<slug>/.claude claude --dangerously-skip-permissions --model claude-opus-4-6 --agent-id 'team-lead@<slug>' --agent-name 'team-lead' --team-name '<slug>'" Enter
-```
-
-IMPORTANT: Always use `superbot3 space create` — never manually mkdir space directories.
+IMPORTANT: Always use `superbot3 space create` — never manually mkdir space directories or tmux send-keys launch commands.
 
 ## Status Report
 

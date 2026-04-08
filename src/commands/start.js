@@ -4,90 +4,14 @@ const fs = require('fs');
 const { getSpaces } = require('./space-list');
 const { writeToInbox } = require('../inbox');
 const { refreshAllSpaceCredentials } = require('../auth');
-
-function tmuxSessionExists(name) {
-  try {
-    execSync(`tmux has-session -t ${name} 2>/dev/null`);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function tmuxWindowExists(session, windowName) {
-  try {
-    const output = execSync(`tmux list-windows -t ${session} -F "#{window_name}" 2>/dev/null`, { encoding: 'utf-8' });
-    return output.split('\n').map(s => s.trim()).includes(windowName);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Write a launcher script that starts Claude in interactive mode.
- * Sets CLAUDE_CONFIG_DIR for full isolation (teams, inbox, plugins, settings).
- * Auth works via .credentials.json fallback (copied from default keychain during init/space-create).
- */
-function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, teamArgs) {
-  const scriptDir = path.join(require('os').homedir(), '.superbot3', '.tmp');
-  fs.mkdirSync(scriptDir, { recursive: true });
-
-  const scriptPath = path.join(scriptDir, `launch-${name}.sh`);
-
-  const claudeArgs = ['--dangerously-skip-permissions', `--model ${model}`];
-  if (resumeSessionId) {
-    claudeArgs.push(`--resume ${resumeSessionId}`);
-  }
-  // Add team args for inbox polling (--agent-id, --agent-name, --team-name)
-  if (teamArgs) {
-    claudeArgs.push(`--agent-id '${teamArgs.agentId}'`);
-    claudeArgs.push(`--agent-name '${teamArgs.agentName}'`);
-    claudeArgs.push(`--team-name '${teamArgs.teamName}'`);
-  }
-
-  const script = `#!/bin/bash
-cd "${cwd}"
-export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
-export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-exec claude ${claudeArgs.join(' ')}
-`;
-
-  fs.writeFileSync(scriptPath, script, { mode: 0o755 });
-  return scriptPath;
-}
-
-/**
- * Ensure the inbox file exists for an agent in a team.
- * This is needed so the inbox poller can read from it immediately on startup.
- */
-function ensureInbox(claudeConfigDir, teamName, agentName) {
-  const inboxDir = path.join(claudeConfigDir, 'teams', teamName, 'inboxes');
-  fs.mkdirSync(inboxDir, { recursive: true });
-  const inboxPath = path.join(inboxDir, `${agentName}.json`);
-  if (!fs.existsSync(inboxPath)) {
-    fs.writeFileSync(inboxPath, '[]', 'utf-8');
-  }
-}
-
-/**
- * Ensure team config.json exists so Claude Code's isTeamLead() returns true.
- * Without this file, the inbox poller won't activate and the space can't
- * properly function as a team lead (can't receive messages, spawn teammates, etc).
- */
-function ensureTeamConfig(claudeConfigDir, teamName) {
-  const teamDir = path.join(claudeConfigDir, 'teams', teamName);
-  fs.mkdirSync(teamDir, { recursive: true });
-  const configPath = path.join(teamDir, 'config.json');
-  if (!fs.existsSync(configPath)) {
-    fs.writeFileSync(configPath, JSON.stringify({
-      name: teamName,
-      description: `Space orchestrator team for ${teamName}`,
-      createdAt: Date.now(),
-      leadAgentId: 'team-lead',
-      members: [],
-    }, null, 2), 'utf-8');
-  }
-}
+const {
+  writeLaunchScript,
+  ensureInbox,
+  ensureTeamConfig,
+  tmuxSessionExists,
+  tmuxWindowExists,
+  launchSpace,
+} = require('../launchSpace');
 
 /**
  * Find the newest JSONL session file in a space's projects directory.
@@ -226,22 +150,12 @@ module.exports = async function start(home) {
     console.log(`\nStarting ${activeSpaces.length} active space(s)...`);
 
     for (const space of activeSpaces) {
-      const spaceWorkDir = space.codeDir || space.spaceDir;
-
-      if (tmuxWindowExists('superbot3', space.slug)) {
-        console.log(`  Space "${space.slug}" already has a window`);
-        continue;
-      }
-
-      // Set up team args so the inbox poller is active from startup
-      const spaceTeamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: space.slug };
-      ensureTeamConfig(space.claudeConfigDir, space.slug);
-      ensureInbox(space.claudeConfigDir, space.slug, 'team-lead');
-
       const spaceModel = space.model || model;
-      const spaceScript = writeLaunchScript(space.slug, spaceWorkDir, spaceModel, space.sessionId, space.claudeConfigDir, spaceTeamArgs);
-      execSync(`tmux new-window -t superbot3 -n ${space.slug} "bash ${spaceScript}"`);
-      console.log(`  Started space "${space.slug}" (cwd: ${spaceWorkDir})`);
+      const launched = launchSpace(space, spaceModel);
+      if (launched) {
+        const spaceWorkDir = space.codeDir || space.spaceDir;
+        console.log(`  Started space "${space.slug}" (cwd: ${spaceWorkDir})`);
+      }
     }
   } else {
     console.log('\nNo active spaces to start.');
