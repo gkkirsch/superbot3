@@ -158,7 +158,7 @@ function createSpace(home, name, codeDir) {
       name: slug,
       description: `Space orchestrator team for ${slug}`,
       createdAt: Date.now(),
-      leadAgentId: `team-lead@${slug}`,
+      leadAgentId: 'team-lead',
       members: [],
     }, null, 2), 'utf-8');
   }

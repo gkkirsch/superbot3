@@ -70,6 +70,28 @@ When a space sends you a message for another space:
 2. Write to the target space's inbox
 3. Confirm routing to the sender
 
+## Creating a Space
+
+To create a new space, use the superbot3 CLI:
+
+```bash
+superbot3 space create "<name>"
+# Or with a code directory:
+superbot3 space create "<name>" --code-dir /path/to/project
+```
+
+After creating, start the space:
+```bash
+# Create tmux window
+tmux new-window -t superbot3 -n <slug>
+
+# Launch Claude in the space (read space.json for claudeConfigDir and codeDir)
+cat ~/.superbot3/spaces/<slug>/space.json
+tmux send-keys -t superbot3:<slug> "cd <codeDir> && env CLAUDECODE=1 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 CLAUDE_CONFIG_DIR=$HOME/.superbot3/spaces/<slug>/.claude claude --dangerously-skip-permissions --model claude-opus-4-6 --agent-id 'team-lead@<slug>' --agent-name 'team-lead' --team-name '<slug>'" Enter
+```
+
+IMPORTANT: Always use `superbot3 space create` — never manually mkdir space directories.
+
 ## Status Report
 
 When asked for status:

@@ -62,6 +62,11 @@ module.exports = function init(home) {
           "Bash(cat *)",
           "Bash(ls *)",
           "Bash(echo *)",
+          "Bash(mkdir *)",
+          "Bash(superbot3 *)",
+          "Bash(node *)",
+          "Bash(cp *)",
+          "Bash(rm *)",
         ],
         deny: [],
       },
@@ -98,7 +103,7 @@ module.exports = function init(home) {
       name: 'superbot3',
       description: 'Master orchestrator team',
       createdAt: Date.now(),
-      leadAgentId: 'team-lead@superbot3',
+      leadAgentId: 'team-lead',
       members: [],
     }, null, 2)
   );

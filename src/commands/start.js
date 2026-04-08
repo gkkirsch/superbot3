@@ -83,7 +83,7 @@ function ensureTeamConfig(claudeConfigDir, teamName) {
       name: teamName,
       description: `Space orchestrator team for ${teamName}`,
       createdAt: Date.now(),
-      leadAgentId: `team-lead@${teamName}`,
+      leadAgentId: 'team-lead',
       members: [],
     }, null, 2), 'utf-8');
   }
@@ -200,7 +200,7 @@ module.exports = async function start(home) {
 
   const masterConfigDir = path.join(home, 'orchestrator', '.claude');
   const masterTeamName = 'superbot3';
-  const masterTeamArgs = { agentId: `team-lead@${masterTeamName}`, agentName: 'team-lead', teamName: masterTeamName };
+  const masterTeamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: masterTeamName };
   ensureInbox(masterConfigDir, masterTeamName, 'team-lead');
 
   if (tmuxSessionExists('superbot3')) {
@@ -234,7 +234,7 @@ module.exports = async function start(home) {
       }
 
       // Set up team args so the inbox poller is active from startup
-      const spaceTeamArgs = { agentId: `team-lead@${space.slug}`, agentName: 'team-lead', teamName: space.slug };
+      const spaceTeamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: space.slug };
       ensureTeamConfig(space.claudeConfigDir, space.slug);
       ensureInbox(space.claudeConfigDir, space.slug, 'team-lead');
 
