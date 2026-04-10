@@ -113,6 +113,47 @@ function createSpace(home, name, codeDir) {
     }
   }
 
+  // Create superbot3-builtin marketplace catalog so Claude Code discovers plugin skills
+  const marketplaceDir = path.join(spaceDir, '.claude', 'plugins', 'cache', 'superbot3-builtin');
+  if (fs.existsSync(marketplaceDir)) {
+    // Build marketplace.json listing all built-in plugins
+    const mpJsonDir = path.join(marketplaceDir, '.claude-plugin');
+    ensureDir(mpJsonDir);
+    const pluginEntries = [];
+    for (const pluginName of defaultPlugins) {
+      const pjPath = path.join(marketplaceDir, pluginName, '1.0.0', '.claude-plugin', 'plugin.json');
+      if (fs.existsSync(pjPath)) {
+        const pj = JSON.parse(fs.readFileSync(pjPath, 'utf-8'));
+        pluginEntries.push({
+          name: pj.name,
+          version: pj.version || '1.0.0',
+          description: pj.description || '',
+          source: { source: 'local', path: path.join(marketplaceDir, pluginName, '1.0.0') },
+          skills: pj.skills || [],
+          keywords: pj.keywords || [],
+        });
+      }
+    }
+    fs.writeFileSync(path.join(mpJsonDir, 'marketplace.json'), JSON.stringify({
+      '$schema': 'https://anthropic.com/claude-code/marketplace.schema.json',
+      name: 'superbot3-builtin',
+      description: 'Built-in superbot3 plugins',
+      owner: { name: 'superbot3' },
+      plugins: pluginEntries,
+    }, null, 2), 'utf-8');
+
+    // Register in known_marketplaces.json
+    const kmPath = path.join(spaceDir, '.claude', 'plugins', 'known_marketplaces.json');
+    let km = {};
+    try { km = JSON.parse(fs.readFileSync(kmPath, 'utf-8')); } catch {}
+    km['superbot3-builtin'] = {
+      source: { source: 'local', path: marketplaceDir },
+      installLocation: marketplaceDir,
+      lastUpdated: new Date().toISOString(),
+    };
+    fs.writeFileSync(kmPath, JSON.stringify(km, null, 2), 'utf-8');
+  }
+
   // Copy system prompt template (must happen before template replacement below)
   const systemPromptPath = path.join(spaceDir, 'system-prompt.md');
   if (!fs.existsSync(systemPromptPath)) {
