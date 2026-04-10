@@ -263,6 +263,40 @@ Key details:
 - No permission prompt — uses `passthrough` behavior (always asks)
 - Results include both search hits (title + URL) and text summaries
 
+## Plugin Skill Discovery (How It Actually Works)
+
+**Source**: `src/utils/plugins/pluginLoader.ts`, `src/utils/plugins/loadPluginCommands.ts`, `src/utils/plugins/marketplaceManager.ts`
+
+Plugin skills are loaded through a completely separate path from `.claude/skills/`:
+
+1. `getPluginSkills()` (memoized) → `loadAllPluginsCacheOnly()`
+2. → `loadPluginsFromMarketplaces({ cacheOnly: true })`
+3. Reads `enabledPlugins` from merged settings (user + project + local + policy)
+4. For each `plugin@marketplace` entry, loads the marketplace catalog
+5. Resolves plugin install path from cache: `{CLAUDE_CONFIG_DIR}/plugins/cache/{marketplace}/{plugin}/{version}/`
+6. Loads skills from the plugin's `skills/` directory
+
+**Plugin skill names are NAMESPACED**: `{pluginName}:{skillName}`. E.g., `browser:browser`, `memory-knowledge:memory`.
+
+**Marketplace resolution pipeline**:
+- Marketplaces come from: `known_marketplaces.json` (global), `extraKnownMarketplaces` (settings.json), or `--add-dir` flag
+- `extraKnownMarketplaces` in settings.json supports `source: 'directory'` for local and `source: 'settings'` for inline declarations
+- The marketplace needs a `.claude-plugin/marketplace.json` at its installLocation
+
+**Known failure mode (2026-04-10)**: Local `directory` source marketplaces declared via `extraKnownMarketplaces` in project-level settings.json appear to silently fail during `loadPluginsFromMarketplaces`. The marketplace catalog parsing succeeds but plugin skills are never loaded. The exact failure point is unclear — errors are caught and logged only via `logForDebugging` which isn't visible in normal operation.
+
+**Working approach**: Use a real marketplace (e.g., superchargeclaudecode.com) that goes through the standard git-clone → cache pipeline. Plugins installed from git-based marketplaces work reliably.
+
+**What does NOT work for local plugins**:
+- Putting plugins in `.claude/plugins/cache/custom-marketplace/...` with a local `known_marketplaces.json` entry
+- Using `extraKnownMarketplaces` with `source: 'directory'` pointing to local cache
+- Using `source: 'settings'` with inline plugin declarations (requires remote sources only)
+
+**What DOES work**:
+- Standard marketplace flow: git repo → marketplace.json → install → cache
+- Plugins from `claude-plugins-official` and `supercharge-claude-code` load correctly
+- Skills in `.claude/skills/` (non-plugin) always work via the Skill tool
+
 ## Things Still Unknown
 
 - How `--resume <sessionId>` interacts with `CLAUDE_CONFIG_DIR` (does it look in the config dir's projects/ for the session file?)
