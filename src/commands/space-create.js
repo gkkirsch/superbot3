@@ -164,9 +164,10 @@ function createSpace(home, name, codeDir) {
     }, null, 2), 'utf-8');
   }
 
-  // Pre-seed scheduled_tasks.json with nightly consolidation crons
+  // Always write scheduled_tasks.json with nightly consolidation crons
+  // (overwrites the empty template copy)
   const schedulePath = path.join(spaceDir, '.claude', 'scheduled_tasks.json');
-  if (!fs.existsSync(schedulePath)) {
+  {
     const now = Date.now();
     const defaultSchedule = {
       tasks: [
@@ -189,7 +190,7 @@ function createSpace(home, name, codeDir) {
       ],
     };
     fs.writeFileSync(schedulePath, JSON.stringify(defaultSchedule, null, 2) + '\n', 'utf-8');
-  }
+  } // end schedule block
 
   // Create initial memory files
   const memoryMdPath = path.join(spaceDir, 'memory', 'MEMORY.md');
