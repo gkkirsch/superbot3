@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Send } from 'lucide-react'
+import { ArrowUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { InboxMessage } from '@/lib/types'
 import type { ConversationMessage } from '@/lib/api'
@@ -205,9 +205,13 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
             <button
               type="submit"
               disabled={!text.trim() || mutation.isPending}
-              className="p-1.5 rounded-lg text-stone/50 hover:text-parchment hover:bg-surface/40 transition-colors disabled:opacity-25"
+              className={`p-1.5 rounded-lg transition-all duration-200 ${
+                text.trim()
+                  ? 'bg-sand text-ink scale-100 opacity-100 hover:bg-sand/80'
+                  : 'bg-transparent text-transparent scale-75 opacity-0 pointer-events-none'
+              }`}
             >
-              <Send className="h-4 w-4" />
+              <ArrowUp className="h-4 w-4 stroke-[2.5]" />
             </button>
           </div>
         </div>
