@@ -128,7 +128,7 @@ function createSpace(home, name, codeDir) {
           name: pj.name,
           version: pj.version || '1.0.0',
           description: pj.description || '',
-          source: { source: 'local', path: path.join(marketplaceDir, pluginName, '1.0.0') },
+          source: `./${pluginName}/1.0.0`,
           skills: pj.skills || [],
           keywords: pj.keywords || [],
         });
@@ -147,7 +147,7 @@ function createSpace(home, name, codeDir) {
     let km = {};
     try { km = JSON.parse(fs.readFileSync(kmPath, 'utf-8')); } catch {}
     km['superbot3-builtin'] = {
-      source: { source: 'local', path: marketplaceDir },
+      source: { source: 'directory', path: marketplaceDir },
       installLocation: marketplaceDir,
       lastUpdated: new Date().toISOString(),
     };
