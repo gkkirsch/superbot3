@@ -748,7 +748,7 @@ function HomeView({ slug, plugins, skills, agents, onBrowse, onSelectPlugin, onS
         <Search className="w-3.5 h-3.5 shrink-0" /><span>Search plugins & marketplace...</span><ChevronRight className="w-3 h-3 ml-auto" />
       </button>
       {enabledPlugins.length > 0 && (
-        <CollapsibleSection title="Enabled" count={enabledPlugins.length} defaultOpen={true}>
+        <CollapsibleSection title="Plugins" count={enabledPlugins.length} defaultOpen={true}>
           <div className="space-y-1">{enabledPlugins.map(p => <PluginCard key={`${p.name}@${p.marketplace}`} plugin={p} slug={slug} onClick={() => onSelectPlugin(p)} compact />)}</div>
         </CollapsibleSection>
       )}
