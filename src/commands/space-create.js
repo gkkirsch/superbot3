@@ -113,6 +113,15 @@ function createSpace(home, name, codeDir) {
     }
   }
 
+  // Copy system prompt template (must happen before template replacement below)
+  const systemPromptPath = path.join(spaceDir, 'system-prompt.md');
+  if (!fs.existsSync(systemPromptPath)) {
+    const templatePath = path.join(__dirname, '..', 'templates', 'space-system-prompt.md');
+    if (fs.existsSync(templatePath)) {
+      fs.copyFileSync(templatePath, systemPromptPath);
+    }
+  }
+
   // Customize templates with space name, slug, and code dir
   const templateFiles = [
     path.join(spaceDir, '.claude', 'CLAUDE.md'),
@@ -211,15 +220,6 @@ function createSpace(home, name, codeDir) {
   const memoryMdPath = path.join(spaceDir, 'memory', 'MEMORY.md');
   if (!fs.existsSync(memoryMdPath)) {
     fs.writeFileSync(memoryMdPath, '# Memory\n\nNo memories yet.\n', 'utf-8');
-  }
-
-  // Space system prompt (replaces default Claude Code system prompt)
-  const systemPromptPath = path.join(spaceDir, 'system-prompt.md');
-  if (!fs.existsSync(systemPromptPath)) {
-    const templatePath = path.join(__dirname, '..', 'templates', 'space-system-prompt.md');
-    if (fs.existsSync(templatePath)) {
-      fs.copyFileSync(templatePath, systemPromptPath);
-    }
   }
 
   return spaceConfig;
