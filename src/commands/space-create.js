@@ -142,16 +142,6 @@ function createSpace(home, name, codeDir) {
       plugins: pluginEntries,
     }, null, 2), 'utf-8');
 
-    // Register in known_marketplaces.json
-    const kmPath = path.join(spaceDir, '.claude', 'plugins', 'known_marketplaces.json');
-    let km = {};
-    try { km = JSON.parse(fs.readFileSync(kmPath, 'utf-8')); } catch {}
-    km['superbot3-builtin'] = {
-      source: { source: 'directory', path: marketplaceDir },
-      installLocation: marketplaceDir,
-      lastUpdated: new Date().toISOString(),
-    };
-    fs.writeFileSync(kmPath, JSON.stringify(km, null, 2), 'utf-8');
   }
 
   // Copy system prompt template (must happen before template replacement below)
@@ -198,6 +188,16 @@ function createSpace(home, name, codeDir) {
   for (const pluginName of defaultPlugins) {
     settings.enabledPlugins[`${pluginName}@superbot3-builtin`] = true;
   }
+
+  // Register the superbot3-builtin marketplace in settings.json
+  // This is the correct way for Claude Code to discover our plugins
+  const marketplaceDir = path.join(spaceDir, '.claude', 'plugins', 'cache', 'superbot3-builtin');
+  if (!settings.extraKnownMarketplaces) settings.extraKnownMarketplaces = {};
+  settings.extraKnownMarketplaces['superbot3-builtin'] = {
+    source: { source: 'directory', path: marketplaceDir },
+    installLocation: marketplaceDir,
+  };
+
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 
   // Register in installed_plugins.json
