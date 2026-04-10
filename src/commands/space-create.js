@@ -94,17 +94,22 @@ function createSpace(home, name, codeDir) {
   };
   fs.writeFileSync(path.join(spaceDir, 'space.json'), JSON.stringify(spaceConfig, null, 2), 'utf-8');
 
-  // Copy SessionStart hook scripts into the space's .claude/hooks/
-  const hooksTemplateDir = path.join(__dirname, '..', 'templates', 'hooks');
-  const hooksTargetDir = path.join(spaceDir, '.claude', 'hooks');
-  if (fs.existsSync(hooksTemplateDir)) {
-    const hookFiles = fs.readdirSync(hooksTemplateDir);
-    for (const file of hookFiles) {
-      const src = path.join(hooksTemplateDir, file);
-      const dest = path.join(hooksTargetDir, file);
-      fs.copyFileSync(src, dest);
-      // Preserve executable bit
-      try { fs.chmodSync(dest, 0o755); } catch {}
+  // Install built-in plugins (memory-knowledge is default-on)
+  const builtinPluginsDir = path.join(__dirname, '..', '..', 'plugins');
+  const defaultPlugins = ['memory-knowledge'];
+  for (const pluginName of defaultPlugins) {
+    const pluginSrc = path.join(builtinPluginsDir, pluginName);
+    if (fs.existsSync(pluginSrc)) {
+      // Copy plugin to space's plugin cache
+      const pluginDest = path.join(spaceDir, '.claude', 'plugins', 'cache', 'superbot3-builtin', pluginName, '1.0.0');
+      copyTemplate(pluginSrc, pluginDest);
+      // Make hook scripts executable
+      const hooksDir = path.join(pluginDest, 'hooks');
+      if (fs.existsSync(hooksDir)) {
+        for (const f of fs.readdirSync(hooksDir)) {
+          if (f.endsWith('.sh')) try { fs.chmodSync(path.join(hooksDir, f), 0o755); } catch {}
+        }
+      }
     }
   }
 
@@ -133,28 +138,31 @@ function createSpace(home, name, codeDir) {
   const claudeConfigDir = path.join(spaceDir, '.claude');
   setupConfigDir(claudeConfigDir, spaceDir, codeDir);
 
-  // Add SessionStart hooks to settings.json (memory + knowledge plugins)
+  // Enable built-in plugins in settings.json and installed_plugins.json
   const settingsPath = path.join(claudeConfigDir, 'settings.json');
   let settings = {};
   try { settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8')); } catch {}
-  if (!settings.hooks) settings.hooks = {};
-  settings.hooks.SessionStart = [
-    {
-      hooks: [
-        {
-          type: 'command',
-          command: 'bash .claude/hooks/session-start-memory.sh',
-          async: false,
-        },
-        {
-          type: 'command',
-          command: 'bash .claude/hooks/session-start-knowledge.sh',
-          async: false,
-        },
-      ],
-    },
-  ];
+
+  // Enable plugins
+  if (!settings.enabledPlugins) settings.enabledPlugins = {};
+  for (const pluginName of defaultPlugins) {
+    settings.enabledPlugins[`${pluginName}@superbot3-builtin`] = true;
+  }
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+
+  // Register in installed_plugins.json
+  const ipPath = path.join(claudeConfigDir, 'plugins', 'installed_plugins.json');
+  const installedPlugins = { version: 2, plugins: {} };
+  for (const pluginName of defaultPlugins) {
+    installedPlugins.plugins[`${pluginName}@superbot3-builtin`] = [{
+      scope: 'project',
+      installPath: path.join(spaceDir, '.claude', 'plugins', 'cache', 'superbot3-builtin', pluginName, '1.0.0'),
+      version: '1.0.0',
+      installedAt: new Date().toISOString(),
+      lastUpdated: new Date().toISOString(),
+    }];
+  }
+  fs.writeFileSync(ipPath, JSON.stringify(installedPlugins, null, 2), 'utf-8');
 
   // Create team config.json so Claude Code's isTeamLead() returns true.
   // Without this, the inbox poller won't activate and the space can't receive messages.

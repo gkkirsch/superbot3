@@ -1,0 +1,17 @@
+{
+  "name": "memory-knowledge",
+  "version": "1.0.0",
+  "description": "Persistent memory and knowledge base for spaces. Memory tracks decisions, preferences, and learnings. Knowledge compiles raw sources into a searchable wiki. Both run nightly consolidation.",
+  "author": {
+    "name": "superbot3",
+    "email": "built-in"
+  },
+  "keywords": ["memory", "knowledge", "wiki", "consolidation"],
+  "skills": [
+    "./skills/memory",
+    "./skills/knowledge-base"
+  ],
+  "agents": [
+    "./agents"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "SessionStart": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash $PLUGIN_DIR/hooks/session-start-memory.sh",
+          "async": false
+        },
+        {
+          "type": "command",
+          "command": "bash $PLUGIN_DIR/hooks/session-start-knowledge.sh",
+          "async": false
+        }
+      ]
+    }
+  ]
+}

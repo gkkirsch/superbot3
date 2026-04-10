@@ -157,7 +157,8 @@ module.exports = function init(home) {
   );
 
   // Agent definitions
-  const agentFiles = ['planner.md', 'coder.md', 'researcher.md', 'reviewer.md', 'memory-consolidator.md', 'knowledge-consolidator.md'];
+  // Note: memory-consolidator and knowledge-consolidator are in the memory-knowledge plugin, not here
+  const agentFiles = ['planner.md', 'coder.md', 'researcher.md', 'reviewer.md'];
   agentFiles.forEach(f => {
     const src = path.join(__dirname, '..', 'templates', 'agents', f);
     if (fs.existsSync(src)) {
@@ -166,7 +167,8 @@ module.exports = function init(home) {
   });
 
   // Skills
-  const skillDirs = ['core-methodology', 'space-cli', 'schedule-manager', 'memory', 'knowledge-base'];
+  // Note: memory and knowledge-base skills are in the memory-knowledge plugin, not here
+  const skillDirs = ['core-methodology', 'space-cli', 'schedule-manager'];
   skillDirs.forEach(s => {
     const src = path.join(__dirname, '..', 'templates', 'skills', s, 'SKILL.md');
     if (fs.existsSync(src)) {
