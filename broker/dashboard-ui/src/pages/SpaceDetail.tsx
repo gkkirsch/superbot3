@@ -6,11 +6,11 @@ import { MemoryTab } from '@/features/MemoryTab'
 import { SchedulesTab } from '@/features/SchedulesTab'
 import { PluginsTab } from '@/features/PluginsTab'
 import { SettingsTab } from '@/features/SettingsTab'
-import { SkillsTab } from '@/features/SkillsTab'
+// SkillsTab removed — skills shown inside PluginsTab
 import { useSpace, useSpaceMessages, useSpaceConversation } from '@/hooks/useSpaces'
 import { sendSpaceMessage } from '@/lib/api'
 import { usePanel } from '@/hooks/usePanel'
-import { PanelRight, X, Puzzle, FolderOpen, Clock, Settings, Brain, Blocks } from 'lucide-react'
+import { PanelRight, X, Puzzle, FolderOpen, Clock, Settings, Brain } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function SpaceDetail() {
@@ -72,9 +72,6 @@ export function SpaceDetail() {
                 <TabsTrigger value="plugins" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
                   <Puzzle className="w-3.5 h-3.5" />Plugins
                 </TabsTrigger>
-                <TabsTrigger value="skills" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
-                  <Blocks className="w-3.5 h-3.5" />Skills
-                </TabsTrigger>
                 <TabsTrigger value="files" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
                   <FolderOpen className="w-3.5 h-3.5" />Files
                 </TabsTrigger>
@@ -98,9 +95,6 @@ export function SpaceDetail() {
             <div className="flex-1 overflow-y-auto scrollbar-auto pb-8">
               <TabsContent value="plugins" className="px-4">
                 <PluginsTab slug={slug!} />
-              </TabsContent>
-              <TabsContent value="skills" className="px-4">
-                <SkillsTab slug={slug!} />
               </TabsContent>
               <TabsContent value="files" className="px-4">
                 <KnowledgeTab slug={slug!} />
