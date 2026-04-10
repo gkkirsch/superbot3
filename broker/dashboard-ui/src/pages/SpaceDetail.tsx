@@ -69,19 +69,19 @@ export function SpaceDetail() {
           <Tabs defaultValue="plugins" className="flex flex-col h-full">
             <div className="flex items-center gap-0.5 px-2 py-2 border-b border-border-custom shrink-0">
               <TabsList className="flex-1 inline-flex h-auto items-center gap-0.5 rounded-none bg-transparent p-0">
-                <TabsTrigger value="plugins" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                <TabsTrigger value="plugins" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-stone bg-transparent shadow-none hover:bg-sand/5 hover:text-parchment transition-colors data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
                   <Puzzle className="w-3.5 h-3.5" />Plugins
                 </TabsTrigger>
-                <TabsTrigger value="files" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                <TabsTrigger value="files" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-stone bg-transparent shadow-none hover:bg-sand/5 hover:text-parchment transition-colors data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
                   <FolderOpen className="w-3.5 h-3.5" />Files
                 </TabsTrigger>
-                <TabsTrigger value="memory" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                <TabsTrigger value="memory" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-stone bg-transparent shadow-none hover:bg-sand/5 hover:text-parchment transition-colors data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
                   <Brain className="w-3.5 h-3.5" />Memory
                 </TabsTrigger>
-                <TabsTrigger value="schedules" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                <TabsTrigger value="schedules" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-stone bg-transparent shadow-none hover:bg-sand/5 hover:text-parchment transition-colors data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
                   <Clock className="w-3.5 h-3.5" />Schedules
                 </TabsTrigger>
-                <TabsTrigger value="settings" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
+                <TabsTrigger value="settings" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-stone bg-transparent shadow-none hover:bg-sand/5 hover:text-parchment transition-colors data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
                   <Settings className="w-3.5 h-3.5" />
                 </TabsTrigger>
               </TabsList>
