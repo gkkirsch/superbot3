@@ -33,21 +33,23 @@ export function SpaceDetail() {
       {/* Main area: header + chat */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="shrink-0 px-4 py-3">
-          <div className="max-w-5xl mx-auto flex items-center gap-3">
-            <h1 className="text-base font-semibold text-parchment">{space.name || space.slug}</h1>
-            {space.codeDir && (
-              <span className="text-xs text-stone font-mono">{space.codeDir}</span>
-            )}
-            <div className="ml-auto">
-              <button
-                onClick={togglePanel}
-                className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
-                title="Toggle panel"
-              >
-                <PanelRight className="w-4 h-4" />
-              </button>
+        <div className="shrink-0 flex items-center py-3">
+          <div className="flex-1 min-w-0">
+            <div className="max-w-5xl mx-auto px-8 flex items-center gap-3">
+              <h1 className="text-base font-semibold text-parchment">{space.name || space.slug}</h1>
+              {space.codeDir && (
+                <span className="text-xs text-stone font-mono truncate">{space.codeDir}</span>
+              )}
             </div>
+          </div>
+          <div className="shrink-0 px-4">
+            <button
+              onClick={togglePanel}
+              className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
+              title="Toggle panel"
+            >
+              <PanelRight className="w-4 h-4" />
+            </button>
           </div>
         </div>
 
