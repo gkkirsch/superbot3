@@ -3,7 +3,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Space } from '@/lib/types'
 import { fetchSystemPrompt, saveSystemPrompt, restartSpace, setSpaceModel } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, Save, RotateCcw, Loader2, Check, AlertTriangle, RefreshCw, Cpu } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { FileText, Save, RotateCcw, Loader2, Check, AlertTriangle, RefreshCw, Cpu, FolderCode, Power } from 'lucide-react'
+
+const putJson = async (url: string, body: object) => {
+  const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  return res.json()
+}
 
 export function SettingsTab({ space }: { space: Space }) {
   const queryClient = useQueryClient()
@@ -21,6 +27,11 @@ export function SettingsTab({ space }: { space: Space }) {
   const [selectedModel, setSelectedModel] = useState(space.model || 'claude-opus-4-6')
   const [modelSaving, setModelSaving] = useState(false)
   const [modelFeedback, setModelFeedback] = useState<'saved' | 'error' | null>(null)
+  const [codeDir, setCodeDir] = useState(space.codeDir || '')
+  const [codeDirSaving, setCodeDirSaving] = useState(false)
+  const [codeDirFeedback, setCodeDirFeedback] = useState<'saved' | 'error' | null>(null)
+  const [active, setActive] = useState(space.active ?? true)
+  const [activeSaving, setActiveSaving] = useState(false)
 
   useEffect(() => {
     if (promptData?.content) setContent(promptData.content)
@@ -80,6 +91,34 @@ export function SettingsTab({ space }: { space: Space }) {
     }
   }
 
+  async function handleCodeDirSave() {
+    setCodeDirSaving(true)
+    setCodeDirFeedback(null)
+    try {
+      await putJson(`/api/spaces/${space.slug}/settings`, { codeDir: codeDir || null })
+      queryClient.invalidateQueries({ queryKey: ['space', space.slug] })
+      setCodeDirFeedback('saved')
+      setTimeout(() => setCodeDirFeedback(null), 3000)
+    } catch {
+      setCodeDirFeedback('error')
+    } finally {
+      setCodeDirSaving(false)
+    }
+  }
+
+  async function handleActiveToggle(val: boolean) {
+    setActive(val)
+    setActiveSaving(true)
+    try {
+      await putJson(`/api/spaces/${space.slug}/settings`, { active: val })
+      queryClient.invalidateQueries({ queryKey: ['space', space.slug] })
+    } catch {
+      setActive(!val) // revert
+    } finally {
+      setActiveSaving(false)
+    }
+  }
+
   const models = [
     { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
     { value: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
@@ -87,33 +126,39 @@ export function SettingsTab({ space }: { space: Space }) {
     { value: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
   ]
 
-  const items = [
-    { label: 'Name', value: space.name },
-    { label: 'Slug', value: space.slug },
-    { label: 'Space Dir', value: space.spaceDir },
-    { label: 'Code Dir', value: space.codeDir || 'None' },
-    { label: 'Config Dir', value: space.claudeConfigDir },
-    { label: 'Active', value: space.active ? 'Yes' : 'No' },
-    { label: 'Created', value: new Date(space.created).toLocaleDateString() },
-    { label: 'Session ID', value: space.sessionId || 'None' },
-  ]
-
   return (
     <div className="space-y-4">
-      {/* Space Info */}
+      {/* Active + Code Dir */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Space Configuration</CardTitle>
+          <CardTitle className="text-sm">Space</CardTitle>
         </CardHeader>
-        <CardContent>
-          <dl className="space-y-2">
-            {items.map(({ label, value }) => (
-              <div key={label} className="flex justify-between text-sm">
-                <dt className="text-stone">{label}</dt>
-                <dd className="text-foreground font-mono text-xs truncate max-w-[60%] text-right">{value}</dd>
-              </div>
-            ))}
-          </dl>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Power className="w-3.5 h-3.5 text-stone" />
+              <span className="text-sm text-parchment">Active</span>
+            </div>
+            <Switch checked={active} onCheckedChange={handleActiveToggle} disabled={activeSaving} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <FolderCode className="w-3.5 h-3.5 text-stone" />
+              <span className="text-sm text-parchment">Code Directory</span>
+              {codeDirSaving && <Loader2 className="h-3 w-3 animate-spin text-stone" />}
+              {codeDirFeedback === 'saved' && <Check className="h-3 w-3 text-green-400" />}
+              {codeDirFeedback === 'error' && <AlertTriangle className="h-3 w-3 text-ember" />}
+            </div>
+            <input
+              value={codeDir}
+              onChange={e => setCodeDir(e.target.value)}
+              onBlur={handleCodeDirSave}
+              onKeyDown={e => { if (e.key === 'Enter') handleCodeDirSave() }}
+              placeholder="~/dev/my-project (optional)"
+              className="w-full px-2 py-1.5 text-xs bg-ink border border-border-custom rounded text-parchment font-mono placeholder:text-stone/40 focus:outline-none focus:border-sand/40"
+            />
+            <p className="text-[10px] text-stone/50 mt-1">Workers will run code changes here. Leave empty to use the space directory.</p>
+          </div>
         </CardContent>
       </Card>
 
@@ -141,24 +186,12 @@ export function SettingsTab({ space }: { space: Space }) {
             {modelFeedback === 'saved' && (
               <span className="flex items-center gap-1 text-[10px] text-green-400">
                 <Check className="h-3 w-3" /> Saved —{' '}
-                <button
-                  onClick={handleRestart}
-                  disabled={restarting}
-                  className="underline hover:text-green-300 transition-colors"
-                >
+                <button onClick={handleRestart} disabled={restarting} className="underline hover:text-green-300 transition-colors">
                   {restarting ? 'restarting...' : 'restart to apply'}
                 </button>
               </span>
             )}
-            {modelFeedback === 'error' && (
-              <span className="flex items-center gap-1 text-[10px] text-ember">
-                <AlertTriangle className="h-3 w-3" /> Failed
-              </span>
-            )}
           </div>
-          <p className="text-[10px] text-stone/50 mt-2">
-            The Claude model used by this space. Restart the space to apply changes.
-          </p>
         </CardContent>
       </Card>
 
@@ -174,11 +207,7 @@ export function SettingsTab({ space }: { space: Space }) {
               {feedback === 'saved' && (
                 <span className="flex items-center gap-1 text-[10px] text-green-400">
                   <Check className="h-3 w-3" /> Saved —{' '}
-                  <button
-                    onClick={handleRestart}
-                    disabled={restarting}
-                    className="underline hover:text-green-300 transition-colors"
-                  >
+                  <button onClick={handleRestart} disabled={restarting} className="underline hover:text-green-300 transition-colors">
                     {restarting ? 'restarting...' : 'restart now'}
                   </button>
                 </span>
@@ -190,26 +219,16 @@ export function SettingsTab({ space }: { space: Space }) {
               )}
               {editing && (
                 <>
-                  <button
-                    onClick={handleReset}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-ink border border-border-custom text-stone hover:text-parchment transition-colors"
-                  >
+                  <button onClick={handleReset} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-ink border border-border-custom text-stone hover:text-parchment transition-colors">
                     <RotateCcw className="h-3 w-3" /> Discard
                   </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-sand/15 border border-sand/25 text-sand hover:bg-sand/25 transition-colors disabled:opacity-50"
-                  >
+                  <button onClick={handleSave} disabled={saving} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-sand/15 border border-sand/25 text-sand hover:bg-sand/25 transition-colors disabled:opacity-50">
                     {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />} Save
                   </button>
                 </>
               )}
               {!editing && !isLoading && (
-                <button
-                  onClick={() => setEditing(true)}
-                  className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-sand/15 border border-sand/25 text-sand hover:bg-sand/25 transition-colors"
-                >
+                <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-sand/15 border border-sand/25 text-sand hover:bg-sand/25 transition-colors">
                   <FileText className="h-3 w-3" /> Edit
                 </button>
               )}
@@ -248,29 +267,13 @@ export function SettingsTab({ space }: { space: Space }) {
               <p className="text-sm text-parchment">Restart Space</p>
               <p className="text-[10px] text-stone/50">Stop and re-launch the space orchestrator</p>
             </div>
-            <button
-              onClick={handleRestart}
-              disabled={restarting}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-sand/15 border border-sand/25 text-sand hover:bg-sand/25 transition-colors disabled:opacity-50"
-            >
-              {restarting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3.5 w-3.5" />
-              )}
+            <button onClick={handleRestart} disabled={restarting} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-sand/15 border border-sand/25 text-sand hover:bg-sand/25 transition-colors disabled:opacity-50">
+              {restarting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               {restarting ? 'Restarting...' : 'Restart'}
             </button>
           </div>
-          {restartFeedback === 'restarted' && (
-            <p className="flex items-center gap-1 text-[10px] text-green-400">
-              <Check className="h-3 w-3" /> Space restarted
-            </p>
-          )}
-          {restartFeedback === 'error' && (
-            <p className="flex items-center gap-1 text-[10px] text-ember">
-              <AlertTriangle className="h-3 w-3" /> Restart failed
-            </p>
-          )}
+          {restartFeedback === 'restarted' && <p className="flex items-center gap-1 text-[10px] text-green-400"><Check className="h-3 w-3" /> Space restarted</p>}
+          {restartFeedback === 'error' && <p className="flex items-center gap-1 text-[10px] text-ember"><AlertTriangle className="h-3 w-3" /> Restart failed</p>}
         </CardContent>
       </Card>
     </div>

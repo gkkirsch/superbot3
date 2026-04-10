@@ -90,6 +90,22 @@ app.get('/api/spaces/:name', (req, res) => {
   res.json(config);
 });
 
+app.put('/api/spaces/:name/settings', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const spaceJsonPath = path.join(config.spaceDir, 'space.json');
+  try {
+    const spaceJson = JSON.parse(fs.readFileSync(spaceJsonPath, 'utf-8'));
+    if (req.body.codeDir !== undefined) spaceJson.codeDir = req.body.codeDir;
+    if (req.body.active !== undefined) spaceJson.active = req.body.active;
+    fs.writeFileSync(spaceJsonPath, JSON.stringify(spaceJson, null, 2), 'utf-8');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
 app.post('/api/spaces', async (req, res) => {
   const { name, codeDir } = req.body;
   if (!name) return res.status(400).json({ error: 'Name is required' });

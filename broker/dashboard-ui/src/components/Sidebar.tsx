@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { MessageSquare, Star, Plus, Sun, Moon, ChevronLeft, ChevronRight } from 'lucide-react'
+import { MessageSquare, Star, Plus, Sun, Moon, ChevronLeft, ChevronRight, Check, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useTheme } from '@/hooks/useTheme'
+import { createSpace } from '@/lib/api'
+import { useQueryClient } from '@tanstack/react-query'
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(() =>
@@ -14,10 +16,15 @@ export function Sidebar() {
       return new Set(JSON.parse(localStorage.getItem('superbot3-starred') || '[]'))
     } catch { return new Set() }
   })
+  const [adding, setAdding] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
   const { data: spaces } = useSpaces()
   const { theme, toggle: toggleTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     localStorage.setItem('superbot3-sidebar-collapsed', String(collapsed))
@@ -85,8 +92,15 @@ export function Sidebar() {
 
         {/* Spaces section */}
         {!collapsed && (
-          <div className="mt-5 mb-1.5 px-3 text-[10px] uppercase tracking-widest text-stone/70 font-medium">
-            Spaces
+          <div className="mt-5 mb-1.5 px-3 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-widest text-stone/70 font-medium">Spaces</span>
+            <button
+              onClick={() => { setAdding(true); setNewName(''); setTimeout(() => inputRef.current?.focus(), 50) }}
+              className="p-0.5 rounded text-stone/50 hover:text-parchment hover:bg-surface transition-colors"
+              title="Create space"
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
         {collapsed && <div className="mt-3 mb-2 border-t border-border-custom mx-1" />}
@@ -124,18 +138,65 @@ export function Sidebar() {
           </NavLink>
         ))}
 
-        {/* Create Space */}
-        <button
-          onClick={() => navigate('/create-space')}
-          className={cn(
-            'flex items-center rounded-md text-stone hover:text-parchment hover:bg-surface w-full mt-1 transition-colors',
-            collapsed ? 'justify-center p-2' : 'gap-2.5 px-3 py-1.5 text-sm'
-          )}
-          title={collapsed ? 'Create Space' : undefined}
-        >
-          <Plus className="w-4 h-4 shrink-0" />
-          {!collapsed && <span className="text-xs">Create Space</span>}
-        </button>
+        {/* Inline create space */}
+        {adding && !collapsed && (
+          <div className="flex items-center gap-1 px-2 mb-0.5">
+            <input
+              ref={inputRef}
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={async e => {
+                if (e.key === 'Enter' && newName.trim()) {
+                  setCreating(true)
+                  try {
+                    const result = await createSpace({ name: newName.trim() })
+                    queryClient.invalidateQueries({ queryKey: ['spaces'] })
+                    setAdding(false)
+                    setNewName('')
+                    if (result?.slug) navigate(`/spaces/${result.slug}`)
+                  } catch {} finally { setCreating(false) }
+                }
+                if (e.key === 'Escape') { setAdding(false); setNewName('') }
+              }}
+              placeholder="Space name..."
+              disabled={creating}
+              className="flex-1 min-w-0 px-2 py-1 text-xs bg-ink border border-border-custom rounded text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/40"
+            />
+            {creating ? (
+              <Loader2 className="w-3.5 h-3.5 text-stone animate-spin shrink-0" />
+            ) : (
+              <>
+                <button
+                  onClick={async () => {
+                    if (!newName.trim()) return
+                    setCreating(true)
+                    try {
+                      const result = await createSpace({ name: newName.trim() })
+                      queryClient.invalidateQueries({ queryKey: ['spaces'] })
+                      setAdding(false)
+                      setNewName('')
+                      if (result?.slug) navigate(`/spaces/${result.slug}`)
+                    } catch {} finally { setCreating(false) }
+                  }}
+                  className="p-0.5 rounded text-moss hover:bg-moss/10 transition-colors shrink-0"
+                ><Check className="w-3.5 h-3.5" /></button>
+                <button
+                  onClick={() => { setAdding(false); setNewName('') }}
+                  className="p-0.5 rounded text-stone hover:text-parchment hover:bg-surface transition-colors shrink-0"
+                ><X className="w-3.5 h-3.5" /></button>
+              </>
+            )}
+          </div>
+        )}
+        {collapsed && (
+          <button
+            onClick={() => { setAdding(true); setCollapsed(false); setTimeout(() => inputRef.current?.focus(), 200) }}
+            className="flex items-center justify-center p-2 rounded-md text-stone hover:text-parchment hover:bg-surface w-full mt-1 transition-colors"
+            title="Create Space"
+          >
+            <Plus className="w-4 h-4 shrink-0" />
+          </button>
+        )}
       </nav>
 
       {/* Bottom */}
