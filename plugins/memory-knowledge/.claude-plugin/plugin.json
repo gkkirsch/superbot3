@@ -12,6 +12,7 @@
     "./skills/knowledge-base"
   ],
   "agents": [
-    "./agents"
+    "./agents/memory-consolidator.md",
+    "./agents/knowledge-consolidator.md"
   ]
 }

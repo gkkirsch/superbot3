@@ -10,9 +10,5 @@
   "skills": [
     "./skills/browser",
     "./skills/browser-scraper"
-  ],
-  "dependencies": {
-    "bins": ["agent-browser"],
-    "install": "npm install -g agent-browser"
-  }
+  ]
 }
