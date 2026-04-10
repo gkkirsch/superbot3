@@ -179,7 +179,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
       </div>
       <div className="max-w-5xl mx-auto px-4 w-full pt-2 pb-6">
       <form onSubmit={handleSubmit}>
-        <div className="relative bg-ink/80 border border-border-custom rounded-xl focus-within:border-stone/30 transition-colors">
+        <div className="relative bg-surface border border-border-custom rounded-xl focus-within:border-stone/30 transition-colors">
           <textarea
             ref={inputRef}
             value={text}
