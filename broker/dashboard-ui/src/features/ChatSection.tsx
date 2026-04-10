@@ -109,7 +109,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
         <div className="px-4 py-2.5 border-b text-sm font-medium text-parchment">{title}</div>
       )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 scrollbar-auto">
-      <div className="max-w-3xl mx-auto px-4 space-y-3">
+      <div className="max-w-4xl mx-auto px-4 space-y-3">
         {merged.length === 0 && (
           <div className="text-center text-stone text-sm py-12">
             No messages yet. Send one below.
@@ -177,7 +177,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
         )}
       </div>
       </div>
-      <div className="max-w-3xl mx-auto px-4 w-full pt-2 pb-6">
+      <div className="max-w-4xl mx-auto px-4 w-full pt-2 pb-6">
       <form onSubmit={handleSubmit}>
         <div className="relative bg-surface border border-border-custom rounded-xl focus-within:border-stone/30 transition-colors">
           <textarea
@@ -205,9 +205,9 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
             <button
               type="submit"
               disabled={!text.trim() || mutation.isPending}
-              className={`p-1.5 rounded-lg transition-all duration-200 ${
+              className={`p-1.5 rounded-lg transition-all hover:bg-sand/80 ${
                 text.trim()
-                  ? 'bg-sand text-ink scale-100 opacity-100 hover:bg-sand/80'
+                  ? 'bg-sand text-ink opacity-100 animate-[spring-in_0.4s_ease-out]'
                   : 'bg-transparent text-transparent scale-75 opacity-0 pointer-events-none'
               }`}
             >
