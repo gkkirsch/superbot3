@@ -94,55 +94,10 @@ function createSpace(home, name, codeDir) {
   };
   fs.writeFileSync(path.join(spaceDir, 'space.json'), JSON.stringify(spaceConfig, null, 2), 'utf-8');
 
-  // Install built-in plugins (memory-knowledge is default-on)
-  const builtinPluginsDir = path.join(__dirname, '..', '..', 'plugins');
+  // Default plugins from superbot3 marketplace on superchargeclaudecode.com
+  const SUPERBOT3_MARKETPLACE = 'superbot3';
+  const SUPERBOT3_MARKETPLACE_URL = 'https://superchargeclaudecode.com/api/marketplaces/superbot3/marketplace.json';
   const defaultPlugins = ['memory-knowledge', 'browser'];
-  for (const pluginName of defaultPlugins) {
-    const pluginSrc = path.join(builtinPluginsDir, pluginName);
-    if (fs.existsSync(pluginSrc)) {
-      // Copy plugin to space's plugin cache
-      const pluginDest = path.join(spaceDir, '.claude', 'plugins', 'cache', 'superbot3-builtin', pluginName, '1.0.0');
-      copyTemplate(pluginSrc, pluginDest);
-      // Make hook scripts executable
-      const hooksDir = path.join(pluginDest, 'hooks');
-      if (fs.existsSync(hooksDir)) {
-        for (const f of fs.readdirSync(hooksDir)) {
-          if (f.endsWith('.sh')) try { fs.chmodSync(path.join(hooksDir, f), 0o755); } catch {}
-        }
-      }
-    }
-  }
-
-  // Create superbot3-builtin marketplace catalog so Claude Code discovers plugin skills
-  const marketplaceDir = path.join(spaceDir, '.claude', 'plugins', 'cache', 'superbot3-builtin');
-  if (fs.existsSync(marketplaceDir)) {
-    // Build marketplace.json listing all built-in plugins
-    const mpJsonDir = path.join(marketplaceDir, '.claude-plugin');
-    ensureDir(mpJsonDir);
-    const pluginEntries = [];
-    for (const pluginName of defaultPlugins) {
-      const pjPath = path.join(marketplaceDir, pluginName, '1.0.0', '.claude-plugin', 'plugin.json');
-      if (fs.existsSync(pjPath)) {
-        const pj = JSON.parse(fs.readFileSync(pjPath, 'utf-8'));
-        pluginEntries.push({
-          name: pj.name,
-          version: pj.version || '1.0.0',
-          description: pj.description || '',
-          source: `./${pluginName}/1.0.0`,
-          skills: pj.skills || [],
-          keywords: pj.keywords || [],
-        });
-      }
-    }
-    fs.writeFileSync(path.join(mpJsonDir, 'marketplace.json'), JSON.stringify({
-      '$schema': 'https://anthropic.com/claude-code/marketplace.schema.json',
-      name: 'superbot3-builtin',
-      description: 'Built-in superbot3 plugins',
-      owner: { name: 'superbot3' },
-      plugins: pluginEntries,
-    }, null, 2), 'utf-8');
-
-  }
 
   // Copy system prompt template (must happen before template replacement below)
   const systemPromptPath = path.join(spaceDir, 'system-prompt.md');
@@ -183,35 +138,19 @@ function createSpace(home, name, codeDir) {
   let settings = {};
   try { settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8')); } catch {}
 
-  // Enable plugins
+  // Enable default plugins from superbot3 marketplace
   if (!settings.enabledPlugins) settings.enabledPlugins = {};
   for (const pluginName of defaultPlugins) {
-    settings.enabledPlugins[`${pluginName}@superbot3-builtin`] = true;
+    settings.enabledPlugins[`${pluginName}@${SUPERBOT3_MARKETPLACE}`] = true;
   }
 
-  // Register the superbot3-builtin marketplace in settings.json
-  // This is the correct way for Claude Code to discover our plugins
+  // Register the superbot3 marketplace so Claude Code can fetch and load plugins
   if (!settings.extraKnownMarketplaces) settings.extraKnownMarketplaces = {};
-  settings.extraKnownMarketplaces['superbot3-builtin'] = {
-    source: { source: 'directory', path: marketplaceDir },
-    installLocation: marketplaceDir,
+  settings.extraKnownMarketplaces[SUPERBOT3_MARKETPLACE] = {
+    source: { source: 'url', url: SUPERBOT3_MARKETPLACE_URL },
   };
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
-
-  // Register in installed_plugins.json
-  const ipPath = path.join(claudeConfigDir, 'plugins', 'installed_plugins.json');
-  const installedPlugins = { version: 2, plugins: {} };
-  for (const pluginName of defaultPlugins) {
-    installedPlugins.plugins[`${pluginName}@superbot3-builtin`] = [{
-      scope: 'project',
-      installPath: path.join(spaceDir, '.claude', 'plugins', 'cache', 'superbot3-builtin', pluginName, '1.0.0'),
-      version: '1.0.0',
-      installedAt: new Date().toISOString(),
-      lastUpdated: new Date().toISOString(),
-    }];
-  }
-  fs.writeFileSync(ipPath, JSON.stringify(installedPlugins, null, 2), 'utf-8');
 
   // Create team config.json so Claude Code's isTeamLead() returns true.
   // Without this, the inbox poller won't activate and the space can't receive messages.
