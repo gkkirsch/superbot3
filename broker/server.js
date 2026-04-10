@@ -1860,9 +1860,9 @@ app.use((req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'Not found' });
   }
-  const indexPath = path.join(distPath, 'index.html');
+  const indexPath = path.resolve(distPath, 'index.html');
   if (fs.existsSync(indexPath)) {
-    res.sendFile(indexPath);
+    res.sendFile('index.html', { root: distPath });
   } else {
     res.status(404).send('Dashboard not built. Run: cd broker/dashboard-ui && npm run build');
   }
