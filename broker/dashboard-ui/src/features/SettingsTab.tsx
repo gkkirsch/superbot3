@@ -168,7 +168,7 @@ export function SettingsTab({ space }: { space: Space }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-sand" />
-              <CardTitle className="text-sm">System Prompt (CLAUDE.md)</CardTitle>
+              <CardTitle className="text-sm">System Prompt</CardTitle>
             </div>
             <div className="flex items-center gap-2">
               {feedback === 'saved' && (
@@ -228,11 +228,11 @@ export function SettingsTab({ space }: { space: Space }) {
             />
           ) : (
             <pre className="w-full h-[400px] overflow-auto bg-ink border border-border-custom rounded-lg p-3 text-xs text-parchment/80 font-mono whitespace-pre-wrap scrollbar-auto">
-              {promptData?.content || 'No CLAUDE.md found'}
+              {promptData?.content || 'No system prompt configured'}
             </pre>
           )}
           <p className="text-[10px] text-stone/50 mt-2">
-            This is the space orchestrator's system prompt. Changes take effect after restarting the space.
+            The system prompt defines this space's core identity and behavior. Changes take effect after restarting the space.
           </p>
         </CardContent>
       </Card>
