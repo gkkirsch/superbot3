@@ -833,6 +833,45 @@ app.get('/api/spaces/:name/plugins', (req, res) => {
     };
   });
 
+  // Add installed plugins not in any marketplace (e.g. built-in plugins)
+  const marketplaceKeys = new Set(results.map(r => `${r.name}@${r.marketplace}`));
+  for (const [key, entries] of Object.entries(spaceInstalled)) {
+    if (!marketplaceKeys.has(key) && entries.length > 0) {
+      const [name, marketplace] = key.split('@');
+      const isEnabled = enabled[key] === true;
+      // Try to read plugin.json for metadata
+      let description = '';
+      let author = null;
+      const installPath = entries[0].installPath;
+      try {
+        const pjPath = path.join(installPath, '.claude-plugin', 'plugin.json');
+        if (fs.existsSync(pjPath)) {
+          const pj = JSON.parse(fs.readFileSync(pjPath, 'utf-8'));
+          description = pj.description || '';
+          author = pj.author?.name || null;
+        }
+      } catch {}
+      results.push({
+        name,
+        description,
+        category: 'built-in',
+        marketplace: marketplace || 'local',
+        homepage: null,
+        source: null,
+        installed: true,
+        hasFiles: true,
+        enabled: isEnabled,
+        version: entries[0].version || null,
+        skills: null,
+        lspServers: null,
+        tags: null,
+        keywords: null,
+        strict: null,
+        author,
+      });
+    }
+  }
+
   // Sort: enabled first, then installed, then alphabetical
   results.sort((a, b) => {
     if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
