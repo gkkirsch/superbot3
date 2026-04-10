@@ -22,11 +22,12 @@ type View = 'home' | 'skill-detail' | 'agent-detail' | 'add-skill'
 
 function SourceBadge({ source }: { source?: string }) {
   if (!source) return null
-  if (source === 'space') return <Badge variant="outline" className="text-[9px] text-sand border-sand/30">Space</Badge>
+  if (source === 'space') return null  // Don't tag space items — they're the default
   if (source === 'user') return <Badge variant="outline" className="text-[9px] text-stone border-stone/30">User</Badge>
+  if (source === 'project') return <Badge variant="outline" className="text-[9px] text-sand border-sand/30">Project</Badge>
   if (source.startsWith('plugin:')) {
     const pluginName = source.slice('plugin:'.length)
-    return <Badge variant="outline" className="text-[9px] text-moss border-moss/30">Plugin: {pluginName}</Badge>
+    return <Badge className="text-[9px] bg-moss/15 text-moss border border-moss/30 hover:bg-moss/15">{pluginName}</Badge>
   }
   return null
 }
