@@ -96,7 +96,7 @@ function createSpace(home, name, codeDir) {
 
   // Install built-in plugins (memory-knowledge is default-on)
   const builtinPluginsDir = path.join(__dirname, '..', '..', 'plugins');
-  const defaultPlugins = ['memory-knowledge'];
+  const defaultPlugins = ['memory-knowledge', 'browser'];
   for (const pluginName of defaultPlugins) {
     const pluginSrc = path.join(builtinPluginsDir, pluginName);
     if (fs.existsSync(pluginSrc)) {

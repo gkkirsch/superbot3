@@ -30,10 +30,14 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
     claudeArgs.push(`--system-prompt-file '${opts.systemPromptFile}'`);
   }
 
+  // Set browser session name for per-space isolation
+  const browserSession = opts.browserSession || name;
+
   const script = `#!/bin/bash
 cd "${cwd}"
 export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+export AGENT_BROWSER_SESSION="${browserSession}"
 exec claude ${claudeArgs.join(' ')}
 `;
 
