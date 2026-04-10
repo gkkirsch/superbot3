@@ -33,19 +33,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   location: 'Location', math: 'Math', migration: 'Migration', other: 'Other',
 }
 
-// ── Source Badge ─────────────────────────────────────────────────────────────
-
-function SourceBadge({ source }: { source?: string }) {
-  if (!source) return null
-  if (source === 'space') return <Badge variant="outline" className="text-[9px] text-sand border-sand/30">Space</Badge>
-  if (source === 'user') return <Badge variant="outline" className="text-[9px] text-stone border-stone/30">User</Badge>
-  if (source.startsWith('plugin:')) {
-    const pluginName = source.slice('plugin:'.length)
-    return <Badge variant="outline" className="text-[9px] text-moss border-moss/30">Plugin: {pluginName}</Badge>
-  }
-  return null
-}
-
 // ── Shared ───────────────────────────────────────────────────────────────────
 
 function BackButton({ onClick, label }: { onClick: () => void; label: string }) {
@@ -110,6 +97,9 @@ function SkillCard({ skill, slug, onClick }: { skill: SkillDef; slug: string; on
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className={cn('text-xs font-medium', isDisabled ? 'text-stone' : 'text-parchment')}>{skill.name}</span>
+            {skill.source?.startsWith('plugin:') && (
+              <Badge className="text-[9px] bg-moss/15 text-moss border border-moss/30 hover:bg-moss/15">{skill.source.slice('plugin:'.length)}</Badge>
+            )}
             {isDisabled && <Badge variant="outline" className="text-[9px] text-stone/50 border-stone/20">Disabled</Badge>}
           </div>
           {skill.description && <p className="text-[10px] text-stone mt-0.5 line-clamp-1">{skill.description}</p>}
@@ -131,6 +121,9 @@ function AgentCard({ agent, onClick }: { agent: AgentDef; onClick: () => void })
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-parchment">{agent.name || agent.filename}</span>
+            {agent.source?.startsWith('plugin:') && (
+              <Badge className="text-[9px] bg-moss/15 text-moss border border-moss/30 hover:bg-moss/15">{agent.source.slice('plugin:'.length)}</Badge>
+            )}
           </div>
           {agent.description && <p className="text-[10px] text-stone mt-0.5 line-clamp-1">{agent.description}</p>}
         </div>
@@ -428,7 +421,9 @@ function SkillDetailView({ skillName, slug, source, skillEnabled, onBack }: { sk
           <div>
             <h3 className="text-sm font-semibold text-parchment">{fm.name || skillName}</h3>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <SourceBadge source={source} />
+              {source?.startsWith('plugin:') && (
+                <Badge className="text-[9px] bg-moss/15 text-moss border border-moss/30 hover:bg-moss/15">{source.slice('plugin:'.length)}</Badge>
+              )}
               {fm['user-invocable'] && <Badge variant="outline" className="text-[10px]">user-invocable</Badge>}
               {skillEnabled === false && <Badge variant="outline" className="text-[9px] text-stone/50 border-stone/20">Disabled</Badge>}
             </div>
@@ -507,7 +502,9 @@ function AgentDetailView({ agentFilename, slug, source, onBack }: { agentFilenam
         <div>
           <h3 className="text-sm font-semibold text-parchment">{fm.name || agentFilename.replace('.md', '')}</h3>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <SourceBadge source={source} />
+            {source?.startsWith('plugin:') && (
+                <Badge className="text-[9px] bg-moss/15 text-moss border border-moss/30 hover:bg-moss/15">{source.slice('plugin:'.length)}</Badge>
+              )}
           </div>
         </div>
       </div>
