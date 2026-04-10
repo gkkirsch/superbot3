@@ -108,18 +108,25 @@ function createSpace(home, name, codeDir) {
     }
   }
 
-  // Customize CLAUDE.md with space name and code dir
-  const claudeMdPath = path.join(spaceDir, '.claude', 'CLAUDE.md');
-  if (fs.existsSync(claudeMdPath)) {
-    let content = fs.readFileSync(claudeMdPath, 'utf-8');
-    content = content.replace(/\{\{SPACE_NAME\}\}/g, slug);
-    content = content.replace(/\{\{SPACE_DIR\}\}/g, spaceDir);
-    if (codeDir) {
-      content = content.replace(/\{\{CODE_DIR_SECTION\}\}/g, `Your code directory is \`${codeDir}\`. This is where your workers should make code changes. Your space directory (\`${spaceDir}\`) holds knowledge, config, and project state.`);
-    } else {
-      content = content.replace(/\n\{\{CODE_DIR_SECTION\}\}\n/g, '\n');
+  // Customize templates with space name, slug, and code dir
+  const templateFiles = [
+    path.join(spaceDir, '.claude', 'CLAUDE.md'),
+    path.join(spaceDir, 'system-prompt.md'),
+  ];
+  for (const filePath of templateFiles) {
+    if (fs.existsSync(filePath)) {
+      let content = fs.readFileSync(filePath, 'utf-8');
+      content = content.replace(/\{\{SPACE_NAME\}\}/g, slug);
+      content = content.replace(/\{\{SPACE_SLUG\}\}/g, slug);
+      content = content.replace(/\{\{SPACE_DIR\}\}/g, spaceDir);
+      if (codeDir) {
+        content = content.replace(/\{\{CODE_DIR_SECTION\}\}/g, `Your code directory is \`${codeDir}\`. This is where your workers should make code changes. Your space directory (\`${spaceDir}\`) holds knowledge, config, and project state.`);
+      } else {
+        content = content.replace(/\n\{\{CODE_DIR_SECTION\}\}\n/g, '\n');
+        content = content.replace(/\{\{CODE_DIR_SECTION\}\}/g, '');
+      }
+      fs.writeFileSync(filePath, content, 'utf-8');
     }
-    fs.writeFileSync(claudeMdPath, content, 'utf-8');
   }
 
   // Set up auth (credentials + config) so CLAUDE_CONFIG_DIR works
