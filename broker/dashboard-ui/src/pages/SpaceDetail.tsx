@@ -79,7 +79,7 @@ export function SpaceDetail() {
                   <Brain className="w-3.5 h-3.5" />Memory
                 </TabsTrigger>
                 <TabsTrigger value="schedules" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
-                  <Clock className="w-3.5 h-3.5" />
+                  <Clock className="w-3.5 h-3.5" />Schedules
                 </TabsTrigger>
                 <TabsTrigger value="settings" className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs bg-transparent shadow-none data-[state=active]:bg-sand/10 data-[state=active]:text-sand">
                   <Settings className="w-3.5 h-3.5" />
