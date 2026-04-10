@@ -2,7 +2,7 @@
 name: browser
 description: "Browser automation with per-space session isolation. Open pages, fill forms, click buttons, take screenshots, extract data. Each space runs its own isolated browser session."
 when-to-use: "When the user needs to interact with websites — navigate pages, fill forms, click buttons, take screenshots, extract data, test web apps, or automate any browser task."
-allowed-tools: Bash(agent-browser *), Bash(agent-browser:*), Bash(npx agent-browser *)
+allowed-tools: Bash(agent-browser *), Bash(npx agent-browser *)
 user-invocable: true
 ---
 
