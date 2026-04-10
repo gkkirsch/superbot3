@@ -191,7 +191,6 @@ function createSpace(home, name, codeDir) {
 
   // Register the superbot3-builtin marketplace in settings.json
   // This is the correct way for Claude Code to discover our plugins
-  const marketplaceDir = path.join(spaceDir, '.claude', 'plugins', 'cache', 'superbot3-builtin');
   if (!settings.extraKnownMarketplaces) settings.extraKnownMarketplaces = {};
   settings.extraKnownMarketplaces['superbot3-builtin'] = {
     source: { source: 'directory', path: marketplaceDir },
