@@ -26,6 +26,9 @@ module.exports = function init(home) {
     path.join(home, 'spaces'),
     path.join(home, 'templates', 'default', '.claude', 'skills', 'core-methodology'),
     path.join(home, 'templates', 'default', '.claude', 'skills', 'space-cli'),
+    path.join(home, 'templates', 'default', '.claude', 'skills', 'schedule-manager'),
+    path.join(home, 'templates', 'default', '.claude', 'skills', 'memory'),
+    path.join(home, 'templates', 'default', '.claude', 'skills', 'knowledge-base'),
     path.join(home, 'templates', 'default', '.claude', 'agents'),
     path.join(home, 'templates', 'default', '.claude', 'plugins'),
     path.join(home, 'templates', 'default', 'knowledge', 'logs'),
@@ -154,7 +157,7 @@ module.exports = function init(home) {
   );
 
   // Agent definitions
-  const agentFiles = ['planner.md', 'coder.md', 'researcher.md', 'reviewer.md'];
+  const agentFiles = ['planner.md', 'coder.md', 'researcher.md', 'reviewer.md', 'memory-consolidator.md', 'knowledge-consolidator.md'];
   agentFiles.forEach(f => {
     const src = path.join(__dirname, '..', 'templates', 'agents', f);
     if (fs.existsSync(src)) {
@@ -163,7 +166,7 @@ module.exports = function init(home) {
   });
 
   // Skills
-  const skillDirs = ['core-methodology', 'space-cli'];
+  const skillDirs = ['core-methodology', 'space-cli', 'schedule-manager', 'memory', 'knowledge-base'];
   skillDirs.forEach(s => {
     const src = path.join(__dirname, '..', 'templates', 'skills', s, 'SKILL.md');
     if (fs.existsSync(src)) {
