@@ -35,7 +35,7 @@ export function SpaceDetail() {
         {/* Header */}
         <div className="shrink-0 flex items-center py-3">
           <div className="flex-1 min-w-0">
-            <div className="max-w-5xl mx-auto px-8 flex items-center gap-3">
+            <div className="max-w-3xl mx-auto px-8 flex items-center gap-3">
               <h1 className="text-base font-semibold text-parchment">{space.name || space.slug}</h1>
               {space.codeDir && (
                 <span className="text-xs text-stone font-mono truncate">{space.codeDir}</span>
