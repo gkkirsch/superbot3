@@ -96,10 +96,10 @@ export function Sidebar() {
             <span className="text-[10px] uppercase tracking-widest text-stone/70 font-medium">Spaces</span>
             <button
               onClick={() => { setAdding(true); setNewName(''); setTimeout(() => inputRef.current?.focus(), 50) }}
-              className="p-0.5 rounded text-stone/50 hover:text-parchment hover:bg-surface transition-colors"
+              className="p-1 rounded-md bg-sand/10 border border-sand/20 text-sand hover:bg-sand/20 transition-colors"
               title="Create space"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-3 h-3" />
             </button>
           </div>
         )}
@@ -140,7 +140,7 @@ export function Sidebar() {
 
         {/* Inline create space */}
         {adding && !collapsed && (
-          <div className="flex items-center gap-1 px-2 mb-0.5">
+          <div className="flex items-center gap-1.5 px-2 py-1 mb-0.5">
             <input
               ref={inputRef}
               value={newName}
