@@ -179,15 +179,15 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
 
             {/* Suggestion pills */}
             <div className="flex items-center justify-center gap-2">
-              <div className="flex gap-2 min-w-[480px] justify-center" key={suggestionPage}>
+              <div className="grid grid-cols-2 gap-2 w-[480px]" key={suggestionPage}>
                 {visibleSuggestions.map(({ icon: Icon, text }) => (
                   <button
                     key={text}
                     onClick={() => setText(text)}
-                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] text-stone border border-border-custom rounded-full hover:text-parchment hover:border-stone/30 hover:bg-surface/50 transition-colors animate-fade-up"
+                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] text-stone border border-border-custom rounded-full hover:text-parchment hover:border-stone/30 hover:bg-surface/50 transition-colors animate-fade-up truncate"
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0 text-stone/50" />
-                    <span className="whitespace-nowrap">{text.split(' ').slice(0, 5).join(' ')}</span>
+                    <span className="truncate">{text}</span>
                   </button>
                 ))}
               </div>
