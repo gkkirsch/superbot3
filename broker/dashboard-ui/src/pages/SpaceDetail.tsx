@@ -50,7 +50,7 @@ export function SpaceDetail() {
   const { open: panelOpen, toggle: togglePanel, close: closePanel } = usePanel()
 
   if (isLoading) {
-    return <div className="p-6 text-stone">Loading space...</div>
+    return <div className="h-screen" />
   }
 
   if (!space) {
