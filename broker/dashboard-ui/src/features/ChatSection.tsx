@@ -134,8 +134,8 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
         <div className="px-4 py-2.5 border-b text-sm font-medium text-parchment">{title}</div>
       )}
       {isEmpty ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-12">
-          <div className="max-w-[640px] w-full">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-12 pointer-events-none">
+          <div className="max-w-[640px] w-full pointer-events-auto">
             <h2 className="text-center text-parchment/80 text-3xl font-light mb-10 tracking-tight">{greeting}</h2>
 
             {/* Input */}
