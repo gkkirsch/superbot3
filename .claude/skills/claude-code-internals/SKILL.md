@@ -302,3 +302,7 @@ Plugin skills are loaded through a completely separate path from `.claude/skills
 - How `--resume <sessionId>` interacts with `CLAUDE_CONFIG_DIR` (does it look in the config dir's projects/ for the session file?)
 - Whether in-process teammates respect `CLAUDE_CONFIG_DIR` or always use the parent's config
 - Full list of what `--dangerously-skip-permissions` actually bypasses vs what it doesn't
+
+## TODO
+
+- Replace gog CLI's OpenClaw OAuth client with our own Google Cloud OAuth credentials. Steps: create GCP project → enable Gmail API → create OAuth consent screen → create Desktop App credentials → `gog auth credentials set /path/to/credentials.json` → `gog auth add ibekidkirsch@gmail.com`
