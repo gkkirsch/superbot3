@@ -30,8 +30,10 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
     claudeArgs.push(`--system-prompt-file '${opts.systemPromptFile}'`);
   }
 
-  // Set browser session name for per-space isolation
+  // Set browser session and profile for per-space isolation using system Chrome
   const browserSession = opts.browserSession || name;
+  const spaceDir = opts.spaceDir || cwd;
+  const browserProfile = path.join(spaceDir, 'browser-profile');
 
   const script = `#!/bin/bash
 cd "${cwd}"
@@ -39,6 +41,7 @@ export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 export CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
 export AGENT_BROWSER_SESSION="${browserSession}"
+export AGENT_BROWSER_PROFILE="${browserProfile}"
 exec claude ${claudeArgs.join(' ')}
 `;
 
@@ -134,6 +137,7 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
   const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
   const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, teamArgs, {
     systemPromptFile: fs.existsSync(systemPromptFile) ? systemPromptFile : null,
+    spaceDir: space.spaceDir,
   });
 
   // Create tmux window and run the launch script
