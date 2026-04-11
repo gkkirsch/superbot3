@@ -10,7 +10,19 @@ import { SettingsTab } from '@/features/SettingsTab'
 import { useSpace, useSpaceMessages, useSpaceConversation } from '@/hooks/useSpaces'
 import { sendSpaceMessage } from '@/lib/api'
 import { usePanel } from '@/hooks/usePanel'
-import { PanelRight, X, Puzzle, FolderOpen, Clock, Settings, Brain, Globe } from 'lucide-react'
+import { PanelRight, X, Puzzle, FolderOpen, Clock, Settings, Brain } from 'lucide-react'
+
+function ChromeIcon({ className, style }: { className?: string; style?: React.CSSProperties }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} style={style}>
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="12" y1="8" x2="21" y2="5" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="8.5" y1="14" x2="3" y2="18" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="15.5" y1="14" x2="18" y2="20" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  )
+}
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
@@ -37,7 +49,7 @@ function BrowserButton({ slug, color }: { slug: string; color?: string }) {
       className="p-1.5 rounded-md hover:bg-ink transition-colors disabled:opacity-50"
       title="Open browser"
     >
-      <Globe className={cn('w-4 h-4', launching && 'animate-pulse')} style={color ? { color, opacity: 0.6 } : undefined} />
+      <ChromeIcon className={cn('w-4 h-4', launching && 'animate-pulse')} style={color ? { color, opacity: 0.6 } : undefined} />
     </button>
   )
 }

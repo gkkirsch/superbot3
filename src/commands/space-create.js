@@ -233,6 +233,9 @@ function createSpace(home, name, codeDir) {
   if (!prefs.profile) prefs.profile = {};
   prefs.profile.name = friendlyName;
   prefs.profile.avatar_index = spaceColor.avatar;
+  prefs.profile.using_default_avatar = false;
+  prefs.profile.using_gaia_avatar = false;
+  prefs.profile.using_default_name = false;
   if (!prefs.browser) prefs.browser = {};
   if (!prefs.browser.theme) prefs.browser.theme = {};
   prefs.browser.theme.user_color = spaceColor.rgb[0] << 16 | spaceColor.rgb[1] << 8 | spaceColor.rgb[2];
