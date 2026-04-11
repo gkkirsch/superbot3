@@ -94,7 +94,7 @@ app.post('/api/spaces/:name/browser', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const url = req.body.url || 'about:blank';
+  const url = req.body.url || `http://localhost:${process.env.SUPERBOT3_BROKER_PORT || 3100}/browser-welcome?space=${config.slug}&name=${encodeURIComponent(config.name)}&color=${encodeURIComponent(config.color || '#706b63')}`;
   const profileDir = path.join(config.spaceDir, 'browser-profile');
   const env = {
     AGENT_BROWSER_SESSION: config.slug,
@@ -1891,6 +1891,74 @@ setInterval(runSchedulerTick, 30000);
 // Also run immediately on startup
 setTimeout(runSchedulerTick, 5000);
 console.log('[scheduler] Broker-side cron scheduler started (30s tick)');
+
+// ── Browser welcome page ─────────────────────────────────────────────────────
+
+app.get('/browser-welcome', (req, res) => {
+  const { space, name, color } = req.query;
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>${name || space || 'Browser'} — superbot3</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0a0a0a; color: #d4cdc4; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .container { max-width: 600px; padding: 40px; }
+  .header { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: ${color || '#706b63'}; }
+  h1 { font-size: 24px; font-weight: 600; }
+  .subtitle { color: #706b63; font-size: 14px; margin-bottom: 32px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #706b63; margin-bottom: 16px; }
+  .card { background: #141414; border: 1px solid #1f1f1e; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card h3 { font-size: 15px; margin-bottom: 8px; color: #c4a882; }
+  .card p { font-size: 13px; color: #706b63; line-height: 1.6; }
+  code { background: #1a1a1a; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: "SF Mono", Monaco, monospace; color: #d4cdc4; }
+  .tip { font-size: 12px; color: #706b63; margin-top: 24px; padding-top: 16px; border-top: 1px solid #1f1f1e; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="dot"></div>
+    <h1>${name || space}</h1>
+  </div>
+  <p class="subtitle">This is your isolated browser for the <strong>${name || space}</strong> space. Your session, cookies, and login state are separate from other spaces.</p>
+
+  <h2>How it works</h2>
+
+  <div class="card">
+    <h3>Chat-driven browsing</h3>
+    <p>Tell your space what to do in the chat. It will control this browser automatically.<br><br>
+    Example: <em>"Go to github.com and star the superbot3 repo"</em></p>
+  </div>
+
+  <div class="card">
+    <h3>Persistent login</h3>
+    <p>Log into any site once and it stays logged in. Cookies and session data persist in this space's browser profile across restarts.</p>
+  </div>
+
+  <div class="card">
+    <h3>Stealth mode</h3>
+    <p>This is your real Chrome with your real fingerprint. No bot detection flags — sites see a normal browser.</p>
+  </div>
+
+  <div class="card">
+    <h3>Commands the space uses</h3>
+    <p>
+      <code>agent-browser open &lt;url&gt;</code> — navigate<br>
+      <code>agent-browser snapshot -i</code> — see interactive elements<br>
+      <code>agent-browser click @e1</code> — click an element<br>
+      <code>agent-browser fill @e2 "text"</code> — type into a field<br>
+      <code>agent-browser screenshot</code> — capture the page
+    </p>
+  </div>
+
+  <p class="tip">Navigate anywhere you like — this browser is yours. The space will take over when you give it a task.</p>
+</div>
+</body>
+</html>`);
+});
 
 // ── SPA fallback ─────────────────────────────────────────────────────────────
 
