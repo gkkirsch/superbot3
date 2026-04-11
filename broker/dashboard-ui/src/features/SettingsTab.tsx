@@ -6,7 +6,7 @@ import { fetchSystemPrompt, saveSystemPrompt, restartSpace, setSpaceModel } from
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
-import { FileText, Save, RotateCcw, Loader2, Check, AlertTriangle, RefreshCw, Cpu, FolderCode, Power, Trash2, Globe } from 'lucide-react'
+import { FileText, Save, RotateCcw, Loader2, Check, AlertTriangle, RefreshCw, Cpu, FolderCode, Power, Trash2 } from 'lucide-react'
 
 const putJson = async (url: string, body: object) => {
   const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -19,8 +19,6 @@ export function SettingsTab({ space }: { space: Space }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmName, setConfirmName] = useState('')
-  const [warmingUp, setWarmingUp] = useState(false)
-  const [warmupDone, setWarmupDone] = useState(false)
   const { data: promptData, isLoading } = useQuery({
     queryKey: ['system-prompt', space.slug],
     queryFn: () => fetchSystemPrompt(space.slug),
@@ -283,28 +281,6 @@ export function SettingsTab({ space }: { space: Space }) {
           {restartFeedback === 'restarted' && <p className="flex items-center gap-1 text-[10px] text-green-400"><Check className="h-3 w-3" /> Space restarted</p>}
           {restartFeedback === 'error' && <p className="flex items-center gap-1 text-[10px] text-ember"><AlertTriangle className="h-3 w-3" /> Restart failed</p>}
 
-          <div className="flex items-center justify-between pt-2 border-t border-border-custom">
-            <div>
-              <p className="text-sm text-parchment">Warm Up Browser</p>
-              <p className="text-[10px] text-stone/50">Visit common sites to build up history and avoid bot detection</p>
-            </div>
-            <button
-              onClick={async () => {
-                setWarmingUp(true)
-                setWarmupDone(false)
-                try {
-                  await fetch(`/api/spaces/${space.slug}/browser/warmup`, { method: 'POST' })
-                  setTimeout(() => { setWarmingUp(false); setWarmupDone(true); setTimeout(() => setWarmupDone(false), 5000) }, 30000)
-                } catch { setWarmingUp(false) }
-              }}
-              disabled={warmingUp}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-sand/15 border border-sand/25 text-sand hover:bg-sand/25 transition-colors disabled:opacity-50"
-            >
-              {warmingUp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
-              {warmingUp ? 'Warming up...' : 'Warm Up'}
-            </button>
-          </div>
-          {warmupDone && <p className="flex items-center gap-1 text-[10px] text-green-400"><Check className="h-3 w-3" /> Browser warmed up</p>}
         </CardContent>
       </Card>
 

@@ -120,19 +120,6 @@ app.post('/api/spaces/:name/browser', (req, res) => {
   res.json({ ok: true, url });
 });
 
-app.post('/api/spaces/:name/browser/warmup', (req, res) => {
-  const config = getSpaceConfig(req.params.name);
-  if (!config) return res.status(404).json({ error: 'Space not found' });
-
-  const { exec } = require('child_process');
-  const warmupScript = path.join(__dirname, '..', 'src', 'warmup-browser.js');
-  exec(`node "${warmupScript}" "${config.slug}"`, { env: { ...process.env, SUPERBOT3_HOME } }, (err, stdout) => {
-    if (err) console.log(`[warmup] error for ${config.slug}: ${err.message}`);
-    else console.log(`[warmup] ${config.slug}: ${stdout.trim().split('\n').pop()}`);
-  });
-  res.json({ ok: true, message: 'Warmup started in background' });
-});
-
 app.delete('/api/spaces/:name', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
@@ -183,16 +170,6 @@ app.post('/api/spaces', async (req, res) => {
       const config = JSON.parse(fs.readFileSync(path.join(SUPERBOT3_HOME, 'config.json'), 'utf-8'));
       const model = config.model || 'claude-opus-4-6';
       launchSpace(spaceConfig, model);
-
-      // Auto-warmup browser profile in background (headless)
-      const { exec } = require('child_process');
-      const warmupScript = path.join(__dirname, '..', 'src', 'warmup-browser.js');
-      exec(`node "${warmupScript}" "${spaceConfig.slug}" --headless`, {
-        env: { ...process.env, SUPERBOT3_HOME }
-      }, (err, stdout) => {
-        if (err) console.log(`[warmup] ${spaceConfig.slug}: failed — ${err.message}`);
-        else console.log(`[warmup] ${spaceConfig.slug}: ${(stdout || '').trim().split('\n').pop()}`);
-      });
     } catch (startErr) {
       // Space was created successfully but auto-start failed — not fatal
       console.log(`Note: Space created but auto-start failed: ${startErr.message}`);
