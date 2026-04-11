@@ -1715,29 +1715,9 @@ try {
     let type = 'unknown';
     let space = null;
     let eventType = 'inbox_update';
-    let preview = '';
 
     if (filePath.endsWith('.jsonl')) {
       eventType = 'conversation_update';
-      // Read last line of JSONL for preview
-      try {
-        const content = fs.readFileSync(filePath, 'utf-8').trim();
-        const lines = content.split('\n');
-        const last = JSON.parse(lines[lines.length - 1]);
-        if (last.type === 'assistant' && last.message?.content) {
-          const textBlock = last.message.content.find(b => b.type === 'text');
-          if (textBlock) preview = textBlock.text.slice(0, 150);
-        }
-      } catch {}
-    } else {
-      // Read last inbox message for preview
-      try {
-        const messages = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        if (Array.isArray(messages) && messages.length > 0) {
-          const last = messages[messages.length - 1];
-          preview = (last.text || last.summary || '').slice(0, 150);
-        }
-      } catch {}
     }
 
     if (filePath.includes('/orchestrator/')) {
@@ -1750,7 +1730,7 @@ try {
       }
     }
 
-    const payload = JSON.stringify({ type: eventType, source: type, space, preview });
+    const payload = JSON.stringify({ type: eventType, source: type, space });
     wss.clients.forEach(client => {
       if (client.readyState === 1) client.send(payload);
     });
