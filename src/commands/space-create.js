@@ -224,46 +224,23 @@ function createSpace(home, name, codeDir) {
     fs.writeFileSync(memoryMdPath, '# Memory\n\nNo memories yet.\n', 'utf-8');
   }
 
-  // Seed Chrome profile — clone from template if one exists, otherwise create fresh
-  const { cloneBrowserProfile } = require('../browserEnv');
-  const templateProfileDir = path.join(home, 'browser-template');
-  let cloned = false;
-  if (fs.existsSync(path.join(templateProfileDir, 'Default', 'Secure Preferences'))) {
-    cloned = cloneBrowserProfile(templateProfileDir, spaceDir, friendlyName, spaceColor.hex);
-  } else {
-    // Check if any existing space has a configured profile we can clone from
-    const spacesDir = path.join(home, 'spaces');
-    if (fs.existsSync(spacesDir)) {
-      for (const entry of fs.readdirSync(spacesDir, { withFileTypes: true })) {
-        if (!entry.isDirectory() || entry.name === slug) continue;
-        const candidateDir = path.join(spacesDir, entry.name);
-        if (fs.existsSync(path.join(candidateDir, 'browser-profile', 'Default', 'Secure Preferences'))) {
-          cloned = cloneBrowserProfile(candidateDir, spaceDir, friendlyName, spaceColor.hex);
-          if (cloned) break;
-        }
-      }
-    }
-  }
-
-  if (!cloned) {
-    // Fresh profile with just name/color
-    const profileDir = path.join(spaceDir, 'browser-profile', 'Default');
-    ensureDir(profileDir);
-    const prefsPath = path.join(profileDir, 'Preferences');
-    let prefs = {};
-    try { prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf-8')); } catch {}
-    if (!prefs.profile) prefs.profile = {};
-    prefs.profile.name = friendlyName;
-    prefs.profile.avatar_index = spaceColor.avatar;
-    prefs.profile.using_default_avatar = false;
-    prefs.profile.using_gaia_avatar = false;
-    prefs.profile.using_default_name = false;
-    if (!prefs.browser) prefs.browser = {};
-    if (!prefs.browser.theme) prefs.browser.theme = {};
-    prefs.browser.theme.user_color = spaceColor.rgb[0] << 16 | spaceColor.rgb[1] << 8 | spaceColor.rgb[2];
-    prefs.browser.theme.color_scheme = 2;
-    fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf-8');
-  }
+  // Seed Chrome profile with space name and color
+  const profileDir = path.join(spaceDir, 'browser-profile', 'Default');
+  ensureDir(profileDir);
+  const prefsPath = path.join(profileDir, 'Preferences');
+  let prefs = {};
+  try { prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf-8')); } catch {}
+  if (!prefs.profile) prefs.profile = {};
+  prefs.profile.name = friendlyName;
+  prefs.profile.avatar_index = spaceColor.avatar;
+  prefs.profile.using_default_avatar = false;
+  prefs.profile.using_gaia_avatar = false;
+  prefs.profile.using_default_name = false;
+  if (!prefs.browser) prefs.browser = {};
+  if (!prefs.browser.theme) prefs.browser.theme = {};
+  prefs.browser.theme.user_color = spaceColor.rgb[0] << 16 | spaceColor.rgb[1] << 8 | spaceColor.rgb[2];
+  prefs.browser.theme.color_scheme = 2;
+  fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf-8');
 
   return spaceConfig;
 }
