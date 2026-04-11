@@ -684,7 +684,15 @@ function AddSkillView({ slug, onBack }: { slug: string; onBack: () => void }) {
     const fileList = e.target.files
     if (!fileList) return
     for (let i = 0; i < fileList.length; i++) {
-      processFile(fileList[i])
+      const file = fileList[i]
+      // webkitRelativePath gives "folderName/subfolder/file.py"
+      const rel = (file as any).webkitRelativePath || file.name
+      // Strip the top-level folder name to get relative path within the skill
+      const parts = rel.split('/')
+      const relativePath = parts.length > 1 ? parts.slice(1).join('/') : rel
+      // Set skill name from folder name if not set
+      if (!name && parts.length > 1) setName(parts[0])
+      processFile(file, relativePath)
     }
   }
 
@@ -774,7 +782,8 @@ function AddSkillView({ slug, onBack }: { slug: string; onBack: () => void }) {
           parsed && 'border-moss/30 bg-moss/5'
         )}
       >
-        <input ref={fileInputRef} type="file" accept=".md,.txt,.sh,.py,.js,.ts,.json" multiple className="hidden" onChange={handleFileSelect} />
+        {/* @ts-expect-error webkitdirectory is valid but not in React types */}
+        <input ref={fileInputRef} type="file" webkitdirectory="" directory="" multiple className="hidden" onChange={handleFileSelect} />
         {parsed ? (
           <div className="space-y-1">
             <p className="text-xs text-moss font-medium">SKILL.md loaded</p>
