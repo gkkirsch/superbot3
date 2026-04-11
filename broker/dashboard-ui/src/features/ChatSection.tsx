@@ -111,8 +111,25 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 scrollbar-auto">
       <div className="max-w-[790px] mx-auto px-4 space-y-3">
         {merged.length === 0 && (
-          <div className="text-center text-stone text-sm py-12">
-            No messages yet. Send one below.
+          <div className="flex flex-col items-center justify-center py-24">
+            <h2 className="text-lg font-medium text-parchment mb-2">What would you like to do?</h2>
+            <p className="text-sm text-stone mb-8">Tell this space what to work on.</p>
+            <div className="flex flex-wrap gap-2 justify-center max-w-md">
+              {[
+                'Research competitors and summarize findings',
+                'Open a browser and scrape data from a website',
+                'Create a plan for a new feature',
+                'Write and send an email',
+              ].map(suggestion => (
+                <button
+                  key={suggestion}
+                  onClick={() => setText(suggestion)}
+                  className="px-3 py-1.5 text-xs text-stone bg-surface border border-border-custom rounded-full hover:text-parchment hover:border-stone/30 transition-colors"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {merged.length > visibleCount && (
