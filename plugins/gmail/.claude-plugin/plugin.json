@@ -1,0 +1,13 @@
+{
+  "name": "gmail",
+  "version": "1.0.0",
+  "description": "Gmail integration via gog CLI — send, search, read, and reply to emails. Triggers: 'send email', 'check email', 'search inbox', 'reply to email', 'draft email'.",
+  "author": {
+    "name": "superbot3",
+    "email": "built-in"
+  },
+  "keywords": ["gmail", "email", "google"],
+  "skills": [
+    "./skills/gmail"
+  ]
+}
