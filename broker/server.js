@@ -1906,18 +1906,17 @@ app.get('/browser-welcome', (req, res) => {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: "Inter", -apple-system, sans-serif; background: #0a0a0a; color: #d4cdc4; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
   .container { text-align: center; max-width: 420px; padding: 40px; }
-  .logo { height: 22px; margin-bottom: 40px; opacity: 0.7; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: ${color || '#706b63'}; display: inline-block; margin-right: 8px; vertical-align: middle; }
-  h1 { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
-  p { font-size: 14px; color: #706b63; line-height: 1.7; }
-  p strong { color: #d4cdc4; font-weight: 500; }
+  .logo { height: 28px; margin-bottom: 48px; opacity: 0.7; }
+  h1 { font-size: 28px; font-weight: 600; margin-bottom: 20px; }
+  p { font-size: 16px; color: #706b63; line-height: 1.8; }
+  .space-name { color: ${color || '#c4a882'}; font-weight: 500; }
 </style>
 </head>
 <body>
 <div class="container">
   <img src="/superbot-logo.png" alt="superbot3" class="logo" onerror="this.style.display='none'">
-  <h1><span class="dot"></span>${name || space}</h1>
-  <p>This browser belongs to the <strong>${name || space}</strong> space. Anything you log into here stays logged in — cookies, sessions, and passwords are saved to this space's profile and won't affect other spaces.</p>
+  <h1>Your Browser</h1>
+  <p>This browser belongs to the <span class="space-name">${name || space}</span> space. Anything you log into here stays logged in — cookies, sessions, and passwords are saved to this space's profile and won't affect other spaces.</p>
 </div>
 </body>
 </html>`);
