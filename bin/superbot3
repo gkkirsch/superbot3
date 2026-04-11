@@ -58,6 +58,15 @@ space
     require('../src/commands/space-remove')(SUPERBOT3_HOME, name);
   });
 
+space
+  .command('warmup <name>')
+  .description('Warm up browser profile by visiting common sites')
+  .action((name) => {
+    process.env.SUPERBOT3_HOME = SUPERBOT3_HOME;
+    process.argv[2] = name;
+    require('../src/warmup-browser');
+  });
+
 // start
 program
   .command('start')
