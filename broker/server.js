@@ -136,35 +136,12 @@ app.post('/api/spaces', async (req, res) => {
     const resolvedCodeDir = codeDir ? path.resolve(codeDir) : null;
     const spaceConfig = createSpace(SUPERBOT3_HOME, name, resolvedCodeDir);
 
-    // Auto-start the space if tmux session exists
+    // Auto-start the space using the shared launchSpace module
     try {
+      const { launchSpace } = require(path.join(__dirname, '..', 'src', 'launchSpace'));
       const config = JSON.parse(fs.readFileSync(path.join(SUPERBOT3_HOME, 'config.json'), 'utf-8'));
       const model = config.model || 'claude-opus-4-6';
-      const spaceWorkDir = spaceConfig.codeDir || spaceConfig.spaceDir;
-
-      // Ensure inbox exists
-      const inboxDir = path.join(spaceConfig.claudeConfigDir, 'teams', spaceConfig.slug, 'inboxes');
-      fs.mkdirSync(inboxDir, { recursive: true });
-      const inboxPath = path.join(inboxDir, 'team-lead.json');
-      if (!fs.existsSync(inboxPath)) {
-        fs.writeFileSync(inboxPath, '[]', 'utf-8');
-      }
-
-      // Write launch script
-      const scriptDir = path.join(SUPERBOT3_HOME, '.tmp');
-      fs.mkdirSync(scriptDir, { recursive: true });
-      const scriptPath = path.join(scriptDir, `launch-${spaceConfig.slug}.sh`);
-      const teamArgs = `--agent-id 'team-lead@${spaceConfig.slug}' --agent-name 'team-lead' --team-name '${spaceConfig.slug}'`;
-      const script = `#!/bin/bash\ncd "${spaceWorkDir}"\nexport CLAUDE_CONFIG_DIR="${spaceConfig.claudeConfigDir}"\nexport CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\nexec claude --dangerously-skip-permissions --model ${model} ${teamArgs}\n`;
-      fs.writeFileSync(scriptPath, script, { mode: 0o755 });
-
-      // Launch in tmux if session exists
-      if (isWindowRunning('master') || isWindowRunning(spaceConfig.slug)) {
-        execSync(`tmux new-window -t superbot3 -n ${spaceConfig.slug} "bash ${scriptPath}"`, { timeout: 5000 });
-        // Send startup prompt
-        const startupPrompt = 'Read your CLAUDE.md. Scan knowledge/ for context. Report your identity, skills, agents, and knowledge files.';
-        await writeToInbox(inboxPath, { from: 'superbot3', text: startupPrompt });
-      }
+      launchSpace(spaceConfig, model);
     } catch (startErr) {
       // Space was created successfully but auto-start failed — not fatal
       console.log(`Note: Space created but auto-start failed: ${startErr.message}`);
