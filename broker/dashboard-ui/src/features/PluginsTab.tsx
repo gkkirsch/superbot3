@@ -747,110 +747,66 @@ function AddSkillView({ slug, onBack }: { slug: string; onBack: () => void }) {
         <h3 className="text-sm font-semibold text-parchment">Add Skill</h3>
       </div>
 
-      {/* Drop zone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        className={cn(
-          'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
-          dragging ? 'border-sand/50 bg-sand/5' : 'border-border-custom hover:border-stone/30 hover:bg-surface/30',
-          parsed && 'border-moss/30 bg-moss/5'
-        )}
-      >
-        {/* @ts-expect-error webkitdirectory is valid but not in React types */}
-        <input ref={fileInputRef} type="file" webkitdirectory="" directory="" multiple className="hidden" onChange={handleFileSelect} />
-        {parsed ? (
-          <div className="space-y-1">
-            <p className="text-xs text-moss font-medium">SKILL.md loaded</p>
-            <p className="text-[10px] text-stone">Name and description auto-filled from frontmatter</p>
-            {fileCount > 0 && <p className="text-[10px] text-stone">+ {fileCount} additional file{fileCount > 1 ? 's' : ''}</p>}
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <p className="text-xs text-stone">Drop a skill folder or SKILL.md here</p>
-            <p className="text-[10px] text-stone/50">or click to browse files</p>
-          </div>
-        )}
-      </div>
-
-      {/* Or import from path */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1 h-px bg-border-custom" />
-        <span className="text-[10px] text-stone/40">or paste a path</span>
-        <div className="flex-1 h-px bg-border-custom" />
-      </div>
-      <div className="flex gap-2">
-        <input
-          value={sourcePath}
-          onChange={e => {
-            setSourcePath(e.target.value)
-            if (!name) {
-              const n = e.target.value.replace(/\/+$/, '').split('/').pop() || ''
-              setName(n)
-            }
-          }}
-          placeholder="/path/to/skill/folder"
-          className="flex-1 px-3 py-2 text-xs bg-ink/50 border border-border-custom rounded-md text-parchment font-mono placeholder:text-stone/40 focus:outline-none focus:border-sand/40"
-        />
-        <button
-          onClick={handleImportPath}
-          disabled={!sourcePath.trim() || submitting}
-          className="px-3 py-2 text-xs font-medium rounded-md bg-sand/20 text-sand hover:bg-sand/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+      {/* Drop zone — shown when no files loaded yet */}
+      {!parsed ? (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          onClick={() => fileInputRef.current?.click()}
+          className={cn(
+            'border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors',
+            dragging ? 'border-sand/50 bg-sand/5' : 'border-border-custom hover:border-stone/30 hover:bg-surface/30'
+          )}
         >
-          Import
-        </button>
-      </div>
-
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div>
-          <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Name</label>
-          <input
-            type="text" value={name} onChange={e => setName(e.target.value)} placeholder="my-custom-skill"
-            className="w-full px-3 py-2 text-xs bg-ink/50 border border-border-custom rounded-md text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/40 font-mono"
-          />
+          {/* @ts-expect-error webkitdirectory is valid but not in React types */}
+          <input ref={fileInputRef} type="file" webkitdirectory="" directory="" multiple className="hidden" onChange={handleFileSelect} />
+          <FolderPlus className="w-6 h-6 text-stone/30 mx-auto mb-3" />
+          <p className="text-sm text-stone">Drop a skill folder here</p>
+          <p className="text-[11px] text-stone/40 mt-1">or click to browse — we'll handle the rest</p>
         </div>
-        <div>
-          <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Description</label>
-          <textarea
-            value={description} onChange={e => setDescription(e.target.value)} placeholder="What does this skill do? When should it be used?"
-            rows={2}
-            className="w-full px-3 py-2 text-xs bg-ink/50 border border-border-custom rounded-md text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/40 resize-none"
-          />
-        </div>
-
-        {/* Preview */}
-        {content && (
-          <div>
-            <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Preview</label>
-            <pre className="w-full max-h-32 overflow-auto bg-ink/50 border border-border-custom rounded-md p-2 text-[10px] text-stone font-mono whitespace-pre-wrap">{content.slice(0, 500)}{content.length > 500 ? '\n...' : ''}</pre>
-          </div>
-        )}
-
-        {/* File list */}
-        {fileCount > 0 && (
-          <div>
-            <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Additional Files</label>
-            <div className="space-y-1">
-              {Object.keys(files).map(f => (
-                <div key={f} className="flex items-center gap-2 text-[10px] text-stone font-mono bg-ink/30 rounded px-2 py-1">
-                  <Code2 className="w-3 h-3 shrink-0" />{f}
-                  <button onClick={() => setFiles(prev => { const n = {...prev}; delete n[f]; return n })} className="ml-auto text-stone/40 hover:text-ember">
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
+      ) : (
+        <>
+          {/* Form — shown after files loaded */}
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Name</label>
+              <input
+                type="text" value={name} onChange={e => setName(e.target.value)} placeholder="my-custom-skill"
+                className="w-full px-3 py-2 text-xs bg-ink/50 border border-border-custom rounded-md text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/40 font-mono"
+              />
             </div>
-          </div>
-        )}
+            <div>
+              <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Description</label>
+              <textarea
+                value={description} onChange={e => setDescription(e.target.value)} placeholder="What does this skill do?"
+                rows={2}
+                className="w-full px-3 py-2 text-xs bg-ink/50 border border-border-custom rounded-md text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/40 resize-none"
+              />
+            </div>
 
-        <button type="submit" disabled={submitting || !name.trim()}
-          className="w-full py-2 text-xs font-medium rounded-md bg-sand/20 text-sand hover:bg-sand/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          {submitting ? 'Creating...' : 'Create Skill'}
-        </button>
-      </form>
+            {/* Files */}
+            <div>
+              <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Files ({fileCount + 1})</label>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-[10px] text-moss font-mono bg-moss/5 border border-moss/20 rounded px-2 py-1.5">
+                  <Blocks className="w-3 h-3 shrink-0" />SKILL.md
+                </div>
+                {Object.keys(files).map(f => (
+                  <div key={f} className="flex items-center gap-2 text-[10px] text-stone font-mono bg-ink/30 rounded px-2 py-1.5">
+                    <Code2 className="w-3 h-3 shrink-0" />{f}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <button type="submit" disabled={submitting || !name.trim()}
+              className="w-full py-2.5 text-xs font-medium rounded-md bg-sand/20 text-sand hover:bg-sand/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              {submitting ? 'Creating...' : 'Add Skill'}
+            </button>
+          </form>
+        </>
+      )}
       {result && <p className={cn('text-xs', result.includes('success') ? 'text-moss' : 'text-ember')}>{result}</p>}
     </div>
   )
