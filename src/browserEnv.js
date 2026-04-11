@@ -80,4 +80,52 @@ function seedBrowserExtensions(spaceDir) {
   fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf-8');
 }
 
-module.exports = { getBrowserEnv, seedBrowserExtensions };
+/**
+ * Clone a base browser profile into a new space.
+ * Copies extensions, Secure Preferences, and other profile data
+ * from a template profile so new spaces get extensions pre-installed.
+ */
+function cloneBrowserProfile(templateSpaceDir, targetSpaceDir, targetName, targetColor) {
+  const templateProfile = path.join(templateSpaceDir, 'browser-profile');
+  const targetProfile = path.join(targetSpaceDir, 'browser-profile');
+
+  if (!fs.existsSync(path.join(templateProfile, 'Default', 'Secure Preferences'))) {
+    return false; // Template doesn't have a configured profile
+  }
+
+  // Copy the whole Default directory (extensions, secure prefs, local storage, etc.)
+  function copyDir(src, dest) {
+    fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+      // Skip lock files and sockets
+      if (['SingletonLock', 'SingletonSocket', 'SingletonCookie', 'RunningChromeVersion'].includes(entry.name)) continue;
+      const s = path.join(src, entry.name);
+      const d = path.join(dest, entry.name);
+      if (entry.isDirectory()) copyDir(s, d);
+      else if (entry.isFile()) fs.copyFileSync(s, d);
+    }
+  }
+  copyDir(templateProfile, targetProfile);
+
+  // Update profile name and color in Preferences
+  const prefsPath = path.join(targetProfile, 'Default', 'Preferences');
+  try {
+    const prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf-8'));
+    if (!prefs.profile) prefs.profile = {};
+    prefs.profile.name = targetName;
+    prefs.profile.using_default_name = false;
+    if (targetColor) {
+      if (!prefs.browser) prefs.browser = {};
+      if (!prefs.browser.theme) prefs.browser.theme = {};
+      const r = parseInt(targetColor.slice(1, 3), 16);
+      const g = parseInt(targetColor.slice(3, 5), 16);
+      const b = parseInt(targetColor.slice(5, 7), 16);
+      prefs.browser.theme.user_color = (r << 16) | (g << 8) | b;
+    }
+    fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf-8');
+  } catch {}
+
+  return true;
+}
+
+module.exports = { getBrowserEnv, seedBrowserExtensions, cloneBrowserProfile };
