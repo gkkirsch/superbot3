@@ -14,7 +14,7 @@ import { PanelRight, X, Puzzle, FolderOpen, Clock, Settings, Brain, Globe } from
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 
-function BrowserButton({ slug }: { slug: string }) {
+function BrowserButton({ slug, color }: { slug: string; color?: string }) {
   const [launching, setLaunching] = useState(false)
 
   async function launch() {
@@ -34,10 +34,10 @@ function BrowserButton({ slug }: { slug: string }) {
     <button
       onClick={launch}
       disabled={launching}
-      className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors disabled:opacity-50"
+      className="p-1.5 rounded-md hover:bg-ink transition-colors disabled:opacity-50"
       title="Open browser"
     >
-      <Globe className={cn('w-4 h-4', launching && 'animate-pulse')} />
+      <Globe className={cn('w-4 h-4', launching && 'animate-pulse')} style={color ? { color } : undefined} />
     </button>
   )
 }
@@ -63,15 +63,12 @@ export function SpaceDetail() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="shrink-0 flex items-center py-3 px-6">
-          {(space as any).color && (
-            <div className="w-2.5 h-2.5 rounded-full mr-2.5 shrink-0" style={{ backgroundColor: (space as any).color }} />
-          )}
           <h1 className="text-base font-semibold text-parchment">{space.name || space.slug}</h1>
           {space.codeDir && (
             <span className="text-xs text-stone font-mono truncate ml-3">{space.codeDir}</span>
           )}
           <div className="ml-auto shrink-0 flex items-center gap-1">
-            <BrowserButton slug={space.slug} />
+            <BrowserButton slug={space.slug} color={(space as any).color} />
             <button
               onClick={togglePanel}
               className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
