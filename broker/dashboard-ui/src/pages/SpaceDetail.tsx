@@ -37,7 +37,7 @@ function BrowserButton({ slug, color }: { slug: string; color?: string }) {
       className="p-1.5 rounded-md hover:bg-ink transition-colors disabled:opacity-50"
       title="Open browser"
     >
-      <Globe className={cn('w-4 h-4', launching && 'animate-pulse')} style={color ? { color } : undefined} />
+      <Globe className={cn('w-4 h-4', launching && 'animate-pulse')} style={color ? { color, opacity: 0.6 } : undefined} />
     </button>
   )
 }
