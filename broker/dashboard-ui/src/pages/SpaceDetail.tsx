@@ -34,10 +34,10 @@ function BrowserButton({ slug, color }: { slug: string; color?: string }) {
     <button
       onClick={launch}
       disabled={launching}
-      className="p-1.5 rounded-md hover:bg-ink transition-colors disabled:opacity-50"
+      className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-surface transition-colors disabled:opacity-50"
       title="Open browser"
     >
-      <Globe className={cn('w-4 h-4', launching && 'animate-pulse')} style={color ? { color, opacity: 0.6 } : undefined} />
+      <Globe className={cn('w-4 h-4', launching && 'animate-pulse')} style={color ? { color } : undefined} />
     </button>
   )
 }
@@ -71,7 +71,7 @@ export function SpaceDetail() {
             <BrowserButton slug={space.slug} color={(space as any).color} />
             <button
               onClick={togglePanel}
-              className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
+              className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-surface transition-colors"
               title="Toggle panel"
             >
               <PanelRight className="w-4 h-4" />
