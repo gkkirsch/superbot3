@@ -33,9 +33,11 @@ if (!fs.existsSync(path.join(spaceDir, 'space.json'))) {
   process.exit(1);
 }
 
+const headless = process.argv.includes('--headless');
 const env = {
   ...process.env,
   ...getBrowserEnv(slug, spaceDir),
+  ...(headless ? { AGENT_BROWSER_HEADED: 'false' } : {}),
 };
 
 function run(cmd, timeout = 30000) {

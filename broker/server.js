@@ -105,10 +105,16 @@ app.post('/api/spaces/:name/browser', (req, res) => {
 
   const port = process.env.SUPERBOT3_BROKER_PORT || 3100;
   const url = req.body.url || `http://localhost:${port}/browser-welcome?space=${config.slug}&name=${encodeURIComponent(config.name)}&color=${encodeURIComponent(config.color || '#706b63')}`;
+  const profileDir = path.join(config.spaceDir, 'browser-profile');
   const { exec } = require('child_process');
-  // Open URL in the user's default browser — no separate profile
-  // Separate profiles get flagged by Google/Cloudflare as bot-like
-  exec(`open "${url}"`, (err) => {
+  const chromeExe = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  const args = [
+    `--user-data-dir="${profileDir}"`,
+    '--no-first-run',
+    '--no-default-browser-check',
+    `"${url}"`,
+  ].join(' ');
+  exec(`"${chromeExe}" ${args}`, (err) => {
     if (err) console.log(`[browser] launch error for ${config.slug}: ${err.message}`);
   });
   res.json({ ok: true, url });
@@ -177,6 +183,16 @@ app.post('/api/spaces', async (req, res) => {
       const config = JSON.parse(fs.readFileSync(path.join(SUPERBOT3_HOME, 'config.json'), 'utf-8'));
       const model = config.model || 'claude-opus-4-6';
       launchSpace(spaceConfig, model);
+
+      // Auto-warmup browser profile in background (headless)
+      const { exec } = require('child_process');
+      const warmupScript = path.join(__dirname, '..', 'src', 'warmup-browser.js');
+      exec(`node "${warmupScript}" "${spaceConfig.slug}" --headless`, {
+        env: { ...process.env, SUPERBOT3_HOME }
+      }, (err, stdout) => {
+        if (err) console.log(`[warmup] ${spaceConfig.slug}: failed — ${err.message}`);
+        else console.log(`[warmup] ${spaceConfig.slug}: ${(stdout || '').trim().split('\n').pop()}`);
+      });
     } catch (startErr) {
       // Space was created successfully but auto-start failed — not fatal
       console.log(`Note: Space created but auto-start failed: ${startErr.message}`);
