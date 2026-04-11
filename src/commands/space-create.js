@@ -28,6 +28,26 @@ function copyTemplate(templateDir, targetDir) {
  * Core space creation logic. Returns the spaceConfig object on success.
  * Throws on error instead of calling process.exit (safe for both CLI and server).
  */
+// Distinct colors for browser profile bars — each space gets a unique one
+const SPACE_COLORS = [
+  { name: 'blue',    rgb: [66, 133, 244],  hex: '#4285f4' },
+  { name: 'red',     rgb: [234, 67, 53],   hex: '#ea4335' },
+  { name: 'green',   rgb: [52, 168, 83],   hex: '#34a853' },
+  { name: 'orange',  rgb: [251, 188, 4],   hex: '#fbbc04' },
+  { name: 'purple',  rgb: [171, 71, 188],  hex: '#ab47bc' },
+  { name: 'teal',    rgb: [0, 172, 193],   hex: '#00acc1' },
+  { name: 'pink',    rgb: [236, 64, 122],  hex: '#ec407a' },
+  { name: 'indigo',  rgb: [92, 107, 192],  hex: '#5c6bc0' },
+  { name: 'lime',    rgb: [124, 179, 66],  hex: '#7cb342' },
+  { name: 'amber',   rgb: [255, 143, 0],   hex: '#ff8f00' },
+];
+
+function getSpaceColor(slug) {
+  let hash = 0;
+  for (let i = 0; i < slug.length; i++) hash = ((hash << 5) - hash + slug.charCodeAt(i)) | 0;
+  return SPACE_COLORS[Math.abs(hash) % SPACE_COLORS.length];
+}
+
 function titleCase(str) {
   return str.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
@@ -76,6 +96,9 @@ function createSpace(home, name, codeDir) {
     copyTemplate(templateDir, spaceDir);
   }
 
+  // Assign a color to this space
+  const spaceColor = getSpaceColor(slug);
+
   // Generate space.json
   const spaceConfig = {
     $schema: 'superbot3-space-v1',
@@ -87,9 +110,9 @@ function createSpace(home, name, codeDir) {
     active: true,
     created: new Date().toISOString(),
     sessionId: null,
+    color: spaceColor.hex,
     browser: {
       maxConcurrent: 1,
-      cdpPort: 9222,
     },
   };
   fs.writeFileSync(path.join(spaceDir, 'space.json'), JSON.stringify(spaceConfig, null, 2), 'utf-8');
@@ -200,6 +223,20 @@ function createSpace(home, name, codeDir) {
   if (!fs.existsSync(memoryMdPath)) {
     fs.writeFileSync(memoryMdPath, '# Memory\n\nNo memories yet.\n', 'utf-8');
   }
+
+  // Seed Chrome profile with space name and color
+  const profileDir = path.join(spaceDir, 'browser-profile', 'Default');
+  ensureDir(profileDir);
+  const prefsPath = path.join(profileDir, 'Preferences');
+  let prefs = {};
+  try { prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf-8')); } catch {}
+  if (!prefs.profile) prefs.profile = {};
+  prefs.profile.name = friendlyName;
+  if (!prefs.browser) prefs.browser = {};
+  if (!prefs.browser.theme) prefs.browser.theme = {};
+  prefs.browser.theme.user_color = spaceColor.rgb[0] << 16 | spaceColor.rgb[1] << 8 | spaceColor.rgb[2];
+  prefs.browser.theme.color_scheme = 2; // 2 = follow system
+  fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf-8');
 
   return spaceConfig;
 }

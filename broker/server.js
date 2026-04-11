@@ -90,6 +90,28 @@ app.get('/api/spaces/:name', (req, res) => {
   res.json(config);
 });
 
+app.post('/api/spaces/:name/browser', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const url = req.body.url || 'about:blank';
+  const profileDir = path.join(config.spaceDir, 'browser-profile');
+  const env = {
+    AGENT_BROWSER_SESSION: config.slug,
+    AGENT_BROWSER_PROFILE: profileDir,
+    AGENT_BROWSER_HEADED: 'true',
+    AGENT_BROWSER_ARGS: '--disable-blink-features=AutomationControlled,--disable-features=AutomationControlled,--disable-infobars,--no-first-run,--no-default-browser-check,--disable-popup-blocking',
+  };
+  try {
+    const envStr = Object.entries(env).map(([k,v]) => `${k}="${v}"`).join(' ');
+    const { execSync } = require('child_process');
+    execSync(`${envStr} agent-browser open "${url}"`, { env: { ...process.env, ...env }, timeout: 15000 });
+    res.json({ ok: true, url });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to launch browser', detail: err.message });
+  }
+});
+
 app.put('/api/spaces/:name/settings', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });

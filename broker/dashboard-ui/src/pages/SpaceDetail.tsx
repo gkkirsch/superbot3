@@ -10,8 +10,37 @@ import { SettingsTab } from '@/features/SettingsTab'
 import { useSpace, useSpaceMessages, useSpaceConversation } from '@/hooks/useSpaces'
 import { sendSpaceMessage } from '@/lib/api'
 import { usePanel } from '@/hooks/usePanel'
-import { PanelRight, X, Puzzle, FolderOpen, Clock, Settings, Brain } from 'lucide-react'
+import { PanelRight, X, Puzzle, FolderOpen, Clock, Settings, Brain, Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useState } from 'react'
+
+function BrowserButton({ slug }: { slug: string }) {
+  const [launching, setLaunching] = useState(false)
+
+  async function launch() {
+    setLaunching(true)
+    try {
+      await fetch(`/api/spaces/${slug}/browser`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'about:blank' }),
+      })
+    } catch {} finally {
+      setTimeout(() => setLaunching(false), 2000)
+    }
+  }
+
+  return (
+    <button
+      onClick={launch}
+      disabled={launching}
+      className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors disabled:opacity-50"
+      title="Open browser"
+    >
+      <Globe className={cn('w-4 h-4', launching && 'animate-pulse')} />
+    </button>
+  )
+}
 
 export function SpaceDetail() {
   const { slug } = useParams<{ slug: string }>()
@@ -34,11 +63,15 @@ export function SpaceDetail() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div className="shrink-0 flex items-center py-3 px-6">
+          {(space as any).color && (
+            <div className="w-2.5 h-2.5 rounded-full mr-2.5 shrink-0" style={{ backgroundColor: (space as any).color }} />
+          )}
           <h1 className="text-base font-semibold text-parchment">{space.name || space.slug}</h1>
           {space.codeDir && (
             <span className="text-xs text-stone font-mono truncate ml-3">{space.codeDir}</span>
           )}
-          <div className="ml-auto shrink-0">
+          <div className="ml-auto shrink-0 flex items-center gap-1">
+            <BrowserButton slug={space.slug} />
             <button
               onClick={togglePanel}
               className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-ink transition-colors"
