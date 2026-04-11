@@ -10,29 +10,12 @@ user-invocable: true
 
 Every space gets its own isolated browser session. No port conflicts, no shared state.
 
-## Setup Check
+## CRITICAL RULES
 
-Before using, verify agent-browser is installed:
-
-```bash
-agent-browser --version
-```
-
-If not installed: `npm install -g agent-browser`
-
-## Session Isolation
-
-Your browser session is automatically isolated by space. The environment variable `AGENT_BROWSER_SESSION` is set to your space slug at launch. All commands use this session automatically.
-
-To verify your session:
-```bash
-agent-browser session
-```
-
-To see all active sessions:
-```bash
-agent-browser session list
-```
+1. **NEVER use `agent-browser close --all`** — this kills browser sessions in ALL spaces. Only use `agent-browser close` (no --all) to close YOUR session.
+2. Your session is automatically set via the `AGENT_BROWSER_SESSION` env var. Verify it's working by running `agent-browser session` — it should show your space slug.
+3. **NEVER use `--session` flag** — the env var handles this. Adding `--session` overrides isolation.
+4. Skip the version check — agent-browser is pre-installed.
 
 ## Core Workflow
 
@@ -201,6 +184,7 @@ agent-browser inspect                             # Open Chrome DevTools
 
 - Your session is isolated — other spaces cannot see or affect your browser
 - The browser daemon persists between commands (no startup cost after first command)
-- Use `agent-browser close --all` when done to free resources
+- Use `agent-browser close` when done (NOT `close --all` — that kills ALL spaces' sessions)
 - Screenshots go to temp dir by default — use explicit paths for important captures
 - For parallel work within a space, workers share the same session (use tabs)
+- First command: verify session with `agent-browser session` — should show your space slug
