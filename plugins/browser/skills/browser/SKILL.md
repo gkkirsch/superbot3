@@ -143,9 +143,20 @@ agent-browser console                             # View console logs
 agent-browser errors                              # View page errors
 ```
 
+## Stealth
+
+The browser launches with anti-detection flags pre-configured:
+- `--disable-blink-features=AutomationControlled` (hides navigator.webdriver)
+- `--disable-infobars` (no "Chrome is being controlled" bar)
+- Real system Chrome with persistent profile (real fingerprint)
+- Headed mode (visible window — matches real user behavior)
+
+If a site still blocks you, try adding a delay between actions (`agent-browser wait 2000`).
+
 ## Important Notes
 
 - Uses system Chrome with a persistent profile — real fingerprint, not bot-detectable
+- Browser opens in a visible window (headed mode) — matches real user behavior
 - Your session is isolated — other spaces cannot see or affect your browser
 - The browser daemon persists between commands (no startup cost after first command)
 - Use `agent-browser close` when done (NEVER `close --all`)
