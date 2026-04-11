@@ -107,29 +107,32 @@ function cloneBrowserProfile(templateSpaceDir, targetSpaceDir, targetName, targe
   }
   copyDir(templateProfile, targetProfile);
 
-  // Update profile name and color in BOTH Preferences and Secure Preferences
-  const colorInt = targetColor ? (() => {
-    const r = parseInt(targetColor.slice(1, 3), 16);
-    const g = parseInt(targetColor.slice(3, 5), 16);
-    const b = parseInt(targetColor.slice(5, 7), 16);
-    return (r << 16) | (g << 8) | b;
-  })() : null;
+  // Delete Secure Preferences — Chrome will regenerate it on launch,
+  // re-detecting the extensions from the Extensions/ directory.
+  // This avoids HMAC mismatch issues with profile name/color.
+  const secPrefsPath = path.join(targetProfile, 'Default', 'Secure Preferences');
+  try { fs.unlinkSync(secPrefsPath); } catch {}
 
-  for (const filename of ['Preferences', 'Secure Preferences']) {
-    const fp = path.join(targetProfile, 'Default', filename);
-    try {
-      const prefs = JSON.parse(fs.readFileSync(fp, 'utf-8'));
-      if (!prefs.profile) prefs.profile = {};
-      prefs.profile.name = targetName;
-      prefs.profile.using_default_name = false;
-      if (colorInt !== null) {
-        if (!prefs.browser) prefs.browser = {};
-        if (!prefs.browser.theme) prefs.browser.theme = {};
-        prefs.browser.theme.user_color = colorInt;
-      }
-      fs.writeFileSync(fp, JSON.stringify(prefs, null, 2), 'utf-8');
-    } catch {}
-  }
+  // Set name and color in regular Preferences (Chrome reads these on first launch
+  // when there's no Secure Preferences yet)
+  const prefsPath = path.join(targetProfile, 'Default', 'Preferences');
+  try {
+    const prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf-8'));
+    if (!prefs.profile) prefs.profile = {};
+    prefs.profile.name = targetName;
+    prefs.profile.using_default_name = false;
+    prefs.profile.using_default_avatar = false;
+    prefs.profile.using_gaia_avatar = false;
+    if (targetColor) {
+      if (!prefs.browser) prefs.browser = {};
+      if (!prefs.browser.theme) prefs.browser.theme = {};
+      const r = parseInt(targetColor.slice(1, 3), 16);
+      const g = parseInt(targetColor.slice(3, 5), 16);
+      const b = parseInt(targetColor.slice(5, 7), 16);
+      prefs.browser.theme.user_color = (r << 16) | (g << 8) | b;
+    }
+    fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf-8');
+  } catch {}
 
   return true;
 }
