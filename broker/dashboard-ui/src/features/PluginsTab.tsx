@@ -43,16 +43,7 @@ function BackButton({ onClick, label }: { onClick: () => void; label: string }) 
   )
 }
 
-function PluginCard({ plugin, slug, onClick, compact }: { plugin: PluginInfo; slug: string; onClick: () => void; compact?: boolean }) {
-  const [toggling, setToggling] = useState(false)
-  const queryClient = useQueryClient()
-  async function handleToggle() {
-    setToggling(true)
-    try {
-      await togglePlugin(slug, `${plugin.name}@${plugin.marketplace}`, !plugin.enabled)
-      queryClient.invalidateQueries({ queryKey: ['plugins', slug] })
-    } finally { setToggling(false) }
-  }
+function PluginCard({ plugin, onClick, compact }: { plugin: PluginInfo; onClick: () => void; compact?: boolean }) {
   return (
     <Card className="cursor-pointer hover:border-border-custom/80 transition-colors" onClick={onClick}>
       <CardContent className={compact ? 'p-2.5' : 'p-3'}>
@@ -69,26 +60,15 @@ function PluginCard({ plugin, slug, onClick, compact }: { plugin: PluginInfo; sl
               <p className="text-xs text-stone mt-0.5 line-clamp-1">{plugin.description}</p>
             )}
           </div>
-          <Switch checked={plugin.enabled} onCheckedChange={handleToggle} disabled={toggling} onClick={(e) => e.stopPropagation()} />
+          <ChevronRight className="w-3 h-3 text-stone/30 shrink-0" />
         </div>
       </CardContent>
     </Card>
   )
 }
 
-function SkillCard({ skill, slug, onClick }: { skill: SkillDef; slug: string; onClick: () => void }) {
-  const [toggling, setToggling] = useState(false)
-  const queryClient = useQueryClient()
-  const isSpace = skill.source === 'space'
+function SkillCard({ skill, onClick }: { skill: SkillDef; onClick: () => void }) {
   const isDisabled = skill.enabled === false
-
-  async function handleToggle() {
-    setToggling(true)
-    try {
-      await toggleSkill(slug, skill.dirname, !skill.enabled)
-      queryClient.invalidateQueries({ queryKey: ['skills', slug] })
-    } finally { setToggling(false) }
-  }
 
   return (
     <Card className={cn('cursor-pointer hover:border-border-custom/80 transition-colors', isDisabled && 'opacity-50')} onClick={onClick}>
@@ -104,9 +84,6 @@ function SkillCard({ skill, slug, onClick }: { skill: SkillDef; slug: string; on
           </div>
           {skill.description && <p className="text-[10px] text-stone mt-0.5 line-clamp-1">{skill.description}</p>}
         </div>
-        {isSpace && (
-          <Switch checked={skill.enabled !== false} onCheckedChange={handleToggle} disabled={toggling} onClick={(e) => e.stopPropagation()} />
-        )}
         <ChevronRight className="w-3 h-3 text-stone/30 shrink-0" />
       </CardContent>
     </Card>
@@ -938,7 +915,7 @@ function BrowseView({ slug, plugins, onBack, onSelect, onNavigate }: {
       <p className="text-[10px] text-stone/50">
         {filtered.length} plugin{filtered.length !== 1 ? 's' : ''}{search && ' matching'}{activeCategory && ` in ${CATEGORY_LABELS[activeCategory] || activeCategory}`}
       </p>
-      <div className="space-y-1">{visible.map(p => <PluginCard key={`${p.name}@${p.marketplace}`} plugin={p} slug={slug} onClick={() => onSelect(p)} />)}</div>
+      <div className="space-y-1">{visible.map(p => <PluginCard key={`${p.name}@${p.marketplace}`} plugin={p} onClick={() => onSelect(p)} />)}</div>
       {hasMore && (
         <button onClick={() => setPage(prev => prev + 1)} className="w-full py-1.5 text-xs text-stone hover:text-parchment border border-border-custom rounded-md hover:bg-ink/30 transition-colors">
           Show more ({filtered.length - visible.length} remaining)
@@ -965,12 +942,12 @@ function HomeView({ slug, plugins, skills, agents, onBrowse, onSelectPlugin, onS
       </button>
       {enabledPlugins.length > 0 && (
         <CollapsibleSection title="Plugins" count={enabledPlugins.length} defaultOpen={true}>
-          <div className="space-y-1">{enabledPlugins.map(p => <PluginCard key={`${p.name}@${p.marketplace}`} plugin={p} slug={slug} onClick={() => onSelectPlugin(p)} compact />)}</div>
+          <div className="space-y-1">{enabledPlugins.map(p => <PluginCard key={`${p.name}@${p.marketplace}`} plugin={p} onClick={() => onSelectPlugin(p)} compact />)}</div>
         </CollapsibleSection>
       )}
       <CollapsibleSection title="Skills" count={skills.length} defaultOpen={true}>
         {skills.length > 0 ? (
-          <div className="space-y-1">{skills.map(s => <SkillCard key={`${s.source}:${s.dirname}`} skill={s} slug={slug} onClick={() => onSelectSkill(s)} />)}</div>
+          <div className="space-y-1">{skills.map(s => <SkillCard key={`${s.source}:${s.dirname}`} skill={s} onClick={() => onSelectSkill(s)} />)}</div>
         ) : (
           <p className="text-xs text-stone mb-2">No skills found.</p>
         )}
