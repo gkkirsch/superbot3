@@ -260,8 +260,8 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
           <div className="animate-fade-up">
             <div className="flex items-center gap-1.5 px-5 py-3">
               <span className="typing-dot" />
-              <span className="typing-dot [animation-delay:0.15s]" />
-              <span className="typing-dot [animation-delay:0.3s]" />
+              <span className="typing-dot" style={{ animationDelay: '0.15s' }} />
+              <span className="typing-dot" style={{ animationDelay: '0.3s' }} />
             </div>
           </div>
         )}
