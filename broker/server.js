@@ -1915,7 +1915,6 @@ app.get('/browser-welcome', (req, res) => {
 <body>
 <div class="container">
   <img src="/superbot-logo.png" alt="superbot3" class="logo" onerror="this.style.display='none'">
-  <h1>Your Browser</h1>
   <p>This browser belongs to the <span class="space-name">${name || space}</span> space. Anything you log into here stays logged in — cookies, sessions, and passwords are saved to this space's profile and won't affect other spaces.</p>
 </div>
 </body>
