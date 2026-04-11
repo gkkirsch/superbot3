@@ -105,7 +105,7 @@ const sites = [
 ];
 
 console.log(`\nWarming up browser profile for "${slug}"...`);
-console.log(`Profile: ${profileDir}\n`);
+console.log(`Profile: ${path.join(spaceDir, 'browser-profile')}\n`);
 
 let visited = 0;
 for (const site of sites) {
