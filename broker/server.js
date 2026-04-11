@@ -1905,10 +1905,9 @@ app.get('/browser-welcome', (req, res) => {
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: "Inter", -apple-system, sans-serif; background: #0a0a0a; color: #d4cdc4; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-  .container { text-align: center; max-width: 420px; padding: 40px; }
-  .logo { height: 28px; margin-bottom: 48px; opacity: 0.7; }
-  h1 { font-size: 28px; font-weight: 600; margin-bottom: 20px; }
-  p { font-size: 16px; color: #706b63; line-height: 1.8; }
+  .container { text-align: center; max-width: 540px; padding: 60px; }
+  .logo { height: 36px; margin-bottom: 56px; opacity: 0.7; }
+  p { font-size: 20px; color: #706b63; line-height: 1.8; }
   .space-name { color: ${color || '#c4a882'}; font-weight: 500; }
 </style>
 </head>
