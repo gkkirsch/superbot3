@@ -178,20 +178,22 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
             </form>
 
             {/* Suggestion pills */}
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              {visibleSuggestions.map(({ icon: Icon, text }) => (
-                <button
-                  key={text}
-                  onClick={() => setText(text)}
-                  className="flex items-center gap-2 px-3.5 py-2 text-[13px] text-stone border border-border-custom rounded-full hover:text-parchment hover:border-stone/30 hover:bg-surface/50 transition-colors"
-                >
-                  <Icon className="w-3.5 h-3.5 shrink-0 text-stone/50" />
-                  <span className="truncate max-w-[200px]">{text.split(' ').slice(0, 5).join(' ')}</span>
-                </button>
-              ))}
+            <div className="flex items-center justify-center gap-2">
+              <div className="flex gap-2 min-w-[480px] justify-center" key={suggestionPage}>
+                {visibleSuggestions.map(({ icon: Icon, text }) => (
+                  <button
+                    key={text}
+                    onClick={() => setText(text)}
+                    className="flex items-center gap-2 px-3.5 py-2 text-[13px] text-stone border border-border-custom rounded-full hover:text-parchment hover:border-stone/30 hover:bg-surface/50 transition-colors animate-fade-up"
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0 text-stone/50" />
+                    <span className="whitespace-nowrap">{text.split(' ').slice(0, 5).join(' ')}</span>
+                  </button>
+                ))}
+              </div>
               <button
                 onClick={() => setSuggestionPage(p => p + 1)}
-                className="p-2 rounded-full text-stone/30 hover:text-stone hover:bg-surface/50 border border-border-custom transition-colors"
+                className="p-2 rounded-full text-stone/30 hover:text-stone hover:bg-surface/50 border border-border-custom transition-colors shrink-0"
                 title="More suggestions"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
