@@ -23,7 +23,7 @@ function BrowserButton({ slug, color }: { slug: string; color?: string }) {
       await fetch(`/api/spaces/${slug}/browser`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: 'about:blank' }),
+        body: JSON.stringify({}),
       })
     } catch {} finally {
       setTimeout(() => setLaunching(false), 2000)
