@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowUp, Search, Globe, FileText, Mail } from 'lucide-react'
+import { ArrowUp, Search, Globe, FileText, Mail, Code, BarChart3, Lightbulb, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { InboxMessage } from '@/lib/types'
 import type { ConversationMessage } from '@/lib/api'
@@ -103,35 +103,67 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
     mutation.mutate(text.trim())
   }
 
+  const greetings = [
+    'What are we building today?',
+    'What should this space work on?',
+    'Give me something to do.',
+    'Ready when you are.',
+    'What\'s the plan?',
+    'Where do we start?',
+  ]
+  const [greeting] = useState(() => greetings[Math.floor(Math.random() * greetings.length)])
+
+  const allSuggestions = [
+    { icon: Search, text: 'Find 10 leads for AI consulting outreach and draft personalized emails' },
+    { icon: Globe, text: 'Open a browser, go to producthunt.com, and find trending AI tools' },
+    { icon: Code, text: 'Set up a new Express API with TypeScript, Postgres, and Zod validation' },
+    { icon: Mail, text: 'Draft a cold email sequence for SaaS founders about our product' },
+    { icon: BarChart3, text: 'Research competitor pricing and summarize in a comparison table' },
+    { icon: FileText, text: 'Write a technical blog post about building with Claude Code' },
+    { icon: Lightbulb, text: 'Brainstorm 10 revenue ideas based on our existing tools and skills' },
+    { icon: Globe, text: 'Scrape job postings from 5 sites and compile into a spreadsheet' },
+  ]
+  const [suggestionPage, setSuggestionPage] = useState(() => Math.floor(Math.random() * (allSuggestions.length / 2)))
+  const visibleSuggestions = allSuggestions.slice((suggestionPage * 2) % allSuggestions.length, (suggestionPage * 2) % allSuggestions.length + 2)
+
+  const isEmpty = merged.length === 0
+
   return (
     <div className="flex flex-col h-full">
       {title && (
         <div className="px-4 py-2.5 border-b text-sm font-medium text-parchment">{title}</div>
       )}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 scrollbar-auto">
-      <div className="max-w-[790px] mx-auto px-4 space-y-3">
-        {merged.length === 0 && (
-          <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <p className="text-sm text-stone mb-6">What would you like to do?</p>
-            <div className="grid grid-cols-2 gap-2 w-full max-w-md">
-              {([
-                { icon: Search, text: 'Research a topic and summarize findings' },
-                { icon: Globe, text: 'Open a browser and scrape a website' },
-                { icon: FileText, text: 'Create a plan for a new project' },
-                { icon: Mail, text: 'Draft and send an outreach email' },
-              ] as const).map(({ icon: Icon, text }) => (
-                <button
-                  key={text}
-                  onClick={() => setText(text)}
-                  className="flex items-start gap-2.5 p-3 text-left text-xs text-stone bg-surface border border-border-custom rounded-lg hover:text-parchment hover:border-stone/30 transition-colors"
-                >
-                  <Icon className="w-3.5 h-3.5 mt-0.5 shrink-0 text-stone/50" />
-                  <span>{text}</span>
-                </button>
-              ))}
+      {isEmpty ? (
+        <div className="flex-1 flex flex-col items-center justify-center px-4">
+          <div className="max-w-[790px] w-full">
+            <p className="text-center text-stone text-sm mb-8">{greeting}</p>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="flex-1 flex gap-2">
+                {visibleSuggestions.map(({ icon: Icon, text }) => (
+                  <button
+                    key={text}
+                    onClick={() => setText(text)}
+                    className="flex-1 flex items-start gap-2.5 p-3.5 text-left text-[13px] text-stone bg-surface border border-border-custom rounded-lg hover:text-parchment hover:border-stone/30 transition-colors"
+                  >
+                    <Icon className="w-4 h-4 mt-0.5 shrink-0 text-sand/40" />
+                    <span className="line-clamp-2">{text}</span>
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setSuggestionPage(p => p + 1)}
+                className="p-1.5 rounded-md text-stone/30 hover:text-stone hover:bg-surface transition-colors shrink-0"
+                title="More suggestions"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      ) : (
+      <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 scrollbar-auto">
+      <div className="max-w-[790px] mx-auto px-4 space-y-3">
+        {false && (null)}
         {merged.length > visibleCount && (
           <div className="text-center pb-2">
             <button
@@ -194,7 +226,8 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
         )}
       </div>
       </div>
-      <div className="max-w-[790px] mx-auto px-4 w-full pt-2 pb-6">
+      )}
+      <div className={cn('mx-auto px-4 w-full', isEmpty ? 'max-w-[790px] pb-12' : 'max-w-[790px] pt-2 pb-6')}>
       <form onSubmit={handleSubmit}>
         <div className="relative bg-surface border border-border-custom rounded-xl focus-within:border-stone/30 transition-colors">
           <textarea
