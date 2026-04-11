@@ -134,28 +134,67 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
         <div className="px-4 py-2.5 border-b text-sm font-medium text-parchment">{title}</div>
       )}
       {isEmpty ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-4">
-          <div className="max-w-[790px] w-full">
-            <p className="text-center text-stone text-sm mb-8">{greeting}</p>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex-1 flex gap-2">
-                {visibleSuggestions.map(({ icon: Icon, text }) => (
+        <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-12">
+          <div className="max-w-[640px] w-full">
+            <h2 className="text-center text-parchment/80 text-3xl font-light mb-10 tracking-tight">{greeting}</h2>
+
+            {/* Input */}
+            <form onSubmit={handleSubmit} className="mb-6">
+              <div className="relative bg-surface border border-border-custom rounded-xl focus-within:border-stone/30 transition-colors">
+                <textarea
+                  ref={inputRef}
+                  value={text}
+                  onChange={e => setText(e.target.value)}
+                  rows={2}
+                  placeholder="Message this space..."
+                  className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-parchment placeholder:text-stone/40 focus:outline-none resize-none overflow-y-auto max-h-32 no-scrollbar"
+                  disabled={mutation.isPending}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      e.currentTarget.form?.requestSubmit()
+                    }
+                  }}
+                  onInput={(e) => {
+                    const target = e.currentTarget
+                    target.style.height = 'auto'
+                    target.style.height = `${Math.min(target.scrollHeight, 128)}px`
+                  }}
+                />
+                <div className="absolute bottom-2 right-3">
                   <button
-                    key={text}
-                    onClick={() => setText(text)}
-                    className="flex-1 flex items-start gap-2.5 p-3.5 text-left text-[13px] text-stone bg-surface border border-border-custom rounded-lg hover:text-parchment hover:border-stone/30 transition-colors"
+                    type="submit"
+                    disabled={!text.trim() || mutation.isPending}
+                    className={`p-1.5 rounded-lg transition-all hover:bg-sand/80 ${
+                      text.trim()
+                        ? 'bg-sand text-ink opacity-100 animate-[spring-in_0.4s_ease-out]'
+                        : 'bg-transparent text-transparent scale-75 opacity-0 pointer-events-none'
+                    }`}
                   >
-                    <Icon className="w-4 h-4 mt-0.5 shrink-0 text-sand/40" />
-                    <span className="line-clamp-2">{text}</span>
+                    <ArrowUp className="h-4 w-4 stroke-[2.5]" />
                   </button>
-                ))}
+                </div>
               </div>
+            </form>
+
+            {/* Suggestion pills */}
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              {visibleSuggestions.map(({ icon: Icon, text }) => (
+                <button
+                  key={text}
+                  onClick={() => setText(text)}
+                  className="flex items-center gap-2 px-3.5 py-2 text-[13px] text-stone border border-border-custom rounded-full hover:text-parchment hover:border-stone/30 hover:bg-surface/50 transition-colors"
+                >
+                  <Icon className="w-3.5 h-3.5 shrink-0 text-stone/50" />
+                  <span className="truncate max-w-[200px]">{text.split(' ').slice(0, 5).join(' ')}</span>
+                </button>
+              ))}
               <button
                 onClick={() => setSuggestionPage(p => p + 1)}
-                className="p-1.5 rounded-md text-stone/30 hover:text-stone hover:bg-surface transition-colors shrink-0"
+                className="p-2 rounded-full text-stone/30 hover:text-stone hover:bg-surface/50 border border-border-custom transition-colors"
                 title="More suggestions"
               >
-                <ChevronRight className="w-4 h-4" />
+                <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -227,7 +266,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
       </div>
       </div>
       )}
-      <div className={cn('mx-auto px-4 w-full', isEmpty ? 'max-w-[790px] pb-12' : 'max-w-[790px] pt-2 pb-6')}>
+      {!isEmpty && <div className="max-w-[790px] mx-auto px-4 w-full pt-2 pb-6">
       <form onSubmit={handleSubmit}>
         <div className="relative bg-surface border border-border-custom rounded-xl focus-within:border-stone/30 transition-colors">
           <textarea
@@ -269,7 +308,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
       {mutation.isError && (
         <span className="text-[10px] text-ember/70 mt-1 ml-1">Failed</span>
       )}
-      </div>
+      </div>}
     </div>
   )
 }
