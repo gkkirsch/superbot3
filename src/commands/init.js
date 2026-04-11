@@ -79,6 +79,7 @@ module.exports = function init(home) {
         ],
         deny: [],
       },
+      enabledPlugins: {},
     }, null, 2)
   );
 
