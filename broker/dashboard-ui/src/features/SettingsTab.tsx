@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import type { Space } from '@/lib/types'
 import { fetchSystemPrompt, saveSystemPrompt, restartSpace, setSpaceModel } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
-import { FileText, Save, RotateCcw, Loader2, Check, AlertTriangle, RefreshCw, Cpu, FolderCode, Power } from 'lucide-react'
+import { FileText, Save, RotateCcw, Loader2, Check, AlertTriangle, RefreshCw, Cpu, FolderCode, Power, Trash2 } from 'lucide-react'
 
 const putJson = async (url: string, body: object) => {
   const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -13,6 +15,10 @@ const putJson = async (url: string, body: object) => {
 
 export function SettingsTab({ space }: { space: Space }) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmName, setConfirmName] = useState('')
   const { data: promptData, isLoading } = useQuery({
     queryKey: ['system-prompt', space.slug],
     queryFn: () => fetchSystemPrompt(space.slug),
@@ -276,6 +282,74 @@ export function SettingsTab({ space }: { space: Space }) {
           {restartFeedback === 'error' && <p className="flex items-center gap-1 text-[10px] text-ember"><AlertTriangle className="h-3 w-3" /> Restart failed</p>}
         </CardContent>
       </Card>
+
+      {/* Danger Zone */}
+      <Card className="border-ember/20">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-parchment">Delete Space</p>
+              <p className="text-[10px] text-stone/50">Permanently delete this space and all its data</p>
+            </div>
+            <button
+              onClick={() => setDeleteOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-ember/10 border border-ember/20 text-ember hover:bg-ember/20 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Delete
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delete Confirm Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {space.name || space.slug}?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the space, its knowledge, memory, browser profile, and all configuration. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <label className="text-xs text-stone block mb-2">
+              Type <span className="text-parchment font-mono">{space.slug}</span> to confirm
+            </label>
+            <input
+              value={confirmName}
+              onChange={e => setConfirmName(e.target.value)}
+              placeholder={space.slug}
+              className="w-full px-3 py-2 text-sm bg-ink border border-border-custom rounded-md text-parchment font-mono placeholder:text-stone/30 focus:outline-none focus:border-ember/40"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <button className="px-4 py-2 text-xs font-medium rounded-md bg-surface border border-border-custom text-stone hover:text-parchment transition-colors">
+                Cancel
+              </button>
+            </DialogClose>
+            <button
+              onClick={async () => {
+                setDeleting(true)
+                try {
+                  const res = await fetch(`/api/spaces/${space.slug}`, { method: 'DELETE' })
+                  const data = await res.json()
+                  if (data.ok) {
+                    queryClient.invalidateQueries({ queryKey: ['spaces'] })
+                    setDeleteOpen(false)
+                    navigate('/')
+                  }
+                } catch {} finally { setDeleting(false) }
+              }}
+              disabled={confirmName !== space.slug || deleting}
+              className="px-4 py-2 text-xs font-medium rounded-md bg-ember text-white hover:bg-ember/80 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              {deleting ? 'Deleting...' : 'Delete Space'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

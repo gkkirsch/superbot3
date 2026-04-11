@@ -120,6 +120,25 @@ app.post('/api/spaces/:name/browser', (req, res) => {
   res.json({ ok: true, url });
 });
 
+app.delete('/api/spaces/:name', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  try {
+    // Kill tmux window if running
+    try {
+      execSync(`tmux kill-window -t superbot3:${config.slug} 2>/dev/null`, { timeout: 5000 });
+    } catch {}
+
+    // Remove the space directory
+    fs.rmSync(config.spaceDir, { recursive: true, force: true });
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete space' });
+  }
+});
+
 app.put('/api/spaces/:name/settings', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
