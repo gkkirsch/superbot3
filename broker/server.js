@@ -112,7 +112,7 @@ app.post('/api/spaces/:name/browser', (req, res) => {
     AGENT_BROWSER_SESSION: config.slug,
     AGENT_BROWSER_PROFILE: profileDir,
     AGENT_BROWSER_HEADED: 'true',
-    AGENT_BROWSER_ARGS: '--disable-infobars,--no-first-run,--no-default-browser-check,--disable-popup-blocking',
+    AGENT_BROWSER_ARGS: '--no-first-run,--no-default-browser-check',
   };
   exec(`agent-browser open "${url}" && osascript -e 'tell application "Google Chrome" to activate' 2>/dev/null`, { env }, (err) => {
     if (err) console.log(`[browser] launch error for ${config.slug}: ${err.message}`);
