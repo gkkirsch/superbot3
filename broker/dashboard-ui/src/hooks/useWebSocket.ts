@@ -9,12 +9,20 @@ if ('Notification' in window && Notification.permission === 'default') {
 export function useWebSocket() {
   const queryClient = useQueryClient()
   const wsRef = useRef<WebSocket | null>(null)
+  const lastUserSendRef = useRef<number>(0)
+
+  // Expose a way for ChatSection to mark when user sends a message
+  useEffect(() => {
+    (window as any).__superbot3_markUserSend = () => { lastUserSendRef.current = Date.now() }
+  }, [])
 
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const url = `${protocol}//${window.location.host}/ws`
 
     function notify(title: string, body?: string) {
+      // Don't notify if user just sent a message in the last 2 seconds
+      if (Date.now() - lastUserSendRef.current < 2000) return
       if ('Notification' in window && Notification.permission === 'granted') {
         const n = new Notification(title, { body, icon: '/favicon.svg', silent: false })
         n.onclick = () => { window.focus(); n.close() }
@@ -32,10 +40,8 @@ export function useWebSocket() {
           if (data.type === 'inbox_update') {
             if (data.source === 'master') {
               queryClient.invalidateQueries({ queryKey: ['master-messages'] })
-              notify('superbot3', 'New message from master')
             } else if (data.source === 'space' && data.space) {
               queryClient.invalidateQueries({ queryKey: ['space-messages', data.space] })
-              notify(data.space, data.preview || 'New message')
             }
           }
 
@@ -45,7 +51,7 @@ export function useWebSocket() {
               notify('superbot3', 'New activity from master')
             } else if (data.source === 'space' && data.space) {
               queryClient.invalidateQueries({ queryKey: ['space-conversation', data.space] })
-              notify(data.space, data.preview || 'New activity')
+              notify(data.space, 'New response')
             }
           }
         } catch {}
