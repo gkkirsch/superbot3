@@ -94,22 +94,23 @@ app.post('/api/spaces/:name/browser', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const url = req.body.url || `http://localhost:${process.env.SUPERBOT3_BROKER_PORT || 3100}/browser-welcome?space=${config.slug}&name=${encodeURIComponent(config.name)}&color=${encodeURIComponent(config.color || '#706b63')}`;
+  const port = process.env.SUPERBOT3_BROKER_PORT || 3100;
+  const url = req.body.url || `http://localhost:${port}/browser-welcome?space=${config.slug}&name=${encodeURIComponent(config.name)}&color=${encodeURIComponent(config.color || '#706b63')}`;
   const profileDir = path.join(config.spaceDir, 'browser-profile');
-  const env = {
-    AGENT_BROWSER_SESSION: config.slug,
-    AGENT_BROWSER_PROFILE: profileDir,
-    AGENT_BROWSER_HEADED: 'true',
-    AGENT_BROWSER_ARGS: '--disable-infobars,--no-first-run,--no-default-browser-check,--disable-popup-blocking',
-  };
-  try {
-    const envStr = Object.entries(env).map(([k,v]) => `${k}="${v}"`).join(' ');
-    const { execSync } = require('child_process');
-    execSync(`${envStr} agent-browser open "${url}"`, { env: { ...process.env, ...env }, timeout: 15000 });
-    res.json({ ok: true, url });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to launch browser', detail: err.message });
-  }
+  const { spawn } = require('child_process');
+  const child = spawn('agent-browser', ['open', url], {
+    detached: true,
+    stdio: 'ignore',
+    env: {
+      ...process.env,
+      AGENT_BROWSER_SESSION: config.slug,
+      AGENT_BROWSER_PROFILE: profileDir,
+      AGENT_BROWSER_HEADED: 'true',
+      AGENT_BROWSER_ARGS: '--disable-infobars,--no-first-run,--no-default-browser-check,--disable-popup-blocking',
+    },
+  });
+  child.unref();
+  res.json({ ok: true, url });
 });
 
 app.put('/api/spaces/:name/settings', (req, res) => {
