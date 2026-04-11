@@ -59,7 +59,6 @@ export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 export CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
 export AGENT_BROWSER_SESSION="${browserSession}"
-export AGENT_BROWSER_PROFILE="${browserProfile}"
 export AGENT_BROWSER_HEADED=true
 export AGENT_BROWSER_ARGS="--no-first-run,--no-default-browser-check"${extensionsEnv}
 exec claude ${claudeArgs.join(' ')}

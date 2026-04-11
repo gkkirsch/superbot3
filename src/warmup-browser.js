@@ -34,13 +34,12 @@ if (!fs.existsSync(path.join(spaceDir, 'space.json'))) {
 
 const env = {
   ...process.env,
-  AGENT_BROWSER_SESSION: `warmup-${slug}`,
-  AGENT_BROWSER_PROFILE: profileDir,
+  AGENT_BROWSER_SESSION: slug,
   AGENT_BROWSER_HEADED: 'true',
   AGENT_BROWSER_ARGS: '--no-first-run,--no-default-browser-check',
 };
 
-function run(cmd, timeout = 15000) {
+function run(cmd, timeout = 30000) {
   try {
     return execSync(`agent-browser ${cmd}`, { env, timeout, stdio: 'pipe', encoding: 'utf-8' });
   } catch {
@@ -114,7 +113,7 @@ for (const site of sites) {
   const domain = new URL(site.url).hostname.replace('www.', '');
   process.stdout.write(`  ${domain}... `);
 
-  if (!run(`open "${site.url}"`, 30000)) {
+  if (!run(`open "${site.url}"`, 45000)) {
     console.log('✗ (timeout)');
     continue;
   }
