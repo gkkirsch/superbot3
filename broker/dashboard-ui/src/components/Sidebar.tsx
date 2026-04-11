@@ -110,7 +110,7 @@ export function Sidebar() {
             key={space.slug}
             to={`/spaces/${space.slug}`}
             className={() => cn(
-              'group/item flex items-center rounded-md text-[0.8125rem] transition-colors mb-0.5',
+              'group/item flex items-center rounded-md text-[0.8125rem] transition-colors mb-0.5 w-full',
               collapsed ? 'justify-center p-2' : 'gap-2 px-3 py-1.5',
               isActive(`/spaces/${space.slug}`) ? 'bg-sand/15 text-sand font-medium' : 'text-stone hover:text-parchment hover:bg-surface'
             )}

@@ -34,10 +34,10 @@ function BrowserButton({ slug, color }: { slug: string; color?: string }) {
     <button
       onClick={launch}
       disabled={launching}
-      className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-surface transition-colors disabled:opacity-50"
+      className="p-1.5 rounded-md text-stone hover:text-parchment hover:bg-surface transition-colors disabled:opacity-50 cursor-pointer"
       title="Open browser"
     >
-      <Globe className={cn('w-4 h-4', launching && 'animate-pulse')} style={color ? { color } : undefined} />
+      <Globe className={cn('w-4 h-4 pointer-events-none', launching && 'animate-pulse')} style={color ? { color } : undefined} />
     </button>
   )
 }
