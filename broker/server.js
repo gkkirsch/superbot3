@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.SUPERBOT3_BROKER_PORT || 3100;
 const SUPERBOT3_HOME = process.env.SUPERBOT3_HOME || path.join(require('os').homedir(), '.superbot3');
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // CORS — allow Chrome extensions and local dev tools
 app.use((req, res, next) => {
