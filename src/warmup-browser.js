@@ -114,13 +114,13 @@ for (const site of sites) {
   const domain = new URL(site.url).hostname.replace('www.', '');
   process.stdout.write(`  ${domain}... `);
 
-  if (!run(`open "${site.url}"`, 20000)) {
+  if (!run(`open "${site.url}"`, 30000)) {
     console.log('✗ (timeout)');
     continue;
   }
 
   // Wait for page load
-  run('wait --load networkidle', 10000);
+  run('wait --load networkidle', 15000);
   randomDelay(1000, 2000);
 
   // Perform human-like actions
