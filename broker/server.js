@@ -1280,7 +1280,7 @@ app.post('/api/spaces/:name/skills', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const { name, description } = req.body;
+  const { name, description, content, files } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
 
   const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
@@ -1289,8 +1289,26 @@ app.post('/api/spaces/:name/skills', (req, res) => {
   if (fs.existsSync(skillDir)) return res.status(409).json({ error: 'Skill already exists' });
 
   fs.mkdirSync(skillDir, { recursive: true });
-  const skillMd = `---\nname: ${safeName}\ndescription: "${(description || '').replace(/"/g, '\\"')}"\n---\n\n# ${safeName}\n\nAdd your skill documentation here.\n`;
-  fs.writeFileSync(path.join(skillDir, 'SKILL.md'), skillMd);
+
+  if (content) {
+    // Full SKILL.md content provided (from drag-and-drop)
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+  } else {
+    // Generate from name/description
+    const skillMd = `---\nname: ${safeName}\ndescription: "${(description || '').replace(/"/g, '\\"')}"\n---\n\n# ${safeName}\n\nAdd your skill documentation here.\n`;
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), skillMd);
+  }
+
+  // Write additional files if provided (e.g. scripts, templates)
+  if (files && typeof files === 'object') {
+    for (const [filePath, fileContent] of Object.entries(files)) {
+      const safePath = filePath.replace(/\.\./g, ''); // prevent path traversal
+      const fullPath = path.join(skillDir, safePath);
+      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+      fs.writeFileSync(fullPath, fileContent);
+    }
+  }
+
   res.json({ ok: true, name: safeName });
 });
 

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { usePlugins, useSkills, useAgents, usePluginCredentials } from '@/hooks/useSpaces'
 import {
   togglePlugin, toggleSkill, fetchPluginFiles, fetchPluginFileContent,
@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import {
   Puzzle, Blocks, Bot, Search, ExternalLink,
   ChevronDown, ChevronRight, ArrowLeft,
-  Server, Tag, Code2, Store, FolderPlus,
+  Server, Tag, Code2, Store, FolderPlus, X,
   Key, Check, AlertTriangle, Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -601,36 +601,105 @@ function AddMarketplaceView({ slug, onBack }: { slug: string; onBack: () => void
 
 // ── Add Skill View ───────────────────────────────────────────────────────────
 
+function parseFrontmatter(content: string): { name?: string; description?: string; [k: string]: any } {
+  const match = content.match(/^---\n([\s\S]*?)\n---/)
+  if (!match) return {}
+  const fm: Record<string, any> = {}
+  match[1].split('\n').forEach(line => {
+    const m = line.match(/^(\w[\w-]*):\s*(.+)/)
+    if (m) fm[m[1]] = m[2].replace(/^["']|["']$/g, '')
+  })
+  return fm
+}
+
 function AddSkillView({ slug, onBack }: { slug: string; onBack: () => void }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [content, setContent] = useState('')
+  const [files, setFiles] = useState<Record<string, string>>({})
+  const [dragging, setDragging] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<string | null>(null)
+  const [parsed, setParsed] = useState(false)
   const queryClient = useQueryClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function processFile(file: File) {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      if (file.name === 'SKILL.md' || file.name.endsWith('.md')) {
+        setContent(text)
+        const fm = parseFrontmatter(text)
+        if (fm.name) setName(fm.name)
+        if (fm.description) setDescription(fm.description)
+        setParsed(true)
+      } else {
+        setFiles(prev => ({ ...prev, [file.name]: text }))
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragging(false)
+    const items = e.dataTransfer.items
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item.kind === 'file') {
+        const file = item.getAsFile()
+        if (file) processFile(file)
+      }
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const fileList = e.target.files
+    if (!fileList) return
+    for (let i = 0; i < fileList.length; i++) {
+      processFile(fileList[i])
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) return
     setSubmitting(true)
     setResult(null)
+
+    // Build content if not from file
+    let finalContent = content
+    if (!finalContent) {
+      finalContent = `---\nname: ${name.trim()}\ndescription: "${description.replace(/"/g, '\\"')}"\nuser-invocable: true\n---\n\n# ${name.trim()}\n\n${description || 'Add your skill documentation here.'}\n`
+    } else if (!finalContent.includes('---')) {
+      // Wrap raw content with frontmatter
+      finalContent = `---\nname: ${name.trim()}\ndescription: "${description.replace(/"/g, '\\"')}"\nuser-invocable: true\n---\n\n${finalContent}`
+    }
+
     try {
       const res = await fetch(`/api/spaces/${slug}/skills`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description: description.trim() }),
+        body: JSON.stringify({
+          name: name.trim(),
+          content: finalContent,
+          files: Object.keys(files).length > 0 ? files : undefined,
+        }),
       })
       const data = await res.json()
       if (data.ok) {
         setResult('Skill created successfully.')
         queryClient.invalidateQueries({ queryKey: ['skills', slug] })
-        setName('')
-        setDescription('')
+        queryClient.invalidateQueries({ queryKey: ['plugins', slug] })
       } else {
         setResult(data.error || 'Failed to create skill.')
       }
     } catch { setResult('Failed to create skill.') }
     finally { setSubmitting(false) }
   }
+
+  const fileCount = Object.keys(files).length
 
   return (
     <div className="space-y-4">
@@ -641,18 +710,77 @@ function AddSkillView({ slug, onBack }: { slug: string; onBack: () => void }) {
         </div>
         <h3 className="text-sm font-semibold text-parchment">Add Skill</h3>
       </div>
-      <p className="text-xs text-stone">Create a new skill directory with a SKILL.md file.</p>
+
+      {/* Drop zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+        className={cn(
+          'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
+          dragging ? 'border-sand/50 bg-sand/5' : 'border-border-custom hover:border-stone/30 hover:bg-surface/30',
+          parsed && 'border-moss/30 bg-moss/5'
+        )}
+      >
+        <input ref={fileInputRef} type="file" accept=".md,.txt,.sh,.py,.js,.ts,.json" multiple className="hidden" onChange={handleFileSelect} />
+        {parsed ? (
+          <div className="space-y-1">
+            <p className="text-xs text-moss font-medium">SKILL.md loaded</p>
+            <p className="text-[10px] text-stone">Name and description auto-filled from frontmatter</p>
+            {fileCount > 0 && <p className="text-[10px] text-stone">+ {fileCount} additional file{fileCount > 1 ? 's' : ''}</p>}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <p className="text-xs text-stone">Drop a SKILL.md file here</p>
+            <p className="text-[10px] text-stone/50">or click to browse — we'll auto-fill everything</p>
+          </div>
+        )}
+      </div>
+
+      {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Skill name (e.g. my-custom-skill)"
-          className="w-full px-3 py-2 text-xs bg-ink/50 border border-border-custom rounded-md text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/40"
-          autoFocus
-        />
-        <textarea
-          value={description} onChange={e => setDescription(e.target.value)} placeholder="Description (optional)"
-          rows={3}
-          className="w-full px-3 py-2 text-xs bg-ink/50 border border-border-custom rounded-md text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/40 resize-none"
-        />
+        <div>
+          <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Name</label>
+          <input
+            type="text" value={name} onChange={e => setName(e.target.value)} placeholder="my-custom-skill"
+            className="w-full px-3 py-2 text-xs bg-ink/50 border border-border-custom rounded-md text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/40 font-mono"
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Description</label>
+          <textarea
+            value={description} onChange={e => setDescription(e.target.value)} placeholder="What does this skill do? When should it be used?"
+            rows={2}
+            className="w-full px-3 py-2 text-xs bg-ink/50 border border-border-custom rounded-md text-parchment placeholder:text-stone/40 focus:outline-none focus:border-sand/40 resize-none"
+          />
+        </div>
+
+        {/* Preview */}
+        {content && (
+          <div>
+            <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Preview</label>
+            <pre className="w-full max-h-32 overflow-auto bg-ink/50 border border-border-custom rounded-md p-2 text-[10px] text-stone font-mono whitespace-pre-wrap">{content.slice(0, 500)}{content.length > 500 ? '\n...' : ''}</pre>
+          </div>
+        )}
+
+        {/* File list */}
+        {fileCount > 0 && (
+          <div>
+            <label className="text-[10px] text-stone/70 uppercase tracking-wider mb-1 block">Additional Files</label>
+            <div className="space-y-1">
+              {Object.keys(files).map(f => (
+                <div key={f} className="flex items-center gap-2 text-[10px] text-stone font-mono bg-ink/30 rounded px-2 py-1">
+                  <Code2 className="w-3 h-3 shrink-0" />{f}
+                  <button onClick={() => setFiles(prev => { const n = {...prev}; delete n[f]; return n })} className="ml-auto text-stone/40 hover:text-ember">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <button type="submit" disabled={submitting || !name.trim()}
           className="w-full py-2 text-xs font-medium rounded-md bg-sand/20 text-sand hover:bg-sand/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
           {submitting ? 'Creating...' : 'Create Skill'}
