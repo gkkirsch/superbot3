@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 /**
- * Warm up a space's browser profile by visiting common sites.
- * Builds up history, cookies, and fingerprint data so the profile
- * doesn't look brand new to anti-bot systems.
+ * Warm up a space's browser profile to resist bot detection.
+ *
+ * Does what anti-detect browser services do:
+ * 1. Visits common sites to build history/cookies
+ * 2. Scrolls naturally, moves mouse, clicks around
+ * 3. Accepts cookie banners
+ * 4. Builds up localStorage/sessionStorage data
+ * 5. Lets tracking pixels fire
  *
  * Usage: node warmup-browser.js <space-slug>
  */
@@ -31,55 +36,116 @@ const env = {
   ...process.env,
   AGENT_BROWSER_SESSION: `warmup-${slug}`,
   AGENT_BROWSER_PROFILE: profileDir,
-  AGENT_BROWSER_HEADED: 'false', // headless for warmup
+  AGENT_BROWSER_HEADED: 'false',
   AGENT_BROWSER_ARGS: '--no-first-run,--no-default-browser-check',
 };
 
-const sites = [
-  'https://www.google.com',
-  'https://www.youtube.com',
-  'https://www.reddit.com',
-  'https://www.amazon.com',
-  'https://www.wikipedia.org',
-  'https://www.github.com',
-  'https://www.stackoverflow.com',
-  'https://news.ycombinator.com',
-  'https://www.nytimes.com',
-  'https://www.linkedin.com',
-  'https://twitter.com',
-  'https://www.facebook.com',
-];
-
-function run(cmd) {
+function run(cmd, timeout = 15000) {
   try {
-    execSync(cmd, { env, timeout: 15000, stdio: 'pipe' });
-    return true;
+    return execSync(`agent-browser ${cmd}`, { env, timeout, stdio: 'pipe', encoding: 'utf-8' });
   } catch {
-    return false;
+    return null;
   }
 }
 
-console.log(`Warming up browser profile for "${slug}"...`);
-console.log(`Profile: ${profileDir}`);
+function randomDelay(min, max) {
+  const ms = Math.floor(Math.random() * (max - min) + min);
+  run(`wait ${ms}`);
+}
+
+function randomScroll() {
+  const distance = Math.floor(Math.random() * 800 + 200);
+  run(`scroll down ${distance}`);
+  randomDelay(500, 1500);
+  // Sometimes scroll back up a bit
+  if (Math.random() > 0.6) {
+    run(`scroll up ${Math.floor(distance * 0.3)}`);
+    randomDelay(300, 800);
+  }
+}
+
+function simulateMouseMove() {
+  // Move mouse to random positions
+  const x = Math.floor(Math.random() * 800 + 100);
+  const y = Math.floor(Math.random() * 500 + 100);
+  run(`mouse move ${x} ${y}`);
+  randomDelay(200, 600);
+}
+
+function tryAcceptCookies() {
+  // Common cookie banner button texts
+  const result = run('snapshot -i');
+  if (!result) return;
+  const acceptPatterns = ['accept', 'agree', 'got it', 'ok', 'allow', 'consent'];
+  const lines = result.split('\n');
+  for (const line of lines) {
+    const lower = line.toLowerCase();
+    if (acceptPatterns.some(p => lower.includes(p)) && line.includes('ref=')) {
+      const match = line.match(/ref=(e\d+)/);
+      if (match) {
+        run(`click @${match[1]}`);
+        randomDelay(500, 1000);
+        return;
+      }
+    }
+  }
+}
+
+const sites = [
+  { url: 'https://www.google.com/search?q=weather+today', actions: ['scroll', 'mouse'] },
+  { url: 'https://www.youtube.com', actions: ['scroll', 'scroll', 'mouse', 'cookies'] },
+  { url: 'https://www.reddit.com/r/popular', actions: ['scroll', 'scroll', 'mouse'] },
+  { url: 'https://www.amazon.com', actions: ['cookies', 'scroll', 'mouse'] },
+  { url: 'https://en.wikipedia.org/wiki/Main_Page', actions: ['scroll', 'mouse'] },
+  { url: 'https://github.com/trending', actions: ['scroll', 'scroll'] },
+  { url: 'https://stackoverflow.com/questions', actions: ['scroll', 'mouse'] },
+  { url: 'https://news.ycombinator.com', actions: ['scroll'] },
+  { url: 'https://www.nytimes.com', actions: ['cookies', 'scroll', 'mouse'] },
+  { url: 'https://www.linkedin.com', actions: ['cookies', 'scroll'] },
+  { url: 'https://x.com', actions: ['scroll', 'mouse'] },
+  { url: 'https://www.facebook.com', actions: ['scroll'] },
+];
+
+console.log(`\nWarming up browser profile for "${slug}"...`);
+console.log(`Profile: ${profileDir}\n`);
 
 let visited = 0;
 for (const site of sites) {
-  const domain = new URL(site).hostname.replace('www.', '');
+  const domain = new URL(site.url).hostname.replace('www.', '');
   process.stdout.write(`  ${domain}... `);
-  if (run(`agent-browser open "${site}"`)) {
-    // Wait for page to fully load and set cookies
-    run('agent-browser wait --load networkidle');
-    // Small delay to let trackers/cookies settle
-    run('agent-browser wait 1000');
-    visited++;
-    console.log('✓');
-  } else {
-    console.log('✗');
+
+  if (!run(`open "${site.url}"`, 20000)) {
+    console.log('✗ (timeout)');
+    continue;
   }
+
+  // Wait for page load
+  run('wait --load networkidle', 10000);
+  randomDelay(1000, 2000);
+
+  // Perform human-like actions
+  for (const action of site.actions) {
+    switch (action) {
+      case 'scroll':
+        randomScroll();
+        break;
+      case 'mouse':
+        simulateMouseMove();
+        break;
+      case 'cookies':
+        tryAcceptCookies();
+        break;
+    }
+  }
+
+  // Let tracking pixels and async scripts settle
+  randomDelay(1500, 3000);
+  visited++;
+  console.log('✓');
 }
 
 // Close the browser
-run('agent-browser close');
+run('close');
 
-console.log(`\nDone. Visited ${visited}/${sites.length} sites.`);
-console.log('Profile now has browsing history and cookies.');
+console.log(`\nDone. Visited ${visited}/${sites.length} sites with human-like behavior.`);
+console.log('Profile now has browsing history, cookies, and natural interaction patterns.\n');
