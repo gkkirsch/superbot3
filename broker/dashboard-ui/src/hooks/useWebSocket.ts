@@ -15,8 +15,9 @@ export function useWebSocket() {
     const url = `${protocol}//${window.location.host}/ws`
 
     function notify(title: string, body?: string) {
-      if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-        new Notification(title, { body, icon: '/favicon.svg' })
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const n = new Notification(title, { body, icon: '/favicon.svg', silent: false })
+        n.onclick = () => { window.focus(); n.close() }
       }
     }
 
