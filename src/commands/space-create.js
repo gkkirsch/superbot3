@@ -242,6 +242,10 @@ function createSpace(home, name, codeDir) {
   prefs.browser.theme.color_scheme = 2; // 2 = follow system
   fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf-8');
 
+  // Pre-install AdBlock into the profile
+  const { seedBrowserExtensions } = require('../browserEnv');
+  seedBrowserExtensions(spaceDir);
+
   return spaceConfig;
 }
 
