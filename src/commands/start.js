@@ -189,7 +189,8 @@ module.exports = async function start(home) {
   // Step 5: Send startup prompts via inbox
   // The inbox poller activates once Claude starts (team args enable it from boot).
   // We write to the inbox immediately — the poller picks them up once ready.
-  console.log('\nSending startup prompts via inbox...');
+  // Send startup prompt to master only — spaces wait for the user
+  console.log('\nSending startup prompt to master...');
 
   const masterStartup = 'Scan ~/.superbot3/spaces/*/space.json to discover all spaces. Report what spaces you find and their status.';
   const masterInboxPath = path.join(home, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
@@ -198,17 +199,6 @@ module.exports = async function start(home) {
     console.log('  Sent startup prompt to master');
   } catch (e) {
     console.log('  Could not send startup prompt to master');
-  }
-
-  for (const space of activeSpaces) {
-    const spaceStartup = 'Read your CLAUDE.md. Scan knowledge/ for context. Report your identity, skills, agents, and knowledge files.';
-    const spaceInboxPath = path.join(space.claudeConfigDir, 'teams', space.slug, 'inboxes', 'team-lead.json');
-    try {
-      await writeToInbox(spaceInboxPath, { from: 'superbot3', text: spaceStartup });
-      console.log(`  Sent startup prompt to ${space.slug}`);
-    } catch (e) {
-      console.log(`  Could not send startup prompt to ${space.slug}`);
-    }
   }
 
   console.log('');
