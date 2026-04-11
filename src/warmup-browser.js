@@ -36,7 +36,7 @@ const env = {
   ...process.env,
   AGENT_BROWSER_SESSION: `warmup-${slug}`,
   AGENT_BROWSER_PROFILE: profileDir,
-  AGENT_BROWSER_HEADED: 'false',
+  AGENT_BROWSER_HEADED: 'true',
   AGENT_BROWSER_ARGS: '--no-first-run,--no-default-browser-check',
 };
 
