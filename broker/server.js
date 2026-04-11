@@ -100,7 +100,7 @@ app.post('/api/spaces/:name/browser', (req, res) => {
     AGENT_BROWSER_SESSION: config.slug,
     AGENT_BROWSER_PROFILE: profileDir,
     AGENT_BROWSER_HEADED: 'true',
-    AGENT_BROWSER_ARGS: '--disable-blink-features=AutomationControlled,--disable-features=AutomationControlled,--disable-infobars,--no-first-run,--no-default-browser-check,--disable-popup-blocking',
+    AGENT_BROWSER_ARGS: '--disable-infobars,--no-first-run,--no-default-browser-check,--disable-popup-blocking',
   };
   try {
     const envStr = Object.entries(env).map(([k,v]) => `${k}="${v}"`).join(' ');

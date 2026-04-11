@@ -43,7 +43,7 @@ export CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
 export AGENT_BROWSER_SESSION="${browserSession}"
 export AGENT_BROWSER_PROFILE="${browserProfile}"
 export AGENT_BROWSER_HEADED=true
-export AGENT_BROWSER_ARGS="--disable-blink-features=AutomationControlled,--disable-features=AutomationControlled,--disable-infobars,--no-first-run,--no-default-browser-check,--disable-popup-blocking"
+export AGENT_BROWSER_ARGS="--disable-infobars,--no-first-run,--no-default-browser-check,--disable-popup-blocking"
 exec claude ${claudeArgs.join(' ')}
 `;
 
