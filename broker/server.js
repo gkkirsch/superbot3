@@ -1695,27 +1695,18 @@ try {
 
   wss = new WebSocketServer({ server, path: '/ws' });
 
-  // Watch inbox and conversation files for changes and broadcast
+  // Watch inbox directories for changes and broadcast
   const chokidar = require('chokidar');
 
-  // Build concrete watch paths (globs don't resolve through .claude dot-dirs)
-  function getWatchPaths() {
-    const paths = [
-      path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes'),
-      path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'projects'),
-    ];
-    const spacesDir = path.join(SUPERBOT3_HOME, 'spaces');
-    try {
-      for (const entry of fs.readdirSync(spacesDir, { withFileTypes: true })) {
-        if (!entry.isDirectory()) continue;
-        paths.push(path.join(spacesDir, entry.name, '.claude', 'teams', entry.name, 'inboxes'));
-        paths.push(path.join(spacesDir, entry.name, '.claude', 'projects'));
-      }
-    } catch {}
-    return paths.filter(p => fs.existsSync(p));
-  }
+  const watchPaths = [
+    path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', '**', 'inboxes', '*.json'),
+    path.join(SUPERBOT3_HOME, 'spaces', '*', '.claude', 'teams', '**', 'inboxes', '*.json'),
+    // Watch conversation JSONL files for real-time Claude responses
+    path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'projects', '**', '*.jsonl'),
+    path.join(SUPERBOT3_HOME, 'spaces', '*', '.claude', 'projects', '**', '*.jsonl'),
+  ];
 
-  const watcher = chokidar.watch(getWatchPaths(), {
+  const watcher = chokidar.watch(watchPaths, {
     ignoreInitial: true,
     awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
   });
@@ -1724,9 +1715,29 @@ try {
     let type = 'unknown';
     let space = null;
     let eventType = 'inbox_update';
+    let preview = '';
 
     if (filePath.endsWith('.jsonl')) {
       eventType = 'conversation_update';
+      // Read last line of JSONL for preview
+      try {
+        const content = fs.readFileSync(filePath, 'utf-8').trim();
+        const lines = content.split('\n');
+        const last = JSON.parse(lines[lines.length - 1]);
+        if (last.type === 'assistant' && last.message?.content) {
+          const textBlock = last.message.content.find(b => b.type === 'text');
+          if (textBlock) preview = textBlock.text.slice(0, 150);
+        }
+      } catch {}
+    } else {
+      // Read last inbox message for preview
+      try {
+        const messages = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        if (Array.isArray(messages) && messages.length > 0) {
+          const last = messages[messages.length - 1];
+          preview = (last.text || last.summary || '').slice(0, 150);
+        }
+      } catch {}
     }
 
     if (filePath.includes('/orchestrator/')) {
@@ -1739,7 +1750,7 @@ try {
       }
     }
 
-    const payload = JSON.stringify({ type: eventType, source: type, space });
+    const payload = JSON.stringify({ type: eventType, source: type, space, preview });
     wss.clients.forEach(client => {
       if (client.readyState === 1) client.send(payload);
     });

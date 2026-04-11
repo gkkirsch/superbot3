@@ -100,7 +100,6 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!text.trim() || mutation.isPending) return
-    ;(window as any).__superbot3_markUserSend?.()
     mutation.mutate(text.trim())
   }
 
