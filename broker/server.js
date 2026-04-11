@@ -1280,7 +1280,7 @@ app.post('/api/spaces/:name/skills', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const { name, description, content, files } = req.body;
+  const { name, description, content, files, sourcePath } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
 
   const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
@@ -1288,24 +1288,53 @@ app.post('/api/spaces/:name/skills', (req, res) => {
 
   if (fs.existsSync(skillDir)) return res.status(409).json({ error: 'Skill already exists' });
 
+  // If sourcePath provided, copy the entire directory
+  if (sourcePath) {
+    const resolved = path.resolve(sourcePath.replace(/^~/, require('os').homedir()));
+    if (!fs.existsSync(resolved)) return res.status(400).json({ error: `Path not found: ${resolved}` });
+    const stat = fs.statSync(resolved);
+    if (stat.isDirectory()) {
+      // Copy directory recursively
+      function copyDir(src, dest) {
+        fs.mkdirSync(dest, { recursive: true });
+        for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+          const s = path.join(src, entry.name);
+          const d = path.join(dest, entry.name);
+          if (entry.isDirectory()) copyDir(s, d);
+          else fs.copyFileSync(s, d);
+        }
+      }
+      copyDir(resolved, skillDir);
+      // Try to read name from SKILL.md if not explicitly set
+      const skillMdPath = path.join(skillDir, 'SKILL.md');
+      if (fs.existsSync(skillMdPath)) {
+        const fileCount = fs.readdirSync(resolved, { recursive: true }).length;
+        return res.json({ ok: true, name: safeName, fileCount });
+      }
+      return res.json({ ok: true, name: safeName });
+    } else {
+      // Single file — treat as SKILL.md
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.copyFileSync(resolved, path.join(skillDir, 'SKILL.md'));
+      return res.json({ ok: true, name: safeName });
+    }
+  }
+
   fs.mkdirSync(skillDir, { recursive: true });
 
   if (content) {
-    // Full SKILL.md content provided (from drag-and-drop)
     fs.writeFileSync(path.join(skillDir, 'SKILL.md'), content);
   } else {
-    // Generate from name/description
-    const skillMd = `---\nname: ${safeName}\ndescription: "${(description || '').replace(/"/g, '\\"')}"\n---\n\n# ${safeName}\n\nAdd your skill documentation here.\n`;
+    const skillMd = `---\nname: ${safeName}\ndescription: "${(description || '').replace(/"/g, '\\"')}"\nuser-invocable: true\n---\n\n# ${safeName}\n\n${description || 'Add your skill documentation here.'}\n`;
     fs.writeFileSync(path.join(skillDir, 'SKILL.md'), skillMd);
   }
 
-  // Write additional files if provided (e.g. scripts, templates)
   if (files && typeof files === 'object') {
-    for (const [filePath, fileContent] of Object.entries(files)) {
-      const safePath = filePath.replace(/\.\./g, ''); // prevent path traversal
+    for (const [fp, fc] of Object.entries(files)) {
+      const safePath = fp.replace(/\.\./g, '');
       const fullPath = path.join(skillDir, safePath);
       fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-      fs.writeFileSync(fullPath, fileContent);
+      fs.writeFileSync(fullPath, fc);
     }
   }
 

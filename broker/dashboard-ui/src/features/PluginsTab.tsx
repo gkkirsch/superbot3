@@ -624,21 +624,45 @@ function AddSkillView({ slug, onBack }: { slug: string; onBack: () => void }) {
   const queryClient = useQueryClient()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  function processFile(file: File) {
+  const [sourcePath, setSourcePath] = useState('')
+
+  function processFile(file: File, relativePath?: string) {
     const reader = new FileReader()
     reader.onload = (e) => {
       const text = e.target?.result as string
-      if (file.name === 'SKILL.md' || file.name.endsWith('.md')) {
+      const filePath = relativePath || file.name
+      if (filePath === 'SKILL.md' || filePath.endsWith('/SKILL.md')) {
         setContent(text)
         const fm = parseFrontmatter(text)
         if (fm.name) setName(fm.name)
         if (fm.description) setDescription(fm.description)
         setParsed(true)
       } else {
-        setFiles(prev => ({ ...prev, [file.name]: text }))
+        setFiles(prev => ({ ...prev, [filePath]: text }))
       }
     }
     reader.readAsText(file)
+  }
+
+  function traverseEntry(entry: any, basePath = '') {
+    if (entry.isFile) {
+      entry.file((file: File) => {
+        const rel = basePath ? `${basePath}/${file.name}` : file.name
+        processFile(file, rel)
+      })
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader()
+      reader.readEntries((entries: any[]) => {
+        // If this is the top-level dropped folder, use its name to set skill name
+        if (!basePath && !name) {
+          setName(entry.name)
+        }
+        entries.forEach((e: any) => {
+          const newPath = basePath ? `${basePath}/${e.name}` : e.name
+          traverseEntry(e, newPath)
+        })
+      })
+    }
   }
 
   function handleDrop(e: React.DragEvent) {
@@ -646,9 +670,11 @@ function AddSkillView({ slug, onBack }: { slug: string; onBack: () => void }) {
     setDragging(false)
     const items = e.dataTransfer.items
     for (let i = 0; i < items.length; i++) {
-      const item = items[i]
-      if (item.kind === 'file') {
-        const file = item.getAsFile()
+      const entry = items[i].webkitGetAsEntry?.()
+      if (entry) {
+        traverseEntry(entry)
+      } else {
+        const file = items[i].getAsFile()
         if (file) processFile(file)
       }
     }
@@ -660,6 +686,31 @@ function AddSkillView({ slug, onBack }: { slug: string; onBack: () => void }) {
     for (let i = 0; i < fileList.length; i++) {
       processFile(fileList[i])
     }
+  }
+
+  async function handleImportPath() {
+    if (!sourcePath.trim()) return
+    setSubmitting(true)
+    setResult(null)
+    // Extract folder name from path for the skill name
+    const pathName = sourcePath.trim().replace(/\/+$/, '').split('/').pop() || 'imported-skill'
+    const skillName = name || pathName
+    try {
+      const res = await fetch(`/api/spaces/${slug}/skills`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: skillName, sourcePath: sourcePath.trim() }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setResult(`Skill imported successfully${data.fileCount ? ` (${data.fileCount} files)` : ''}.`)
+        queryClient.invalidateQueries({ queryKey: ['skills', slug] })
+        queryClient.invalidateQueries({ queryKey: ['plugins', slug] })
+      } else {
+        setResult(data.error || 'Failed to import skill.')
+      }
+    } catch { setResult('Failed to import skill.') }
+    finally { setSubmitting(false) }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -732,10 +783,38 @@ function AddSkillView({ slug, onBack }: { slug: string; onBack: () => void }) {
           </div>
         ) : (
           <div className="space-y-1">
-            <p className="text-xs text-stone">Drop a SKILL.md file here</p>
-            <p className="text-[10px] text-stone/50">or click to browse — we'll auto-fill everything</p>
+            <p className="text-xs text-stone">Drop a skill folder or SKILL.md here</p>
+            <p className="text-[10px] text-stone/50">or click to browse files</p>
           </div>
         )}
+      </div>
+
+      {/* Or import from path */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-px bg-border-custom" />
+        <span className="text-[10px] text-stone/40">or paste a path</span>
+        <div className="flex-1 h-px bg-border-custom" />
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={sourcePath}
+          onChange={e => {
+            setSourcePath(e.target.value)
+            if (!name) {
+              const n = e.target.value.replace(/\/+$/, '').split('/').pop() || ''
+              setName(n)
+            }
+          }}
+          placeholder="/path/to/skill/folder"
+          className="flex-1 px-3 py-2 text-xs bg-ink/50 border border-border-custom rounded-md text-parchment font-mono placeholder:text-stone/40 focus:outline-none focus:border-sand/40"
+        />
+        <button
+          onClick={handleImportPath}
+          disabled={!sourcePath.trim() || submitting}
+          className="px-3 py-2 text-xs font-medium rounded-md bg-sand/20 text-sand hover:bg-sand/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+        >
+          Import
+        </button>
       </div>
 
       {/* Form */}
