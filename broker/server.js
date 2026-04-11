@@ -105,14 +105,11 @@ app.post('/api/spaces/:name/browser', (req, res) => {
 
   const port = process.env.SUPERBOT3_BROKER_PORT || 3100;
   const url = req.body.url || `http://localhost:${port}/browser-welcome?space=${config.slug}&name=${encodeURIComponent(config.name)}&color=${encodeURIComponent(config.color || '#706b63')}`;
-  const profileDir = path.join(config.spaceDir, 'browser-profile');
+  const { getBrowserEnv } = require(path.join(__dirname, '..', 'src', 'browserEnv'));
   const { exec } = require('child_process');
   const env = {
     ...process.env,
-    AGENT_BROWSER_SESSION: config.slug,
-    AGENT_BROWSER_PROFILE: profileDir,
-    AGENT_BROWSER_HEADED: 'true',
-    AGENT_BROWSER_ARGS: '--no-first-run,--no-default-browser-check',
+    ...getBrowserEnv(config.slug, config.spaceDir),
   };
   exec(`agent-browser open "${url}" && osascript -e 'tell application "Google Chrome" to activate' 2>/dev/null`, { env }, (err) => {
     if (err) console.log(`[browser] launch error for ${config.slug}: ${err.message}`);

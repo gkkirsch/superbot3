@@ -23,9 +23,10 @@ if (!slug) {
   process.exit(1);
 }
 
+const { getBrowserEnv } = require('./browserEnv');
+
 const home = process.env.SUPERBOT3_HOME || path.join(os.homedir(), '.superbot3');
 const spaceDir = path.join(home, 'spaces', slug);
-const profileDir = path.join(spaceDir, 'browser-profile');
 
 if (!fs.existsSync(path.join(spaceDir, 'space.json'))) {
   console.error(`Space "${slug}" not found`);
@@ -34,10 +35,7 @@ if (!fs.existsSync(path.join(spaceDir, 'space.json'))) {
 
 const env = {
   ...process.env,
-  AGENT_BROWSER_SESSION: slug,
-  AGENT_BROWSER_PROFILE: profileDir,
-  AGENT_BROWSER_HEADED: 'true',
-  AGENT_BROWSER_ARGS: '--no-first-run,--no-default-browser-check',
+  ...getBrowserEnv(slug, spaceDir),
 };
 
 function run(cmd, timeout = 30000) {

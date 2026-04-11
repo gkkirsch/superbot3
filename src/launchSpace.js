@@ -30,38 +30,18 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
     claudeArgs.push(`--system-prompt-file '${opts.systemPromptFile}'`);
   }
 
-  // Set browser session and profile for per-space isolation using system Chrome
-  const browserSession = opts.browserSession || name;
+  // Browser env from shared config
+  const { getBrowserEnv } = require('./browserEnv');
   const spaceDir = opts.spaceDir || cwd;
-  const browserProfile = path.join(spaceDir, 'browser-profile');
-
-  // Find common Chrome extensions to load (makes profile look more real)
-  const chromeExtDir = path.join(require('os').homedir(), 'Library', 'Application Support', 'Google', 'Chrome', 'Default', 'Extensions');
-  const realUserExtensions = [
-    'gighmmpiobklfepjocnamgkkbiglidom', // AdBlock
-    'aeblfdkhhhdcdjpifhhbdiojplfjncoa', // 1Password
-  ];
-  const extensionPaths = [];
-  for (const extId of realUserExtensions) {
-    const extDir = path.join(chromeExtDir, extId);
-    try {
-      const versions = fs.readdirSync(extDir).filter(v => !v.startsWith('.'));
-      if (versions.length > 0) {
-        extensionPaths.push(path.join(extDir, versions[versions.length - 1]));
-      }
-    } catch {}
-  }
-  const extensionsEnv = extensionPaths.length > 0 ? `\nexport AGENT_BROWSER_EXTENSIONS="${extensionPaths.join(',')}"` : '';
+  const browserEnv = getBrowserEnv(opts.browserSession || name, spaceDir);
+  const browserExports = Object.entries(browserEnv).map(([k, v]) => `export ${k}="${v}"`).join('\n');
 
   const script = `#!/bin/bash
 cd "${cwd}"
 export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 export CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
-export AGENT_BROWSER_SESSION="${browserSession}"
-export AGENT_BROWSER_PROFILE="${browserProfile}"
-export AGENT_BROWSER_HEADED=true
-export AGENT_BROWSER_ARGS="--no-first-run,--no-default-browser-check"${extensionsEnv}
+${browserExports}
 exec claude ${claudeArgs.join(' ')}
 `;
 
