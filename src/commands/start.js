@@ -192,7 +192,7 @@ module.exports = async function start(home) {
   // Send startup prompt to master only — spaces wait for the user
   console.log('\nSending startup prompt to master...');
 
-  const masterStartup = 'Scan ~/.superbot3/spaces/*/space.json to discover all spaces. Report what spaces you find and their status.';
+  const masterStartup = 'Scan ~/.superbot3/spaces/*/space.json to discover all spaces. Note what spaces exist but do NOT message them — spaces wait for the user to talk first.';
   const masterInboxPath = path.join(home, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
   try {
     await writeToInbox(masterInboxPath, { from: 'superbot3', text: masterStartup });

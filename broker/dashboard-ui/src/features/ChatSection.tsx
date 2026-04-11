@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp, Search, Globe, FileText, Mail } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { InboxMessage } from '@/lib/types'
 import type { ConversationMessage } from '@/lib/api'
@@ -111,22 +111,22 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 scrollbar-auto">
       <div className="max-w-[790px] mx-auto px-4 space-y-3">
         {merged.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-24">
-            <h2 className="text-lg font-medium text-parchment mb-2">What would you like to do?</h2>
-            <p className="text-sm text-stone mb-8">Tell this space what to work on.</p>
-            <div className="flex flex-wrap gap-2 justify-center max-w-md">
-              {[
-                'Research competitors and summarize findings',
-                'Open a browser and scrape data from a website',
-                'Create a plan for a new feature',
-                'Write and send an email',
-              ].map(suggestion => (
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <p className="text-sm text-stone mb-6">What would you like to do?</p>
+            <div className="grid grid-cols-2 gap-2 w-full max-w-md">
+              {([
+                { icon: Search, text: 'Research a topic and summarize findings' },
+                { icon: Globe, text: 'Open a browser and scrape a website' },
+                { icon: FileText, text: 'Create a plan for a new project' },
+                { icon: Mail, text: 'Draft and send an outreach email' },
+              ] as const).map(({ icon: Icon, text }) => (
                 <button
-                  key={suggestion}
-                  onClick={() => setText(suggestion)}
-                  className="px-3 py-1.5 text-xs text-stone bg-surface border border-border-custom rounded-full hover:text-parchment hover:border-stone/30 transition-colors"
+                  key={text}
+                  onClick={() => setText(text)}
+                  className="flex items-start gap-2.5 p-3 text-left text-xs text-stone bg-surface border border-border-custom rounded-lg hover:text-parchment hover:border-stone/30 transition-colors"
                 >
-                  {suggestion}
+                  <Icon className="w-3.5 h-3.5 mt-0.5 shrink-0 text-stone/50" />
+                  <span>{text}</span>
                 </button>
               ))}
             </div>
