@@ -42,6 +42,7 @@ export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 export CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
 export AGENT_BROWSER_SESSION="${browserSession}"
 export AGENT_BROWSER_PROFILE="${browserProfile}"
+export AGENT_BROWSER_HEADED=true
 exec claude ${claudeArgs.join(' ')}
 `;
 
