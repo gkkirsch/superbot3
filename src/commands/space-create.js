@@ -30,16 +30,16 @@ function copyTemplate(templateDir, targetDir) {
  */
 // Distinct colors for browser profile bars — each space gets a unique one
 const SPACE_COLORS = [
-  { name: 'blue',    rgb: [66, 133, 244],  hex: '#4285f4' },
-  { name: 'red',     rgb: [234, 67, 53],   hex: '#ea4335' },
-  { name: 'green',   rgb: [52, 168, 83],   hex: '#34a853' },
-  { name: 'orange',  rgb: [251, 188, 4],   hex: '#fbbc04' },
-  { name: 'purple',  rgb: [171, 71, 188],  hex: '#ab47bc' },
-  { name: 'teal',    rgb: [0, 172, 193],   hex: '#00acc1' },
-  { name: 'pink',    rgb: [236, 64, 122],  hex: '#ec407a' },
-  { name: 'indigo',  rgb: [92, 107, 192],  hex: '#5c6bc0' },
-  { name: 'lime',    rgb: [124, 179, 66],  hex: '#7cb342' },
-  { name: 'amber',   rgb: [255, 143, 0],   hex: '#ff8f00' },
+  { name: 'blue',    rgb: [66, 133, 244],  hex: '#4285f4', avatar: 0 },
+  { name: 'red',     rgb: [234, 67, 53],   hex: '#ea4335', avatar: 6 },
+  { name: 'green',   rgb: [52, 168, 83],   hex: '#34a853', avatar: 2 },
+  { name: 'orange',  rgb: [251, 188, 4],   hex: '#fbbc04', avatar: 4 },
+  { name: 'purple',  rgb: [171, 71, 188],  hex: '#ab47bc', avatar: 8 },
+  { name: 'teal',    rgb: [0, 172, 193],   hex: '#00acc1', avatar: 10 },
+  { name: 'pink',    rgb: [236, 64, 122],  hex: '#ec407a', avatar: 12 },
+  { name: 'indigo',  rgb: [92, 107, 192],  hex: '#5c6bc0', avatar: 14 },
+  { name: 'lime',    rgb: [124, 179, 66],  hex: '#7cb342', avatar: 16 },
+  { name: 'amber',   rgb: [255, 143, 0],   hex: '#ff8f00', avatar: 18 },
 ];
 
 function getSpaceColor(slug) {
@@ -232,6 +232,7 @@ function createSpace(home, name, codeDir) {
   try { prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf-8')); } catch {}
   if (!prefs.profile) prefs.profile = {};
   prefs.profile.name = friendlyName;
+  prefs.profile.avatar_index = spaceColor.avatar;
   if (!prefs.browser) prefs.browser = {};
   if (!prefs.browser.theme) prefs.browser.theme = {};
   prefs.browser.theme.user_color = spaceColor.rgb[0] << 16 | spaceColor.rgb[1] << 8 | spaceColor.rgb[2];
