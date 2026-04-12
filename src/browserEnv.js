@@ -7,15 +7,62 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+/**
+ * Get a deterministic CDP port for a space based on its slug.
+ * Range: 9300-9399 (100 spaces max)
+ */
+function getCdpPort(slug) {
+  let hash = 0;
+  for (let i = 0; i < slug.length; i++) hash = ((hash << 5) - hash + slug.charCodeAt(i)) | 0;
+  return 9300 + (Math.abs(hash) % 100);
+}
+
 function getBrowserEnv(slug, spaceDir) {
   const profileDir = path.join(spaceDir, 'browser-profile');
+  const cdpPort = getCdpPort(slug);
 
   return {
+    // agent-browser connects to real Chrome via CDP — never launches its own browser
+    AGENT_BROWSER_CDP: String(cdpPort),
+    // Keep session name for agent-browser's internal state
     AGENT_BROWSER_SESSION: slug,
-    AGENT_BROWSER_PROFILE: profileDir,
-    AGENT_BROWSER_HEADED: 'true',
-    AGENT_BROWSER_ARGS: '--no-first-run,--no-default-browser-check',
   };
+}
+
+/**
+ * Launch real Chrome for a space with remote debugging enabled.
+ * Returns the CDP port.
+ */
+function launchSpaceChrome(slug, spaceDir) {
+  const { execSync } = require('child_process');
+  const profileDir = path.join(spaceDir, 'browser-profile');
+  const cdpPort = getCdpPort(slug);
+
+  // Check if already running on this port
+  try {
+    execSync(`curl -s http://localhost:${cdpPort}/json/version`, { timeout: 2000 });
+    return cdpPort; // Already running
+  } catch {}
+
+  // Kill any stale Chrome on this profile
+  try {
+    execSync(`pkill -f "user-data-dir=.*${slug}/browser-profile" 2>/dev/null`, { timeout: 3000 });
+  } catch {}
+
+  // Launch real Chrome
+  const chromeExe = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  const args = [
+    `--user-data-dir="${profileDir}"`,
+    `--remote-debugging-port=${cdpPort}`,
+    '--no-first-run',
+    '--no-default-browser-check',
+    '"about:blank"',
+  ].join(' ');
+
+  const { exec } = require('child_process');
+  exec(`"${chromeExe}" ${args}`, () => {});
+
+  return cdpPort;
 }
 
 /**
@@ -132,4 +179,4 @@ function cloneBrowserProfile(templateSpaceDir, targetSpaceDir, targetName, targe
   return true;
 }
 
-module.exports = { getBrowserEnv, seedBrowserExtensions, cloneBrowserProfile };
+module.exports = { getBrowserEnv, getCdpPort, launchSpaceChrome, seedBrowserExtensions, cloneBrowserProfile };

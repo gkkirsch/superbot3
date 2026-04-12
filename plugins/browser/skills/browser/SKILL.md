@@ -1,167 +1,106 @@
 ---
 name: browser
-description: "Browser automation with per-space session isolation. Open pages, fill forms, click buttons, take screenshots, extract data. Each space runs its own isolated browser session using the system Chrome."
+description: "Browser automation using the space's real Chrome browser via CDP. Open pages, fill forms, click buttons, take screenshots, extract data."
 when-to-use: "When the user needs to interact with websites — navigate pages, fill forms, click buttons, take screenshots, extract data, test web apps, or automate any browser task."
-allowed-tools: Bash(agent-browser *), Bash(npx agent-browser *)
+allowed-tools: Bash(agent-browser *)
 user-invocable: true
 ---
 
 # Browser Automation
 
-Every space gets its own isolated browser session with a persistent profile.
+Controls the space's real Chrome browser via CDP (Chrome DevTools Protocol). Real Chrome, real fingerprint, real extensions — no bot detection.
 
 ## CRITICAL RULES
 
-1. **NEVER use `agent-browser close --all`** — this kills browser sessions in ALL spaces. Only use `agent-browser close` (no --all) to close YOUR session.
-2. **NEVER use `--session`, `--profile`, `--auto-connect`, or `--executable-path` flags** — session and profile are set automatically via env vars. Adding them overrides isolation.
-3. **NEVER use `--profile Default`** — this hijacks the user's personal Chrome. Always use the default session.
-4. **If `agent-browser open` fails**, do NOT retry with different flags. Just report the error.
-5. Agent-browser is pre-installed. Skip version checks.
-6. Before your first browser command, verify your session: `agent-browser session`
+1. **ALWAYS check your CDP port first**: run `echo $AGENT_BROWSER_CDP` — this is your port
+2. **ALWAYS use `--cdp $AGENT_BROWSER_CDP`** on every agent-browser command
+3. **NEVER run `agent-browser open` without `--cdp`** — that launches a separate Chromium
+4. **NEVER use `--auto-connect`, `--profile`, `--session`, or `--executable-path`**
+5. **NEVER use `close --all`** — only `agent-browser --cdp $AGENT_BROWSER_CDP close`
+6. **If commands fail**, the Chrome browser may not be running. Tell the user to click the globe icon in the dashboard to launch it.
 
 ## Core Workflow
 
-Every browser automation follows this pattern:
-
 ```
-1. Verify session  →  agent-browser session  (should show your space slug)
-2. Open URL        →  agent-browser open <url>
-3. Wait for load   →  agent-browser wait --load networkidle
-4. Snapshot        →  agent-browser snapshot -i    (get element refs like @e1, @e2)
-5. Interact        →  agent-browser click/fill/select @ref
-6. Re-snapshot     →  agent-browser snapshot -i    (after any navigation or DOM change)
+1. Check port     →  echo $AGENT_BROWSER_CDP
+2. Open URL       →  agent-browser --cdp $AGENT_BROWSER_CDP open <url>
+3. Wait           →  agent-browser --cdp $AGENT_BROWSER_CDP wait --load networkidle
+4. Snapshot       →  agent-browser --cdp $AGENT_BROWSER_CDP snapshot -i
+5. Interact       →  agent-browser --cdp $AGENT_BROWSER_CDP click/fill/select @ref
+6. Re-snapshot    →  agent-browser --cdp $AGENT_BROWSER_CDP snapshot -i
 ```
 
 ## Essential Commands
 
+All commands MUST include `--cdp $AGENT_BROWSER_CDP`.
+
 ### Navigation
 ```bash
-agent-browser open <url>              # Navigate to URL
-agent-browser back                    # Go back
-agent-browser forward                 # Go forward
-agent-browser reload                  # Reload page
-agent-browser close                   # Close THIS session only
+agent-browser --cdp $AGENT_BROWSER_CDP open <url>
+agent-browser --cdp $AGENT_BROWSER_CDP back
+agent-browser --cdp $AGENT_BROWSER_CDP forward
+agent-browser --cdp $AGENT_BROWSER_CDP reload
 ```
 
 ### Snapshot (Discover Elements)
 ```bash
-agent-browser snapshot -i             # Interactive elements with refs (@e1, @e2...)
-agent-browser snapshot -i -C          # Include cursor-interactive elements (divs with onclick)
-agent-browser snapshot -s "#selector" # Scope to CSS selector
+agent-browser --cdp $AGENT_BROWSER_CDP snapshot -i
+agent-browser --cdp $AGENT_BROWSER_CDP snapshot -i -C    # include cursor-interactive
+agent-browser --cdp $AGENT_BROWSER_CDP snapshot -s "#id" # scope to selector
 ```
 
-### Interaction (Use @refs from Snapshot)
+### Interaction
 ```bash
-agent-browser click @e1               # Click element
-agent-browser fill @e2 "text"         # Clear and type text
-agent-browser type @e2 "text"         # Type without clearing (append)
-agent-browser select @e1 "option"     # Select dropdown option
-agent-browser check @e1               # Check checkbox
-agent-browser press Enter             # Press key
-agent-browser keyboard type "text"    # Type at current focus (no selector)
-agent-browser scroll down 500         # Scroll page
+agent-browser --cdp $AGENT_BROWSER_CDP click @e1
+agent-browser --cdp $AGENT_BROWSER_CDP fill @e2 "text"
+agent-browser --cdp $AGENT_BROWSER_CDP type @e2 "text"
+agent-browser --cdp $AGENT_BROWSER_CDP select @e1 "option"
+agent-browser --cdp $AGENT_BROWSER_CDP check @e1
+agent-browser --cdp $AGENT_BROWSER_CDP press Enter
+agent-browser --cdp $AGENT_BROWSER_CDP scroll down 500
 ```
 
 ### Get Information
 ```bash
-agent-browser get text @e1            # Get element text
-agent-browser get text body           # Get all page text
-agent-browser get url                 # Get current URL
-agent-browser get title               # Get page title
+agent-browser --cdp $AGENT_BROWSER_CDP get text @e1
+agent-browser --cdp $AGENT_BROWSER_CDP get text body
+agent-browser --cdp $AGENT_BROWSER_CDP get url
+agent-browser --cdp $AGENT_BROWSER_CDP get title
 ```
 
 ### Wait
 ```bash
-agent-browser wait @e1                # Wait for element to appear
-agent-browser wait --load networkidle # Wait for network idle
-agent-browser wait --url "**/page"    # Wait for URL pattern
-agent-browser wait 2000               # Wait milliseconds
+agent-browser --cdp $AGENT_BROWSER_CDP wait @e1
+agent-browser --cdp $AGENT_BROWSER_CDP wait --load networkidle
+agent-browser --cdp $AGENT_BROWSER_CDP wait --url "**/page"
+agent-browser --cdp $AGENT_BROWSER_CDP wait 2000
 ```
 
 ### Screenshots
 ```bash
-agent-browser screenshot              # Screenshot to temp dir
-agent-browser screenshot page.png     # Screenshot to specific file
-agent-browser screenshot --full       # Full page screenshot
-agent-browser screenshot --annotate   # Labeled screenshot with numbered elements
+agent-browser --cdp $AGENT_BROWSER_CDP screenshot
+agent-browser --cdp $AGENT_BROWSER_CDP screenshot page.png
+agent-browser --cdp $AGENT_BROWSER_CDP screenshot --full
+agent-browser --cdp $AGENT_BROWSER_CDP screenshot --annotate
 ```
 
 ### Tabs
 ```bash
-agent-browser tab list                # List open tabs
-agent-browser tab new                 # New tab
-agent-browser tab 2                   # Switch to tab 2
-agent-browser tab close               # Close current tab
-```
-
-## Command Chaining
-
-Chain commands with `&&` when you don't need intermediate output:
-
-```bash
-agent-browser open https://example.com && agent-browser wait --load networkidle && agent-browser snapshot -i
-```
-
-Run separately when you need to parse output (e.g., snapshot to discover refs, then interact).
-
-## Authentication
-
-Your browser profile persists across sessions. Cookies and login state are saved automatically in the space's `browser-profile/` directory.
-
-### Login and it stays logged in
-```bash
-agent-browser open https://example.com/login
-agent-browser snapshot -i
-agent-browser fill @e1 "user@example.com"
-agent-browser fill @e2 "password"
-agent-browser click @e3
-agent-browser wait --url "**/dashboard"
-# Done — next time you open this site, you're already logged in
-```
-
-### Auth Vault (encrypted credential storage)
-```bash
-# Save credentials once
-echo "password" | agent-browser auth save mysite --url https://example.com/login --username user --password-stdin
-
-# Login using saved profile
-agent-browser auth login mysite
+agent-browser --cdp $AGENT_BROWSER_CDP tab list
+agent-browser --cdp $AGENT_BROWSER_CDP tab new
+agent-browser --cdp $AGENT_BROWSER_CDP tab 2
+agent-browser --cdp $AGENT_BROWSER_CDP tab close
 ```
 
 ## Data Extraction
 ```bash
-agent-browser open https://example.com/products
-agent-browser snapshot -i
-agent-browser get text @e5              # Specific element
-agent-browser get text body > page.txt  # Full page text
-agent-browser eval "JSON.stringify([...document.querySelectorAll('.price')].map(e => e.textContent))"
+agent-browser --cdp $AGENT_BROWSER_CDP eval "JSON.stringify([...document.querySelectorAll('.item')].map(e => e.textContent))"
 ```
 
-## Debugging
-```bash
-agent-browser --headed open https://example.com  # Show browser window
-agent-browser highlight @e1                       # Highlight element
-agent-browser console                             # View console logs
-agent-browser errors                              # View page errors
-```
+## If Chrome Isn't Running
 
-## Stealth
+If you get connection errors, the Chrome browser for this space isn't running. Tell the user:
 
-The browser launches with anti-detection flags pre-configured:
-- `--disable-blink-features=AutomationControlled` (hides navigator.webdriver)
-- `--disable-infobars` (no "Chrome is being controlled" bar)
-- Real system Chrome with persistent profile (real fingerprint)
-- Headed mode (visible window — matches real user behavior)
+> "Click the globe icon in the dashboard header to launch your browser, then I can control it."
 
-If a site still blocks you, try adding a delay between actions (`agent-browser wait 2000`).
-
-## Important Notes
-
-- Uses system Chrome with a persistent profile — real fingerprint, not bot-detectable
-- Browser opens in a visible window (headed mode) — matches real user behavior
-- Your session is isolated — other spaces cannot see or affect your browser
-- The browser daemon persists between commands (no startup cost after first command)
-- Use `agent-browser close` when done (NEVER `close --all`)
-- Login state persists in `browser-profile/` — log in once, stay logged in
-- Screenshots go to temp dir by default — use explicit paths for important captures
-- First command: verify session with `agent-browser session`
+Do NOT try to launch Chrome yourself.
