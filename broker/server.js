@@ -1708,43 +1708,18 @@ app.post('/api/spaces/:name/restart', async (req, res) => {
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
   try {
-    // Step 1: Kill existing tmux window
+    // Kill existing tmux window
     try {
       execSync(`tmux kill-window -t superbot3:${config.slug} 2>/dev/null`);
-    } catch {
-      // Window may not exist — that's fine
-    }
+    } catch {}
 
-    // Step 2: Wait for cleanup
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Step 3: Re-launch the space
+    // Re-launch using shared launchSpace module
+    const { launchSpace } = require(path.join(__dirname, '..', 'src', 'launchSpace'));
     const globalConfig = JSON.parse(fs.readFileSync(path.join(SUPERBOT3_HOME, 'config.json'), 'utf-8'));
     const model = config.model || globalConfig.model || 'claude-opus-4-6';
-    const spaceWorkDir = config.codeDir || config.spaceDir;
-
-    // Ensure inbox exists
-    const inboxDir = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes');
-    fs.mkdirSync(inboxDir, { recursive: true });
-    const inboxPath = path.join(inboxDir, 'team-lead.json');
-    if (!fs.existsSync(inboxPath)) {
-      fs.writeFileSync(inboxPath, '[]', 'utf-8');
-    }
-
-    // Write launch script
-    const scriptDir = path.join(SUPERBOT3_HOME, '.tmp');
-    fs.mkdirSync(scriptDir, { recursive: true });
-    const scriptPath = path.join(scriptDir, `launch-${config.slug}.sh`);
-    const teamArgs = `--agent-id 'team-lead@${config.slug}' --agent-name 'team-lead' --team-name '${config.slug}'`;
-    const script = `#!/bin/bash\ncd "${spaceWorkDir}"\nexport CLAUDE_CONFIG_DIR="${config.claudeConfigDir}"\nexport CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\nexec claude --dangerously-skip-permissions --model ${model} ${teamArgs}\n`;
-    fs.writeFileSync(scriptPath, script, { mode: 0o755 });
-
-    // Launch in tmux
-    execSync(`tmux new-window -t superbot3 -n ${config.slug} "bash ${scriptPath}"`, { timeout: 5000 });
-
-    // Send startup prompt
-    const startupPrompt = 'Read your CLAUDE.md. Scan knowledge/ for context. Report your identity, skills, agents, and knowledge files.';
-    await writeToInbox(inboxPath, { from: 'superbot3', text: startupPrompt });
+    launchSpace(config, model);
 
     res.json({ ok: true, message: `Space "${config.slug}" restarted` });
   } catch (err) {
