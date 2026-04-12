@@ -92,9 +92,10 @@ You CAN read `.claude/` files freely — only writes are blocked.
 
 ## Communication
 
-- To message the master orchestrator: use SendMessage to team-lead
-- To message another space: send via master relay
-- Check your inbox regularly for messages from the CLI, dashboard, or master
+- Do NOT use SendMessage to send messages to yourself or to "team-lead" — that creates a loop
+- To respond to the user: just output text directly (the dashboard shows your output)
+- To message the master orchestrator: use `superbot3 message master "your message"` via Bash
+- To message another space: use `superbot3 message <space-slug> "your message"` via Bash
 
 ## Self-Modification
 
