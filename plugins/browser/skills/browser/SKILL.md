@@ -8,14 +8,16 @@ user-invocable: true
 
 # Browser Automation
 
-Every space gets its own isolated browser session using the system Chrome with a persistent profile. Real Chrome fingerprint — no bot detection blocks.
+Every space gets its own isolated browser session with a persistent profile.
 
 ## CRITICAL RULES
 
 1. **NEVER use `agent-browser close --all`** — this kills browser sessions in ALL spaces. Only use `agent-browser close` (no --all) to close YOUR session.
-2. **NEVER use `--session` or `--profile` flags** — these are set automatically via env vars (`AGENT_BROWSER_SESSION` and `AGENT_BROWSER_PROFILE`). Adding them overrides isolation.
-3. Agent-browser is pre-installed. Skip version checks.
-4. Before your first browser command, verify your session: `agent-browser session`
+2. **NEVER use `--session`, `--profile`, `--auto-connect`, or `--executable-path` flags** — session and profile are set automatically via env vars. Adding them overrides isolation.
+3. **NEVER use `--profile Default`** — this hijacks the user's personal Chrome. Always use the default session.
+4. **If `agent-browser open` fails**, do NOT retry with different flags. Just report the error.
+5. Agent-browser is pre-installed. Skip version checks.
+6. Before your first browser command, verify your session: `agent-browser session`
 
 ## Core Workflow
 

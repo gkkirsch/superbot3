@@ -10,16 +10,11 @@ const os = require('os');
 function getBrowserEnv(slug, spaceDir) {
   const profileDir = path.join(spaceDir, 'browser-profile');
 
-  // Use system Chrome, not Playwright's Chromium
-  const chromeExe = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-  const useSystemChrome = fs.existsSync(chromeExe);
-
   return {
     AGENT_BROWSER_SESSION: slug,
     AGENT_BROWSER_PROFILE: profileDir,
     AGENT_BROWSER_HEADED: 'true',
     AGENT_BROWSER_ARGS: '--no-first-run,--no-default-browser-check',
-    ...(useSystemChrome ? { AGENT_BROWSER_EXECUTABLE_PATH: chromeExe } : {}),
   };
 }
 
