@@ -41,6 +41,7 @@ cd "${cwd}"
 export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 export CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
+export ENABLE_CLAUDEAI_MCP_SERVERS=0
 ${browserExports}
 exec claude ${claudeArgs.join(' ')}
 `;
