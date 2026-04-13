@@ -20,11 +20,8 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   if (resumeSessionId) {
     claudeArgs.push(`--resume ${resumeSessionId}`);
   }
-  // TeamCreate as initial prompt — establishes space as team LEAD (not teammate).
-  // This enables both inbox polling AND named teammate spawning.
-  if (teamArgs && teamArgs.teamName) {
-    claudeArgs.push(`-p 'Run: TeamCreate({ team_name: \"${teamArgs.teamName}\" })'`);
-  }
+  // No --agent-id/--agent-name/--team-name — TeamCreate in step 1 establishes
+  // the team in the session. --continue in step 2 restores teamContext.
   // Custom system prompt file replaces the entire default Claude Code system prompt
   if (opts.systemPromptFile && fs.existsSync(opts.systemPromptFile)) {
     claudeArgs.push(`--system-prompt-file '${opts.systemPromptFile}'`);
@@ -36,6 +33,11 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   const browserEnv = getBrowserEnv(opts.browserSession || name, spaceDir);
   const browserExports = Object.entries(browserEnv).map(([k, v]) => `export ${k}="${v}"`).join('\n');
 
+  // Two-step launch:
+  // 1. Run TeamCreate in print mode (no --agent-id → isTeammate()=false → creates team properly)
+  // 2. Continue the session with --agent-id for inbox polling (team already exists → TeamCreate won't re-run)
+  const teamName = teamArgs?.teamName || name;
+
   const script = `#!/bin/bash
 cd "${cwd}"
 export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
@@ -43,7 +45,12 @@ export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 export CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
 export ENABLE_CLAUDEAI_MCP_SERVERS=0
 ${browserExports}
-exec claude ${claudeArgs.join(' ')}
+
+# Step 1: Create team (print mode, no agent-id → proper team lead)
+claude --dangerously-skip-permissions --model ${model} -p 'Call the TeamCreate tool with team_name "${teamName}". Do nothing else. Do not delete or clean up anything.' 2>/dev/null || true
+
+# Step 2: Continue session interactively (teamContext restored from step 1)
+exec claude --dangerously-skip-permissions --model ${model} ${opts.systemPromptFile && fs.existsSync(opts.systemPromptFile) ? "--system-prompt-file '" + opts.systemPromptFile + "'" : ''} --continue
 `;
 
   fs.writeFileSync(scriptPath, script, { mode: 0o755 });
@@ -137,8 +144,9 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
     fs.writeFileSync(inboxPath, '[]', 'utf-8');
   }
 
-  // No --agent-id/--agent-name/--team-name. TeamCreate runs as initial prompt.
-  const teamArgs = { teamName: slug };
+  // Two-step launch: first run TeamCreate via -p (print mode, creates team),
+  // then resume the session in interactive mode with --agent-id etc for inbox polling.
+  const teamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: slug };
   const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
   const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, teamArgs, {
     systemPromptFile: fs.existsSync(systemPromptFile) ? systemPromptFile : null,
