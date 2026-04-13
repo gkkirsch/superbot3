@@ -175,19 +175,13 @@ function createSpace(home, name, codeDir) {
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 
-  // Create team config.json so Claude Code's isTeamLead() returns true.
-  // Without this, the inbox poller won't activate and the space can't receive messages.
-  const teamDir = path.join(spaceDir, '.claude', 'teams', slug);
+  // Create inbox directory so messages can be queued before TeamCreate runs.
+  // Don't create team config.json — TeamCreate handles that on first boot.
+  const teamDir = path.join(spaceDir, '.claude', 'teams', slug, 'inboxes');
   ensureDir(teamDir);
-  const teamConfigPath = path.join(teamDir, 'config.json');
-  if (!fs.existsSync(teamConfigPath)) {
-    fs.writeFileSync(teamConfigPath, JSON.stringify({
-      name: slug,
-      description: `Space orchestrator team for ${slug}`,
-      createdAt: Date.now(),
-      leadAgentId: 'team-lead',
-      members: [],
-    }, null, 2), 'utf-8');
+  const inboxPath = path.join(teamDir, 'team-lead.json');
+  if (!fs.existsSync(inboxPath)) {
+    fs.writeFileSync(inboxPath, '[]', 'utf-8');
   }
 
   // Always write scheduled_tasks.json with nightly consolidation crons

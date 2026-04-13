@@ -20,12 +20,10 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   if (resumeSessionId) {
     claudeArgs.push(`--resume ${resumeSessionId}`);
   }
-  // All three required together for inbox polling.
-  // isTeammate()=true blocks named teammate spawning — spaces use unnamed subagents.
-  if (teamArgs) {
-    if (teamArgs.agentId) claudeArgs.push(`--agent-id '${teamArgs.agentId}'`);
-    if (teamArgs.agentName) claudeArgs.push(`--agent-name '${teamArgs.agentName}'`);
-    if (teamArgs.teamName) claudeArgs.push(`--team-name '${teamArgs.teamName}'`);
+  // TeamCreate as initial prompt — establishes space as team LEAD (not teammate).
+  // This enables both inbox polling AND named teammate spawning.
+  if (teamArgs && teamArgs.teamName) {
+    claudeArgs.push(`-p 'Run: TeamCreate({ team_name: \"${teamArgs.teamName}\" })'`);
   }
   // Custom system prompt file replaces the entire default Claude Code system prompt
   if (opts.systemPromptFile && fs.existsSync(opts.systemPromptFile)) {
@@ -130,11 +128,17 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
     return false;
   }
 
-  // Ensure team config and inbox exist
-  ensureTeamConfig(claudeConfigDir, slug);
-  ensureInbox(claudeConfigDir, slug, 'team-lead');
+  // Don't pre-create team config — TeamCreate will create it on boot.
+  // Only ensure the inbox directory exists so messages can be queued.
+  const inboxDir = path.join(claudeConfigDir, 'teams', slug, 'inboxes');
+  fs.mkdirSync(inboxDir, { recursive: true });
+  const inboxPath = path.join(inboxDir, 'team-lead.json');
+  if (!fs.existsSync(inboxPath)) {
+    fs.writeFileSync(inboxPath, '[]', 'utf-8');
+  }
 
-  const teamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: slug };
+  // No --agent-id/--agent-name/--team-name. TeamCreate runs as initial prompt.
+  const teamArgs = { teamName: slug };
   const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
   const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, teamArgs, {
     systemPromptFile: fs.existsSync(systemPromptFile) ? systemPromptFile : null,
