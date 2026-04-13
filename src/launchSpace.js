@@ -129,8 +129,27 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
     return false;
   }
 
-  // Ensure team config and inbox exist
-  ensureTeamConfig(claudeConfigDir, slug);
+  // Write team config matching TeamCreate's exact format
+  const teamDir = path.join(claudeConfigDir, 'teams', slug);
+  fs.mkdirSync(teamDir, { recursive: true });
+  const configPath = path.join(teamDir, 'config.json');
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, JSON.stringify({
+      name: slug,
+      description: `Space orchestrator team for ${slug}`,
+      createdAt: Date.now(),
+      leadAgentId: 'team-lead',
+      members: [{
+        agentId: 'team-lead',
+        name: 'team-lead',
+        agentType: 'team-lead',
+        joinedAt: Date.now(),
+        tmuxPaneId: '',
+        cwd: cwd,
+        subscriptions: [],
+      }],
+    }, null, 2), 'utf-8');
+  }
   ensureInbox(claudeConfigDir, slug, 'team-lead');
 
   const teamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: slug };

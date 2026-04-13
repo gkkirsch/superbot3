@@ -185,7 +185,15 @@ function createSpace(home, name, codeDir) {
       description: `Space orchestrator team for ${slug}`,
       createdAt: Date.now(),
       leadAgentId: 'team-lead',
-      members: [],
+      members: [{
+        agentId: 'team-lead',
+        name: 'team-lead',
+        agentType: 'team-lead',
+        joinedAt: Date.now(),
+        tmuxPaneId: '',
+        cwd: spaceDir,
+        subscriptions: [],
+      }],
     }, null, 2), 'utf-8');
   }
 
