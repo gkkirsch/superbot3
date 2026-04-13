@@ -321,6 +321,28 @@ The fix: don't pass `--agent-id` or `--team-name` on launch. Instead, call `Team
 - `isTeamLead(teamContext)` in `teammate.ts` — true if `myAgentId === teamContext.leadAgentId` or no agentId set
 - `getAgentNameToPoll()` in `useInboxPoller.ts` — teammates poll by agent name, leads poll by lead name from team config
 
+## Updating superbot3
+
+**NEVER nuke `~/.superbot3/` to update.** That deletes all space data, knowledge, memory, browser profiles.
+
+Instead:
+```bash
+superbot3 stop
+superbot3 update
+superbot3 start
+```
+
+`superbot3 update` does:
+1. `git pull` latest code in `~/.superbot3-app/`
+2. `npm install` dependencies
+3. Rebuilds dashboard
+4. Refreshes ALL space system prompts from the latest template
+5. Refreshes master system prompt
+6. Ensures master settings are correct
+
+**Preserved**: spaces, knowledge, memory, browser profiles, plugins, config, installed_plugins.json
+**Updated**: code, dashboard UI, system prompts, master settings
+
 ## TODO
 
 - Replace gog CLI's OpenClaw OAuth client with our own Google Cloud OAuth credentials. Steps: create GCP project → enable Gmail API → create OAuth consent screen → create Desktop App credentials → `gog auth credentials set /path/to/credentials.json` → `gog auth add ibekidkirsch@gmail.com`
