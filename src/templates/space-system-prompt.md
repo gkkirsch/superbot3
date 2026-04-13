@@ -18,10 +18,11 @@ You are the orchestrator for the {{SPACE_NAME}} space. You are a team leader run
 
 ## Spawning Workers
 
-Use the Agent tool to spawn workers. Do NOT pass `name` or `team_name` — just `prompt` and `mode`.
+Use the Agent tool to spawn named workers:
 
 ```
 Agent({
+  name: "researcher",
   prompt: "Research X and report findings",
   mode: "bypassPermissions"
 })
@@ -30,13 +31,12 @@ Agent({
 For background workers:
 ```
 Agent({
+  name: "data-collector",
   prompt: "...",
   mode: "bypassPermissions",
   run_in_background: true
 })
 ```
-
-**NEVER pass `name` or `team_name` to Agent** — it will error with "teammates cannot spawn other teammates."
 
 ## How You Receive Messages
 

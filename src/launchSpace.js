@@ -20,13 +20,12 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   if (resumeSessionId) {
     claudeArgs.push(`--resume ${resumeSessionId}`);
   }
-  // All three required together by Claude Code for inbox polling.
-  // isTeammate()=true blocks named teammate spawning, but spaces can still
-  // spawn unnamed subagents (omit `name` param in Agent tool).
-  if (teamArgs) {
-    if (teamArgs.agentId) claudeArgs.push(`--agent-id '${teamArgs.agentId}'`);
-    if (teamArgs.agentName) claudeArgs.push(`--agent-name '${teamArgs.agentName}'`);
-    if (teamArgs.teamName) claudeArgs.push(`--team-name '${teamArgs.teamName}'`);
+  // Do NOT pass --agent-id/--agent-name/--team-name — that makes isTeammate()=true
+  // which blocks named teammate spawning. Instead, pass TeamCreate as the initial
+  // prompt (-p flag). TeamCreate sets appState.teamContext which enables inbox
+  // polling AND named teammate spawning (as team LEAD, not teammate).
+  if (teamArgs && teamArgs.teamName) {
+    claudeArgs.push(`-p 'TeamCreate({ team_name: \"${teamArgs.teamName}\" })'`);
   }
   // Custom system prompt file replaces the entire default Claude Code system prompt
   if (opts.systemPromptFile && fs.existsSync(opts.systemPromptFile)) {
@@ -135,8 +134,8 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
   ensureTeamConfig(claudeConfigDir, slug);
   ensureInbox(claudeConfigDir, slug, 'team-lead');
 
-  // All three required for inbox polling. agent-id='team-lead' makes isTeamLead()=true.
-  const teamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: slug };
+  // TeamCreate runs as the initial prompt — establishes the space as team LEAD
+  const teamArgs = { teamName: slug };
   const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
   const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, teamArgs, {
     systemPromptFile: fs.existsSync(systemPromptFile) ? systemPromptFile : null,
