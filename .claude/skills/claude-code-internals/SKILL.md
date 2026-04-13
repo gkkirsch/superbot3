@@ -303,6 +303,24 @@ Plugin skills are loaded through a completely separate path from `.claude/skills
 - Whether in-process teammates respect `CLAUDE_CONFIG_DIR` or always use the parent's config
 - Full list of what `--dangerously-skip-permissions` actually bypasses vs what it doesn't
 
+## Teammate Spawning: --agent-id Makes You a Teammate, Not a Lead
+
+**Source**: `src/tools/AgentTool/AgentTool.tsx` line 272
+
+If a session has `--agent-id` AND `--team-name`, `isTeammate()` returns true. Teammates CANNOT spawn named teammates — "the team roster is flat."
+
+The fix: don't pass `--agent-id` or `--team-name` on launch. Instead, call `TeamCreate` at runtime which:
+1. Creates/reads the team config file
+2. Sets `appState.teamContext` with `leadAgentId`
+3. Makes `isTeamLead()` return true
+4. Enables inbox polling via `getAgentNameToPoll()`
+5. Enables teammate spawning (named agents via the Agent tool)
+
+**Key functions**:
+- `isTeammate()` in `teammate.ts` — true if `dynamicTeamContext.agentId && dynamicTeamContext.teamName`
+- `isTeamLead(teamContext)` in `teammate.ts` — true if `myAgentId === teamContext.leadAgentId` or no agentId set
+- `getAgentNameToPoll()` in `useInboxPoller.ts` — teammates poll by agent name, leads poll by lead name from team config
+
 ## TODO
 
 - Replace gog CLI's OpenClaw OAuth client with our own Google Cloud OAuth credentials. Steps: create GCP project → enable Gmail API → create OAuth consent screen → create Desktop App credentials → `gog auth credentials set /path/to/credentials.json` → `gog auth add ibekidkirsch@gmail.com`
