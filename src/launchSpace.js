@@ -162,6 +162,39 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
   // Create tmux window and run the launch script
   execSync(`tmux new-window -t ${tmuxSession} -n ${slug} "bash ${scriptPath}"`);
 
+  // Wait briefly then capture session ID and update team config
+  setTimeout(() => {
+    try {
+      const projectsDir = path.join(claudeConfigDir, 'projects');
+      if (!fs.existsSync(projectsDir)) return;
+      const dirs = fs.readdirSync(projectsDir, { withFileTypes: true }).filter(d => d.isDirectory());
+      let newest = null;
+      let newestMtime = 0;
+      for (const dir of dirs) {
+        const dirPath = path.join(projectsDir, dir.name);
+        const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.jsonl'));
+        for (const file of files) {
+          const filePath = path.join(dirPath, file);
+          const stat = fs.statSync(filePath);
+          if (stat.mtimeMs > newestMtime) {
+            newestMtime = stat.mtimeMs;
+            newest = file.replace('.jsonl', '');
+          }
+        }
+      }
+      if (newest && fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        config.leadSessionId = newest;
+        // Also update tmuxPaneId for the lead
+        try {
+          const paneId = execSync(`tmux list-panes -t ${tmuxSession}:${slug} -F "#{pane_id}" 2>/dev/null`, { encoding: 'utf-8' }).trim();
+          if (paneId && config.members?.[0]) config.members[0].tmuxPaneId = paneId;
+        } catch {}
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+      }
+    } catch {}
+  }, 5000);
+
   return true;
 }
 
