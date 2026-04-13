@@ -20,10 +20,14 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   if (resumeSessionId) {
     claudeArgs.push(`--resume ${resumeSessionId}`);
   }
-  // NOTE: we intentionally do NOT pass --agent-id or --team-name here.
-  // Passing them makes isTeammate()=true which blocks spawning teammates.
-  // Instead, the space system prompt tells it to call TeamCreate on first
-  // message, which properly establishes it as the team LEAD.
+  // All three required together by Claude Code for inbox polling.
+  // isTeammate()=true blocks named teammate spawning, but spaces can still
+  // spawn unnamed subagents (omit `name` param in Agent tool).
+  if (teamArgs) {
+    if (teamArgs.agentId) claudeArgs.push(`--agent-id '${teamArgs.agentId}'`);
+    if (teamArgs.agentName) claudeArgs.push(`--agent-name '${teamArgs.agentName}'`);
+    if (teamArgs.teamName) claudeArgs.push(`--team-name '${teamArgs.teamName}'`);
+  }
   // Custom system prompt file replaces the entire default Claude Code system prompt
   if (opts.systemPromptFile && fs.existsSync(opts.systemPromptFile)) {
     claudeArgs.push(`--system-prompt-file '${opts.systemPromptFile}'`);
@@ -131,10 +135,10 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
   ensureTeamConfig(claudeConfigDir, slug);
   ensureInbox(claudeConfigDir, slug, 'team-lead');
 
-  // No --agent-id or --team-name — space calls TeamCreate itself to become lead
-  // Look for system-prompt.md in the space directory
+  // All three required for inbox polling. agent-id='team-lead' makes isTeamLead()=true.
+  const teamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: slug };
   const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
-  const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, null, {
+  const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, teamArgs, {
     systemPromptFile: fs.existsSync(systemPromptFile) ? systemPromptFile : null,
     spaceDir: space.spaceDir,
   });
