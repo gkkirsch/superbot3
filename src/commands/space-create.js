@@ -175,27 +175,10 @@ function createSpace(home, name, codeDir) {
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 
-  // Create team config so Claude Code's isTeamLead() returns true.
-  const teamDir = path.join(spaceDir, '.claude', 'teams', slug);
-  ensureDir(teamDir);
-  const teamConfigPath = path.join(teamDir, 'config.json');
-  if (!fs.existsSync(teamConfigPath)) {
-    fs.writeFileSync(teamConfigPath, JSON.stringify({
-      name: slug,
-      description: `Space orchestrator team for ${slug}`,
-      createdAt: Date.now(),
-      leadAgentId: 'team-lead',
-      members: [{
-        agentId: 'team-lead',
-        name: 'team-lead',
-        agentType: 'team-lead',
-        joinedAt: Date.now(),
-        tmuxPaneId: '',
-        cwd: spaceDir,
-        subscriptions: [],
-      }],
-    }, null, 2), 'utf-8');
-  }
+  // Don't pre-create team config — TeamCreate runs as the first interactive prompt
+  // and needs a clean slate to properly set appState.teamContext.
+  // Just ensure the teams directory exists.
+  ensureDir(path.join(spaceDir, '.claude', 'teams'));
 
   // Always write scheduled_tasks.json with nightly consolidation crons
   // (overwrites the empty template copy)

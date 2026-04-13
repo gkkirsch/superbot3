@@ -17,16 +17,10 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   const scriptPath = path.join(scriptDir, `launch-${name}.sh`);
 
   const claudeArgs = ['--dangerously-skip-permissions', `--model ${model}`];
-  // Don't use --resume when --session-id is set (they conflict)
-  if (resumeSessionId && !opts.sessionId) {
-    claudeArgs.push(`--resume ${resumeSessionId}`);
-  }
-  // All three required for inbox polling
-  if (teamArgs) {
-    if (teamArgs.agentId) claudeArgs.push(`--agent-id '${teamArgs.agentId}'`);
-    if (teamArgs.agentName) claudeArgs.push(`--agent-name '${teamArgs.agentName}'`);
-    if (teamArgs.teamName) claudeArgs.push(`--team-name '${teamArgs.teamName}'`);
-  }
+  // Don't resume — TeamCreate as positional prompt needs a fresh session
+  // (resumed sessions already have teamContext and would error)
+  // No --agent-id/--agent-name/--team-name — TeamCreate runs as first prompt
+  // and sets up team context properly (isTeammate()=false, isTeamLead()=true)
   // Custom system prompt file replaces the entire default Claude Code system prompt
   if (opts.systemPromptFile && fs.existsSync(opts.systemPromptFile)) {
     claudeArgs.push(`--system-prompt-file '${opts.systemPromptFile}'`);
@@ -45,7 +39,7 @@ export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 export CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
 export ENABLE_CLAUDEAI_MCP_SERVERS=0
 ${browserExports}
-exec claude ${claudeArgs.join(' ')}
+exec claude ${claudeArgs.join(' ')} 'TeamCreate({ team_name: "${teamArgs?.teamName || name}" })'
 `;
 
   fs.writeFileSync(scriptPath, script, { mode: 0o755 });
@@ -130,26 +124,11 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
     return false;
   }
 
-  // Write team config matching TeamCreate's exact format
-  const teamDir = path.join(claudeConfigDir, 'teams', slug);
+  // Don't pre-create team config — let TeamCreate do it via the positional prompt
+  // so appState.teamContext gets set properly (enables inbox polling + teammate spawning).
+  // Only ensure the teams directory exists so TeamCreate can write to it.
+  const teamDir = path.join(claudeConfigDir, 'teams');
   fs.mkdirSync(teamDir, { recursive: true });
-  const configPath = path.join(teamDir, 'config.json');
-  fs.writeFileSync(configPath, JSON.stringify({
-    name: slug,
-    description: `Space orchestrator team for ${slug}`,
-    createdAt: Date.now(),
-    leadAgentId: 'team-lead',
-    members: [{
-      agentId: 'team-lead',
-      name: 'team-lead',
-      agentType: 'team-lead',
-      joinedAt: Date.now(),
-      tmuxPaneId: '',
-      cwd: cwd,
-      subscriptions: [],
-    }],
-  }, null, 2), 'utf-8');
-  ensureInbox(claudeConfigDir, slug, 'team-lead');
 
   const teamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: slug };
   const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
