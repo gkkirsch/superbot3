@@ -17,7 +17,8 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   const scriptPath = path.join(scriptDir, `launch-${name}.sh`);
 
   const claudeArgs = ['--dangerously-skip-permissions', `--model ${model}`];
-  if (resumeSessionId) {
+  // Don't use --resume when --session-id is set (they conflict)
+  if (resumeSessionId && !opts.sessionId) {
     claudeArgs.push(`--resume ${resumeSessionId}`);
   }
   // All three required for inbox polling
