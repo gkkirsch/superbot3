@@ -30,6 +30,10 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   if (opts.systemPromptFile && fs.existsSync(opts.systemPromptFile)) {
     claudeArgs.push(`--system-prompt-file '${opts.systemPromptFile}'`);
   }
+  // Pre-generated session ID for team config linkage
+  if (opts.sessionId) {
+    claudeArgs.push(`--session-id '${opts.sessionId}'`);
+  }
 
   // Browser env from shared config
   const { getBrowserEnv } = require('./browserEnv');
@@ -156,12 +160,10 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
   }, null, 2), 'utf-8');
   ensureInbox(claudeConfigDir, slug, 'team-lead');
 
-  // Pass the session ID to Claude
-  claudeArgs.push(`--session-id '${sessionId}'`);
-
   const teamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: slug };
   const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
   const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, teamArgs, {
+    sessionId: sessionId,
     systemPromptFile: fs.existsSync(systemPromptFile) ? systemPromptFile : null,
     spaceDir: space.spaceDir,
   });
