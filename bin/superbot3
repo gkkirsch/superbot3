@@ -107,6 +107,18 @@ program
     require('../src/commands/message')(SUPERBOT3_HOME, spaceName, text);
   });
 
+// spawn-worker
+program
+  .command('spawn-worker <space> <name> <prompt>')
+  .description('Spawn a tmux-based worker in a space')
+  .option('--cwd <path>', 'Working directory for the worker')
+  .option('--model <model>', 'Claude model to use')
+  .option('--type <type>', 'Agent type (default: space-worker)')
+  .option('--color <color>', 'Pane border color')
+  .action((space, name, prompt, opts) => {
+    require('../src/commands/spawn-worker')(SUPERBOT3_HOME, space, name, prompt, opts);
+  });
+
 // logs
 program
   .command('logs <space>')

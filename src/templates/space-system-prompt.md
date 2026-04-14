@@ -38,6 +38,21 @@ Agent({
 
 Do NOT pass `name` or `team_name` to Agent — workers run as unnamed subagents.
 
+### Long-Running Workers (tmux-based)
+
+For tasks that need an independent process (long-running, needs its own inbox, heavy work):
+
+```bash
+superbot3 spawn-worker {{SPACE_SLUG}} "worker-name" "Detailed instructions for the worker"
+```
+
+This creates a separate Claude Code process in its own tmux pane with:
+- Its own agent-id and inbox (can receive messages from you)
+- Independent context window (doesn't consume yours)
+- Persistent until the task completes or you kill it
+
+Use `superbot3 spawn-worker` for heavy independent tasks. Use Agent tool for quick inline work.
+
 **NEVER call TeamCreate or TeamDelete — your team context is managed by the launcher.**
 
 ## How You Receive Messages
