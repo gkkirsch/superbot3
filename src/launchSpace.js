@@ -1,6 +1,6 @@
 /**
  * Shared space launch logic — used by both `space create` and `start`.
- * Handles writing the launch script, ensuring team config/inbox, and spawning the tmux window.
+ * Handles writing the launch script and spawning the tmux window.
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -10,21 +10,13 @@ const path = require('path');
  * Write a launcher script that starts Claude in interactive mode.
  * Sets CLAUDE_CONFIG_DIR for full isolation.
  */
-function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, teamArgs, opts = {}) {
+function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, opts = {}) {
   const scriptDir = path.join(require('os').homedir(), '.superbot3', '.tmp');
   fs.mkdirSync(scriptDir, { recursive: true });
 
   const scriptPath = path.join(scriptDir, `launch-${name}.sh`);
 
   const claudeArgs = ['--dangerously-skip-permissions', `--model ${model}`];
-  // Use --agent-id and --team-name to bootstrap team context at launch.
-  // This activates inbox polling immediately (agent polls its own inbox file).
-  // Trade-off: isTeammate()=true prevents spawning NAMED teammates, but
-  // unnamed subagents (via Agent tool) work fine. This is far more reliable
-  // than depending on TeamCreate running as a tool call.
-  if (teamArgs?.agentId) claudeArgs.push(`--agent-id '${teamArgs.agentId}'`);
-  if (teamArgs?.agentName) claudeArgs.push(`--agent-name '${teamArgs.agentName}'`);
-  if (teamArgs?.teamName) claudeArgs.push(`--team-name '${teamArgs.teamName}'`);
   // Resume previous session if available
   if (resumeSessionId) claudeArgs.push(`--resume '${resumeSessionId}'`);
   // Custom system prompt file replaces the entire default Claude Code system prompt
@@ -38,51 +30,15 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   const browserEnv = getBrowserEnv(opts.browserSession || name, spaceDir);
   const browserExports = Object.entries(browserEnv).map(([k, v]) => `export ${k}="${v}"`).join('\n');
 
-  // No positional prompt — space launches idle, preserving the dashboard empty state.
-  // Messages arrive via inbox (polling is active from --agent-id/--team-name flags).
-
   const script = `#!/bin/bash
 cd "${cwd}"
 export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
-export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-export CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
-export ENABLE_CLAUDEAI_MCP_SERVERS=0
 ${browserExports}
 exec claude ${claudeArgs.join(' ')}
 `;
 
   fs.writeFileSync(scriptPath, script, { mode: 0o755 });
   return scriptPath;
-}
-
-/**
- * Ensure the inbox file exists for an agent in a team.
- */
-function ensureInbox(claudeConfigDir, teamName, agentName) {
-  const inboxDir = path.join(claudeConfigDir, 'teams', teamName, 'inboxes');
-  fs.mkdirSync(inboxDir, { recursive: true });
-  const inboxPath = path.join(inboxDir, `${agentName}.json`);
-  if (!fs.existsSync(inboxPath)) {
-    fs.writeFileSync(inboxPath, '[]', 'utf-8');
-  }
-}
-
-/**
- * Ensure team config.json exists so Claude Code's isTeamLead() returns true.
- */
-function ensureTeamConfig(claudeConfigDir, teamName) {
-  const teamDir = path.join(claudeConfigDir, 'teams', teamName);
-  fs.mkdirSync(teamDir, { recursive: true });
-  const configPath = path.join(teamDir, 'config.json');
-  if (!fs.existsSync(configPath)) {
-    fs.writeFileSync(configPath, JSON.stringify({
-      name: teamName,
-      description: `Space orchestrator team for ${teamName}`,
-      createdAt: Date.now(),
-      leadAgentId: 'team-lead',
-      members: [],
-    }, null, 2), 'utf-8');
-  }
 }
 
 /**
@@ -133,15 +89,8 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
     return false;
   }
 
-  // Pre-create team config and inbox so Claude Code's inbox poller works immediately.
-  // With --agent-id/--team-name flags, the poller reads the agent name from CLI args
-  // and polls the matching inbox file. No TeamCreate tool call needed.
-  ensureTeamConfig(claudeConfigDir, slug);
-  ensureInbox(claudeConfigDir, slug, 'team-lead');
-
-  const teamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: slug };
   const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
-  const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, teamArgs, {
+  const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, {
     systemPromptFile: fs.existsSync(systemPromptFile) ? systemPromptFile : null,
     spaceDir: space.spaceDir,
   });
@@ -154,8 +103,6 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
 
 module.exports = {
   writeLaunchScript,
-  ensureInbox,
-  ensureTeamConfig,
   tmuxSessionExists,
   tmuxWindowExists,
   launchSpace,

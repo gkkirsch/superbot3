@@ -29,16 +29,6 @@ export function useWebSocket() {
         try {
           const data = JSON.parse(event.data)
 
-          if (data.type === 'inbox_update') {
-            if (data.source === 'master') {
-              queryClient.invalidateQueries({ queryKey: ['master-messages'] })
-              notify('superbot3', 'New message from master')
-            } else if (data.source === 'space' && data.space) {
-              queryClient.invalidateQueries({ queryKey: ['space-messages', data.space] })
-              notify(data.space, data.preview || 'New message')
-            }
-          }
-
           if (data.type === 'conversation_update') {
             if (data.source === 'master') {
               queryClient.invalidateQueries({ queryKey: ['master-conversation'] })

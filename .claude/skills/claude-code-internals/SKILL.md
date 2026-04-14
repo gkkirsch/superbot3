@@ -84,30 +84,18 @@ Functions:
 - `getTeamName()` — returns the team name
 - `isTeammate()` — true if running as a teammate (has both agentId AND teamName)
 
-## Inbox / Mailbox Protocol
+## Messaging (tmux send-keys)
 
-**Source**: `teammateMailbox.ts`
+**superbot3 does NOT use Claude Code's inbox/mailbox system.** All messaging uses tmux send-keys for instant delivery.
 
-Inboxes are JSON files at `~/.claude/teams/{team}/inboxes/{agent-name}.json`.
-
-**Write protocol** (must follow exactly):
-1. `mkdirSync` on parent dir
-2. Create file with `wx` flag (fail if exists)
-3. Lock with `proper-lockfile` (10 retries, 5-100ms backoff)
-4. Read current content, parse JSON array, append new message, write back
-5. Release lock in finally block
-
-**Never write inbox files directly** with the Write/Edit tools — use `superbot3 message` CLI or the `writeToMailbox()` function which handles locking.
-
-Message format:
-```json
-{
-  "from": "sender-name",
-  "text": "message content",
-  "timestamp": "2026-04-08T10:00:00.000Z",
-  "summary": "brief preview"
-}
+```javascript
+const { sendToPane, getSpacePaneTarget } = require('../src/tmuxMessage.js');
+sendToPane(getSpacePaneTarget('my-space'), 'your message');
 ```
+
+- Uses `tmux load-buffer` + `paste-buffer` for safe escaping
+- Workers tracked in `spaces/{slug}/workers.json`
+- No inbox files, no lockfiles, no team config needed for messaging
 
 ## Team Config File
 

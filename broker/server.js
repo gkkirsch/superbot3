@@ -52,15 +52,7 @@ function getSpaceConfig(name) {
   return config;
 }
 
-function getInboxMessages(inboxPath) {
-  try {
-    return JSON.parse(fs.readFileSync(inboxPath, 'utf-8'));
-  } catch {
-    return [];
-  }
-}
-
-const { writeToInbox } = require('../src/inbox');
+const { sendToPane, getSpacePaneTarget, getMasterPaneTarget, isSpaceWindowAlive, getWorkerPane, isPaneAlive, readWorkerRegistry, writeWorkerRegistry } = require('../src/tmuxMessage');
 
 // ── Health ───────────────────────────────────────────────────────────────────
 
@@ -186,101 +178,60 @@ app.post('/api/spaces', async (req, res) => {
 
 // ── Messages ─────────────────────────────────────────────────────────────────
 
-app.post('/api/spaces/:name/message', async (req, res) => {
+app.post('/api/spaces/:name/message', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
-  const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
+  if (!isSpaceWindowAlive(req.params.name)) {
+    return res.status(400).json({ error: `Space "${req.params.name}" is not running` });
+  }
+
   try {
-    await writeToInbox(inboxPath, { from: 'user', text, summary: text.slice(0, 80) });
-    console.log(`[inbox] Message written to space "${config.slug}"`);
+    const target = getSpacePaneTarget(req.params.name);
+    sendToPane(target, text);
+    console.log(`[tmux] Message sent to space "${config.slug}"`);
     res.json({ ok: true });
   } catch (err) {
-    console.error(`[inbox] Failed to write to space "${config.slug}": ${err.message}`);
-    res.status(500).json({ error: `Failed to write message: ${err.message}` });
+    console.error(`[tmux] Failed to send to space "${config.slug}": ${err.message}`);
+    res.status(500).json({ error: `Failed to send message: ${err.message}` });
   }
 });
 
 app.get('/api/spaces/:name/messages', (req, res) => {
-  const config = getSpaceConfig(req.params.name);
-  if (!config) return res.status(404).json({ error: 'Space not found' });
-
-  const inboxDir = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes');
-  let messages = [];
-  try {
-    const files = fs.readdirSync(inboxDir).filter(f => f.endsWith('.json'));
-    for (const file of files) {
-      const msgs = getInboxMessages(path.join(inboxDir, file));
-      messages = messages.concat(msgs);
-    }
-  } catch {}
-  messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  res.json(messages);
+  // Inbox messages are no longer used — conversation JSONL is the sole data source.
+  // Return empty array for backwards compatibility with dashboard.
+  res.json([]);
 });
 
-app.post('/api/master/message', async (req, res) => {
+app.post('/api/master/message', (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
-  const inboxPath = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
+  if (!isWindowRunning('master')) {
+    return res.status(400).json({ error: 'Master orchestrator is not running' });
+  }
+
   try {
-    await writeToInbox(inboxPath, { from: 'user', text, summary: text.slice(0, 80) });
-    console.log(`[inbox] Message written to master`);
+    const target = getMasterPaneTarget();
+    sendToPane(target, text);
+    console.log(`[tmux] Message sent to master`);
     res.json({ ok: true });
   } catch (err) {
-    console.error(`[inbox] Failed to write to master: ${err.message}`);
-    res.status(500).json({ error: `Failed to write message: ${err.message}` });
+    console.error(`[tmux] Failed to send to master: ${err.message}`);
+    res.status(500).json({ error: `Failed to send message: ${err.message}` });
   }
 });
 
 app.get('/api/master/messages', (req, res) => {
-  const inboxDir = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes');
-  let messages = [];
-  try {
-    const files = fs.readdirSync(inboxDir).filter(f => f.endsWith('.json'));
-    for (const file of files) {
-      const msgs = getInboxMessages(path.join(inboxDir, file));
-      messages = messages.concat(msgs);
-    }
-  } catch {}
-  messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  res.json(messages);
+  // Inbox messages are no longer used — conversation JSONL is the sole data source.
+  res.json([]);
 });
 
 app.get('/api/master/status', (req, res) => {
   res.json({ running: isWindowRunning('master') });
-});
-
-// Inbox health: check if team config exists (needed for inbox polling to work)
-app.get('/api/spaces/:name/inbox-health', (req, res) => {
-  const config = getSpaceConfig(req.params.name);
-  if (!config) return res.status(404).json({ error: 'Space not found' });
-
-  const teamConfigPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'config.json');
-  const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
-  const hasTeamConfig = fs.existsSync(teamConfigPath);
-  const hasInbox = fs.existsSync(inboxPath);
-  const running = isWindowRunning(config.slug);
-
-  let unreadCount = 0;
-  if (hasInbox) {
-    try {
-      const msgs = JSON.parse(fs.readFileSync(inboxPath, 'utf-8'));
-      unreadCount = Array.isArray(msgs) ? msgs.filter(m => m.read === false).length : 0;
-    } catch {}
-  }
-
-  res.json({
-    running,
-    hasTeamConfig,
-    hasInbox,
-    unreadCount,
-    healthy: running && hasTeamConfig,
-    issue: !hasTeamConfig ? 'TeamCreate has not run — inbox polling inactive. Restart the space.' : null,
-  });
 });
 
 // ── Conversation Logs ────────────────────────────────────────────────────────
@@ -469,13 +420,12 @@ app.get('/api/spaces/:name/workers', (req, res) => {
     output.split('\n').filter(Boolean).forEach(id => livePanes.add(id.trim()));
   } catch {}
 
-  const teamConfigPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'config.json');
-  const teamConfig = readJsonSafe(teamConfigPath);
-  const members = (teamConfig?.members || [])
-    .filter(m => m.name !== 'team-lead')
-    .map(m => ({
-      ...m,
-      alive: m.tmuxPaneId && m.tmuxPaneId !== 'pending' && livePanes.has(m.tmuxPaneId),
+  const registry = readWorkerRegistry(SUPERBOT3_HOME, req.params.name);
+  const members = (registry.workers || [])
+    .map(w => ({
+      ...w,
+      tmuxPaneId: w.paneId,
+      alive: w.paneId && w.paneId !== 'pending' && livePanes.has(w.paneId),
     }));
 
   res.json({ members });
@@ -514,16 +464,22 @@ app.post('/api/spaces/:name/workers', (req, res) => {
 });
 
 // Message a specific worker
-app.post('/api/spaces/:name/workers/:worker/message', async (req, res) => {
+app.post('/api/spaces/:name/workers/:worker/message', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'text is required' });
 
-  const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', `${req.params.worker}.json`);
+  const result = getWorkerPane(SUPERBOT3_HOME, req.params.name, req.params.worker);
+  if (!result) return res.status(404).json({ error: 'Worker not found' });
+
+  if (!isPaneAlive(result.paneId)) {
+    return res.status(400).json({ error: 'Worker pane is not alive' });
+  }
+
   try {
-    await writeToInbox(inboxPath, { from: 'team-lead', text, color: 'blue', summary: text.slice(0, 80) });
+    sendToPane(result.paneId, text);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -531,26 +487,23 @@ app.post('/api/spaces/:name/workers/:worker/message', async (req, res) => {
 });
 
 // Kill a worker
-app.delete('/api/spaces/:name/workers/:worker', async (req, res) => {
+app.delete('/api/spaces/:name/workers/:worker', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const teamConfigPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'config.json');
-  const teamConfig = readJsonSafe(teamConfigPath);
-  if (!teamConfig) return res.status(500).json({ error: 'Team config not found' });
-
-  const member = (teamConfig.members || []).find(m => m.name === req.params.worker);
-  if (!member) return res.status(404).json({ error: 'Worker not found' });
+  const registry = readWorkerRegistry(SUPERBOT3_HOME, req.params.name);
+  const worker = (registry.workers || []).find(w => w.name === req.params.worker);
+  if (!worker) return res.status(404).json({ error: 'Worker not found' });
 
   // Kill tmux pane
-  if (member.tmuxPaneId && member.tmuxPaneId !== 'pending') {
-    try { execSync(`tmux kill-pane -t ${member.tmuxPaneId} 2>/dev/null`); } catch {}
+  if (worker.paneId && worker.paneId !== 'pending') {
+    try { execSync(`tmux kill-pane -t ${worker.paneId} 2>/dev/null`); } catch {}
   }
 
-  // Remove from config
+  // Remove from registry
   try {
-    teamConfig.members = (teamConfig.members || []).filter(m => m.name !== req.params.worker);
-    fs.writeFileSync(teamConfigPath, JSON.stringify(teamConfig, null, 2), 'utf-8');
+    registry.workers = (registry.workers || []).filter(w => w.name !== req.params.worker);
+    writeWorkerRegistry(SUPERBOT3_HOME, req.params.name, registry);
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -559,32 +512,29 @@ app.delete('/api/spaces/:name/workers/:worker', async (req, res) => {
 });
 
 // Interrupt a worker (send Escape to tmux pane)
-app.post('/api/spaces/:name/workers/:worker/interrupt', async (req, res) => {
+app.post('/api/spaces/:name/workers/:worker/interrupt', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const teamConfigPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'config.json');
-  const teamConfig = readJsonSafe(teamConfigPath);
-  const member = (teamConfig?.members || []).find(m => m.name === req.params.worker);
-  if (!member) return res.status(404).json({ error: 'Worker not found' });
+  const result = getWorkerPane(SUPERBOT3_HOME, req.params.name, req.params.worker);
+  if (!result) return res.status(404).json({ error: 'Worker not found' });
 
-  if (!member.tmuxPaneId || member.tmuxPaneId === 'pending') {
+  if (!result.paneId || result.paneId === 'pending') {
     return res.status(400).json({ error: 'Worker has no active tmux pane' });
   }
 
   try {
-    execSync(`tmux send-keys -t ${member.tmuxPaneId} Escape`);
+    execSync(`tmux send-keys -t ${result.paneId} Escape`);
   } catch {
     return res.status(500).json({ error: 'Failed to send Escape to pane' });
   }
 
-  // Optional follow-up message
+  // Optional follow-up message via send-keys
   const { message } = req.body || {};
   if (message) {
-    const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', `${req.params.worker}.json`);
-    try {
-      await writeToInbox(inboxPath, { from: 'team-lead', text: message, color: 'blue', summary: message.slice(0, 80) });
-    } catch {}
+    setTimeout(() => {
+      try { sendToPane(result.paneId, message); } catch {}
+    }, 1000);
   }
 
   res.json({ ok: true });
@@ -1889,13 +1839,10 @@ try {
 
   wss = new WebSocketServer({ server, path: '/ws' });
 
-  // Watch inbox directories for changes and broadcast
+  // Watch conversation JSONL files for real-time Claude responses
   const chokidar = require('chokidar');
 
   const watchPaths = [
-    path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', '**', 'inboxes', '*.json'),
-    path.join(SUPERBOT3_HOME, 'spaces', '*', '.claude', 'teams', '**', 'inboxes', '*.json'),
-    // Watch conversation JSONL files for real-time Claude responses
     path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'projects', '**', '*.jsonl'),
     path.join(SUPERBOT3_HOME, 'spaces', '*', '.claude', 'projects', '**', '*.jsonl'),
   ];
@@ -1908,11 +1855,6 @@ try {
   watcher.on('change', (filePath) => {
     let type = 'unknown';
     let space = null;
-    let eventType = 'inbox_update';
-
-    if (filePath.endsWith('.jsonl')) {
-      eventType = 'conversation_update';
-    }
 
     if (filePath.includes('/orchestrator/')) {
       type = 'master';
@@ -1924,7 +1866,7 @@ try {
       }
     }
 
-    const payload = JSON.stringify({ type: eventType, source: type, space });
+    const payload = JSON.stringify({ type: 'conversation_update', source: type, space });
     wss.clients.forEach(client => {
       if (client.readyState === 1) client.send(payload);
     });
@@ -1945,12 +1887,7 @@ try {
 
 // ── Broker-Side Cron Scheduler ───────────────────────────────────────────────
 // Claude Code's built-in scheduler is feature-gated (AGENT_TRIGGERS) and may not fire.
-// This scheduler reads scheduled_tasks.json for each space and sends prompts via inbox.
-
-// writeToInbox and getSpaceInboxPath already imported at top of file
-const inboxModule = require(path.join(__dirname, '..', 'src', 'inbox'));
-const schedWriteToInbox = inboxModule.writeToInbox;
-const schedGetSpaceInboxPath = inboxModule.getSpaceInboxPath;
+// This scheduler reads scheduled_tasks.json for each space and sends prompts via tmux send-keys.
 
 function parseCronFields(expr) {
   const parts = expr.trim().split(/\s+/);
@@ -2035,17 +1972,17 @@ function runSchedulerTick() {
           lastFiredMap.set(taskKey, true);
           console.log(`[scheduler] Firing task ${task.id} for space ${slug}: ${task.prompt.slice(0, 60)}`);
 
-          // Send the prompt to the space's inbox
-          const configDir = path.join(spacesDir, slug, '.claude');
-          const inboxPath = schedGetSpaceInboxPath(configDir, slug);
-
-          schedWriteToInbox(inboxPath, {
-            from: 'scheduler',
-            text: task.prompt,
-            summary: `Scheduled: ${task.prompt.slice(0, 50)}`,
-          }).catch(err => {
+          // Send the prompt to the space via tmux send-keys
+          try {
+            if (isSpaceWindowAlive(slug)) {
+              const target = getSpacePaneTarget(slug);
+              sendToPane(target, task.prompt);
+            } else {
+              console.error(`[scheduler] Space "${slug}" is not running — skipping`);
+            }
+          } catch (err) {
             console.error(`[scheduler] Failed to send to ${slug}: ${err.message}`);
-          });
+          }
 
           // Update lastFiredAt in the file
           task.lastFiredAt = Date.now();

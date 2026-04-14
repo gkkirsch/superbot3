@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { writeToInbox, getSpaceInboxPath, getMasterInboxPath } = require('../inbox');
+const { sendToPane, getSpacePaneTarget, getMasterPaneTarget, isSpaceWindowAlive } = require('../tmuxMessage');
 
 module.exports = async function message(home, spaceName, text) {
   if (!text) {
@@ -28,29 +28,30 @@ module.exports = async function message(home, spaceName, text) {
       process.exit(1);
     }
 
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    const inboxPath = getSpaceInboxPath(config.claudeConfigDir, config.slug);
+    if (!isSpaceWindowAlive(spaceName)) {
+      console.error(`Error: Space "${spaceName}" is not running (no tmux window found)`);
+      process.exit(1);
+    }
+
     try {
-      await writeToInbox(inboxPath, {
-        from: 'user',
-        text: text,
-        summary: text.slice(0, 80),
-      });
-      console.log(`Message sent to space "${spaceName}" (via inbox)`);
+      const target = getSpacePaneTarget(spaceName);
+      sendToPane(target, text);
+      console.log(`Message sent to space "${spaceName}" (via tmux send-keys)`);
     } catch (err) {
       console.error(`Error sending message: ${err.message}`);
       process.exit(1);
     }
   } else {
     // Message to master orchestrator
-    const inboxPath = getMasterInboxPath(home);
+    if (!isSpaceWindowAlive('master')) {
+      console.error('Error: Master orchestrator is not running (no tmux window found)');
+      process.exit(1);
+    }
+
     try {
-      await writeToInbox(inboxPath, {
-        from: 'user',
-        text: text,
-        summary: text.slice(0, 80),
-      });
-      console.log('Message sent to master orchestrator (via inbox)');
+      const target = getMasterPaneTarget();
+      sendToPane(target, text);
+      console.log('Message sent to master orchestrator (via tmux send-keys)');
     } catch (err) {
       console.error(`Error sending message: ${err.message}`);
       process.exit(1);

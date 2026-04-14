@@ -1,7 +1,6 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { writeToInbox, getSpaceInboxPath } = require('../inbox');
 
 module.exports = async function stop(home, name, opts = {}) {
   const spaceDir = path.join(home, 'spaces', name);
@@ -24,26 +23,12 @@ module.exports = async function stop(home, name, opts = {}) {
       console.log(`  No tmux window found for "${name}"`);
     }
   } else {
-    // Graceful stop — send shutdown request to inbox
-    const inboxPath = getSpaceInboxPath(config.claudeConfigDir, config.slug);
-
+    // Graceful stop — send /exit via tmux send-keys
     try {
-      const shutdownMsg = JSON.stringify({
-        type: 'shutdown_request',
-        requestId: `shutdown-${name}-${Date.now()}`,
-        from: 'superbot3-cli',
-        reason: 'Space stopping',
-        timestamp: new Date().toISOString(),
-      });
-
-      await writeToInbox(inboxPath, {
-        from: 'superbot3-cli',
-        text: shutdownMsg,
-        summary: 'Shutdown request',
-      });
-      console.log('  Sent shutdown request to inbox');
+      execSync(`tmux send-keys -t superbot3:${name} '/exit' Enter 2>/dev/null`);
+      console.log('  Sent /exit to space');
     } catch (err) {
-      console.log(`  Could not send shutdown request: ${err.message}`);
+      console.log(`  Could not send /exit: ${err.message}`);
     }
 
     // Wait up to 10 seconds for graceful shutdown

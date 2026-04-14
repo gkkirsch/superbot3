@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { readWorkerRegistry } = require('../tmuxMessage');
 
 /**
  * List workers for a space (or all spaces).
- * Cross-references team config members with tmux pane liveness.
+ * Cross-references worker registry with tmux pane liveness.
  */
 module.exports = function workers(home, spaceName) {
   const spacesDir = path.join(home, 'spaces');
@@ -36,37 +37,21 @@ module.exports = function workers(home, spaceName) {
   let totalWorkers = 0;
 
   for (const name of spaceNames) {
-    const configPath = path.join(spacesDir, name, 'space.json');
-    let spaceConfig;
-    try {
-      spaceConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    } catch {
-      continue;
-    }
-
-    const teamConfigPath = path.join(spaceConfig.claudeConfigDir, 'teams', name, 'config.json');
-    let teamConfig;
-    try {
-      teamConfig = JSON.parse(fs.readFileSync(teamConfigPath, 'utf-8'));
-    } catch {
-      continue;
-    }
-
-    // Filter to non-lead members (workers)
-    const members = (teamConfig.members || []).filter(m => m.name !== 'team-lead');
-    if (members.length === 0) continue;
+    const registry = readWorkerRegistry(home, name);
+    const workers = registry.workers || [];
+    if (workers.length === 0) continue;
 
     console.log(`\n  ${name}`);
     console.log('  ' + '─'.repeat(60));
 
-    for (const m of members) {
-      const alive = m.tmuxPaneId && m.tmuxPaneId !== 'pending' && livePanes.has(m.tmuxPaneId);
+    for (const w of workers) {
+      const alive = w.paneId && w.paneId !== 'pending' && livePanes.has(w.paneId);
       const status = alive ? '● alive' : '○ dead';
-      const uptime = m.joinedAt ? timeSince(m.joinedAt) : '?';
-      const model = m.model || '?';
-      const pane = m.tmuxPaneId || 'none';
+      const uptime = w.spawnedAt ? timeSince(w.spawnedAt) : '?';
+      const model = w.model || '?';
+      const pane = w.paneId || 'none';
 
-      console.log(`  ${status}  ${m.name}  pane=${pane}  model=${model}  up=${uptime}`);
+      console.log(`  ${status}  ${w.name}  pane=${pane}  model=${model}  up=${uptime}`);
       totalWorkers++;
     }
   }

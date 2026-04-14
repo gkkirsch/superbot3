@@ -1,9 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const { writeToInbox } = require('../inbox');
+const { sendToPane, getWorkerPane, isPaneAlive, readWorkerRegistry } = require('../tmuxMessage');
 
 /**
- * Send a message to a specific worker's inbox.
+ * Send a message to a specific worker via tmux send-keys.
  */
 module.exports = async function messageWorker(home, spaceName, workerName, text) {
   if (!text) {
@@ -12,39 +12,28 @@ module.exports = async function messageWorker(home, spaceName, workerName, text)
   }
 
   const configPath = path.join(home, 'spaces', spaceName, 'space.json');
-  let spaceConfig;
-  try {
-    spaceConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  } catch {
+  if (!fs.existsSync(configPath)) {
     console.error(`Error: Space "${spaceName}" not found.`);
     process.exit(1);
   }
 
-  // Verify worker exists in team config
-  const teamConfigPath = path.join(spaceConfig.claudeConfigDir, 'teams', spaceName, 'config.json');
-  try {
-    const teamConfig = JSON.parse(fs.readFileSync(teamConfigPath, 'utf-8'));
-    const member = (teamConfig.members || []).find(m => m.name === workerName);
-    if (!member) {
-      console.error(`Error: Worker "${workerName}" not found in space "${spaceName}"`);
-      const names = (teamConfig.members || []).filter(m => m.name !== 'team-lead').map(m => m.name);
-      if (names.length) console.error(`Available workers: ${names.join(', ')}`);
-      process.exit(1);
-    }
-  } catch {
-    console.error(`Error: Team config not found for space "${spaceName}"`);
+  const result = getWorkerPane(home, spaceName, workerName);
+  if (!result) {
+    console.error(`Error: Worker "${workerName}" not found in space "${spaceName}"`);
+    const registry = readWorkerRegistry(home, spaceName);
+    const names = (registry.workers || []).map(w => w.name);
+    if (names.length) console.error(`Available workers: ${names.join(', ')}`);
     process.exit(1);
   }
 
-  const inboxPath = path.join(spaceConfig.claudeConfigDir, 'teams', spaceName, 'inboxes', `${workerName}.json`);
+  if (!isPaneAlive(result.paneId)) {
+    console.error(`Error: Worker "${workerName}" pane ${result.paneId} is not alive`);
+    process.exit(1);
+  }
+
   try {
-    await writeToInbox(inboxPath, {
-      from: 'team-lead',
-      text,
-      color: 'blue',
-      summary: text.slice(0, 80),
-    });
-    console.log(`Message sent to worker "${workerName}" in space "${spaceName}"`);
+    sendToPane(result.paneId, text);
+    console.log(`Message sent to worker "${workerName}" in space "${spaceName}" (via tmux send-keys)`);
   } catch (err) {
     console.error(`Error sending message: ${err.message}`);
     process.exit(1);

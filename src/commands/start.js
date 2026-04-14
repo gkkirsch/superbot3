@@ -2,12 +2,10 @@ const { execSync, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { getSpaces } = require('./space-list');
-const { writeToInbox } = require('../inbox');
 const { refreshAllSpaceCredentials } = require('../auth');
+const { sendToPane, getMasterPaneTarget } = require('../tmuxMessage');
 const {
   writeLaunchScript,
-  ensureInbox,
-  ensureTeamConfig,
   tmuxSessionExists,
   tmuxWindowExists,
   launchSpace,
@@ -71,7 +69,6 @@ module.exports = async function start(home) {
 
   // Step 1: Start broker
   console.log('Starting broker...');
-  // Broker lives in the code directory (relative to this file), not the data directory
   const brokerScript = path.resolve(__dirname, '..', '..', 'broker', 'server.js');
   if (!fs.existsSync(brokerScript)) {
     console.error('Error: Broker server.js not found.');
@@ -123,9 +120,6 @@ module.exports = async function start(home) {
   console.log('Setting up tmux session + master orchestrator...');
 
   const masterConfigDir = path.join(home, 'orchestrator', '.claude');
-  const masterTeamName = 'superbot3';
-  const masterTeamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: masterTeamName };
-  ensureInbox(masterConfigDir, masterTeamName, 'team-lead');
 
   // Master system prompt file (replaces default Claude Code prompt)
   const masterSystemPromptFile = path.join(home, 'orchestrator', 'system-prompt.md');
@@ -136,14 +130,14 @@ module.exports = async function start(home) {
   if (tmuxSessionExists('superbot3')) {
     console.log('  tmux session "superbot3" already exists');
     if (!tmuxWindowExists('superbot3', 'master')) {
-      const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir, masterTeamArgs, masterLaunchOpts);
+      const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir, masterLaunchOpts);
       execSync(`tmux new-window -t superbot3 -n master "bash ${masterScript}"`);
       console.log('  Master orchestrator launched in new window');
     } else {
       console.log('  Master window already exists');
     }
   } else {
-    const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir, masterTeamArgs, masterLaunchOpts);
+    const masterScript = writeLaunchScript('master', path.join(home, 'orchestrator'), model, null, masterConfigDir, masterLaunchOpts);
     execSync(`tmux new-session -d -s superbot3 -n master "bash ${masterScript}"`);
     console.log('  Created tmux session with master orchestrator');
   }
@@ -168,10 +162,8 @@ module.exports = async function start(home) {
   }
 
   // Step 4: Capture session IDs for --resume on next restart
-  // Wait briefly for Claude to create session JSONL files, then capture the session ID
   if (activeSpaces.length > 0) {
     console.log('\nCapturing session IDs...');
-    // Give Claude a moment to create the session file
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     for (const space of activeSpaces) {
@@ -186,16 +178,15 @@ module.exports = async function start(home) {
     }
   }
 
-  // Step 5: Send startup prompts via inbox
-  // The inbox poller activates once Claude starts (team args enable it from boot).
-  // We write to the inbox immediately — the poller picks them up once ready.
-  // Send startup prompt to master only — spaces wait for the user
+  // Step 5: Send startup prompt to master via tmux send-keys
   console.log('\nSending startup prompt to master...');
 
   const masterStartup = 'Scan ~/.superbot3/spaces/*/space.json to discover all spaces. Note what spaces exist but do NOT message them — spaces wait for the user to talk first.';
-  const masterInboxPath = path.join(home, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
+  // Wait a moment for Claude to start up before sending
+  await new Promise(resolve => setTimeout(resolve, 3000));
   try {
-    await writeToInbox(masterInboxPath, { from: 'superbot3', text: masterStartup });
+    const target = getMasterPaneTarget();
+    sendToPane(target, masterStartup);
     console.log('  Sent startup prompt to master');
   } catch (e) {
     console.log('  Could not send startup prompt to master');

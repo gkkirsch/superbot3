@@ -128,22 +128,22 @@ Workers get BOTH:
 
 ## Messaging Protocol
 
-All messaging uses Claude Code's inbox system with `proper-lockfile`:
+All messaging uses tmux send-keys — instant delivery, no files or polling:
 
 ```javascript
-// Use the shared inbox module — NEVER write inbox files directly
-const { writeToInbox } = require('../src/inbox.js');
+const { sendToPane, getSpacePaneTarget } = require('../src/tmuxMessage.js');
 
-await writeToInbox(configDir, teamName, agentName, {
-  from: 'user',
-  text: 'your message',
-  timestamp: new Date().toISOString()
-});
+// Send to a space
+const target = getSpacePaneTarget('my-space');
+sendToPane(target, 'your message');
+
+// Send to a worker by pane ID
+sendToPane('%5', 'your message');
 ```
 
-- Lockfile: `{inbox}.lock`, 10 retries, 5-100ms backoff
-- Polling: Claude's inbox poller checks every 1000ms
-- Requires team args on launch: `--agent-id team-lead@{space} --agent-name team-lead --team-name {space}`
+- Uses `tmux load-buffer` + `paste-buffer` for safe escaping of special chars
+- Workers tracked in `spaces/{slug}/workers.json` (pane IDs, names, config)
+- No inbox files, no lockfiles, no team config needed
 
 ## Authentication Setup
 
