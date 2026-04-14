@@ -309,12 +309,11 @@ Plugin skills are loaded through a completely separate path from `.claude/skills
 
 If a session has `--agent-id` AND `--team-name`, `isTeammate()` returns true. Teammates CANNOT spawn named teammates — "the team roster is flat."
 
-The fix: don't pass `--agent-id` or `--team-name` on launch. Instead, call `TeamCreate` at runtime which:
-1. Creates/reads the team config file
-2. Sets `appState.teamContext` with `leadAgentId`
-3. Makes `isTeamLead()` return true
-4. Enables inbox polling via `getAgentNameToPoll()`
-5. Enables teammate spawning (named agents via the Agent tool)
+**superbot3 decision (2026-04-13)**: Use `--agent-id team-lead --team-name <slug>` at launch WITH pre-created team config. This activates inbox polling immediately (agent polls by its own name). Workers are unnamed subagents. The TeamCreate-as-positional-prompt approach was abandoned because Claude frequently interpreted the prompt as informational text and never called the tool — breaking all messaging.
+
+Trade-off accepted: no named teammates, but reliable inbox from first boot.
+
+**Why TeamCreate doesn't work as a boot prompt**: Claude interprets `TeamCreate({ team_name: "..." })` or even `MANDATORY FIRST STEP: Call TeamCreate...` as informational text, not as a tool call instruction. Verified in session JSONL — Claude responds with "space is online" without ever calling the tool.
 
 **Key functions**:
 - `isTeammate()` in `teammate.ts` — true if `dynamicTeamContext.agentId && dynamicTeamContext.teamName`
