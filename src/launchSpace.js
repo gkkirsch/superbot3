@@ -70,7 +70,7 @@ function launchSpace(home, slug, tmuxSession = 'superbot3') {
 
   execSync(`tmux new-window -t ${tmuxSession} -n ${slug} "bash ${scriptPath}"`);
 
-  // Capture the pane ID of the new window
+  // Capture the pane ID and set the title
   try {
     const paneId = execSync(
       `tmux list-panes -t ${tmuxSession}:${slug} -F "#{pane_id}" 2>/dev/null`,
@@ -78,6 +78,10 @@ function launchSpace(home, slug, tmuxSession = 'superbot3') {
     ).trim().split('\n')[0];
     if (paneId) {
       state.updateSpace(home, slug, { paneId });
+      execSync(`tmux select-pane -t ${paneId} -T "${space.name || slug}" 2>/dev/null`);
+      if (space.color) {
+        execSync(`tmux set-option -p -t ${paneId} pane-border-style "fg=${space.color}" 2>/dev/null`);
+      }
     }
   } catch {}
 
