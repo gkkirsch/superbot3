@@ -75,6 +75,14 @@ program
     require('../src/commands/stop-all')(SUPERBOT3_HOME);
   });
 
+// restart
+program
+  .command('restart <space>')
+  .description('Restart a space (stop + relaunch)')
+  .action((space) => {
+    require('../src/commands/restart')(SUPERBOT3_HOME, space);
+  });
+
 // update
 program
   .command('update')
@@ -117,6 +125,146 @@ program
   .option('--color <color>', 'Pane border color')
   .action((space, name, prompt, opts) => {
     require('../src/commands/spawn-worker')(SUPERBOT3_HOME, space, name, prompt, opts);
+  });
+
+// skill commands
+const skill = program.command('skill').description('Manage space skills');
+
+skill
+  .command('create <space> <name>')
+  .description('Create a new skill in a space')
+  .option('--description <desc>', 'Skill description')
+  .option('--body <body>', 'Skill body content')
+  .action((space, name, opts) => {
+    require('../src/commands/skill').create(SUPERBOT3_HOME, space, name, opts);
+  });
+
+skill
+  .command('list <space>')
+  .description('List skills in a space')
+  .action((space) => {
+    require('../src/commands/skill').list(SUPERBOT3_HOME, space);
+  });
+
+skill
+  .command('remove <space> <name>')
+  .description('Remove a skill from a space')
+  .action((space, name) => {
+    require('../src/commands/skill').remove(SUPERBOT3_HOME, space, name);
+  });
+
+// agent commands
+const agent = program.command('agent').description('Manage space agent definitions');
+
+agent
+  .command('create <space> <name>')
+  .description('Create a new agent definition')
+  .option('--description <desc>', 'Agent description')
+  .option('--model <model>', 'Model override')
+  .option('--body <body>', 'Agent prompt body')
+  .action((space, name, opts) => {
+    require('../src/commands/agent').create(SUPERBOT3_HOME, space, name, opts);
+  });
+
+agent
+  .command('list <space>')
+  .description('List agent definitions in a space')
+  .action((space) => {
+    require('../src/commands/agent').list(SUPERBOT3_HOME, space);
+  });
+
+agent
+  .command('show <space> <name>')
+  .description('Show an agent definition')
+  .action((space, name) => {
+    require('../src/commands/agent').show(SUPERBOT3_HOME, space, name);
+  });
+
+agent
+  .command('remove <space> <name>')
+  .description('Remove an agent definition')
+  .action((space, name) => {
+    require('../src/commands/agent').remove(SUPERBOT3_HOME, space, name);
+  });
+
+// settings commands
+const settings = program.command('settings').description('Manage space settings');
+
+settings
+  .command('get <space> [key]')
+  .description('Get settings (all or by dot-path key)')
+  .action((space, key) => {
+    require('../src/commands/settings').get(SUPERBOT3_HOME, space, key);
+  });
+
+settings
+  .command('set <space> <key> <value>')
+  .description('Set a settings value (dot-path key, JSON or string value)')
+  .action((space, key, value) => {
+    require('../src/commands/settings').set(SUPERBOT3_HOME, space, key, value);
+  });
+
+settings
+  .command('unset <space> <key>')
+  .description('Remove a settings key')
+  .action((space, key) => {
+    require('../src/commands/settings').unset(SUPERBOT3_HOME, space, key);
+  });
+
+// hook commands
+const hook = program.command('hook').description('Manage space hooks');
+
+hook
+  .command('add <space> <event> <command>')
+  .description('Add a hook (events: PreToolUse, PostToolUse, Notification, Stop)')
+  .action((space, event, command) => {
+    require('../src/commands/settings').hookAdd(SUPERBOT3_HOME, space, event, command);
+  });
+
+hook
+  .command('list <space>')
+  .description('List all hooks')
+  .action((space) => {
+    require('../src/commands/settings').hookList(SUPERBOT3_HOME, space);
+  });
+
+hook
+  .command('remove <space> <event> <index>')
+  .description('Remove a hook by event and index')
+  .action((space, event, index) => {
+    require('../src/commands/settings').hookRemove(SUPERBOT3_HOME, space, event, index);
+  });
+
+// mcp commands
+const mcp = program.command('mcp').description('Manage MCP servers');
+
+mcp
+  .command('add <space> <name> <command> [args...]')
+  .description('Add an MCP server')
+  .action((space, name, command, args) => {
+    require('../src/commands/settings').mcpAdd(SUPERBOT3_HOME, space, name, command, args);
+  });
+
+mcp
+  .command('list <space>')
+  .description('List MCP servers')
+  .action((space) => {
+    require('../src/commands/settings').mcpList(SUPERBOT3_HOME, space);
+  });
+
+mcp
+  .command('remove <space> <name>')
+  .description('Remove an MCP server')
+  .action((space, name) => {
+    require('../src/commands/settings').mcpRemove(SUPERBOT3_HOME, space, name);
+  });
+
+// permission shortcut
+program
+  .command('permit <space> <rule>')
+  .description('Add a permission rule (e.g. "Bash(npm *)")')
+  .action((space, rule) => {
+    require('../src/commands/settings').permitAdd(SUPERBOT3_HOME, space, rule);
   });
 
 // logs
