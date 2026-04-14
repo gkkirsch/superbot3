@@ -1,36 +1,12 @@
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const { isSpaceWindowAlive } = require('../tmuxMessage');
+const state = require('../state');
 
 function getSpaces(home) {
-  const spacesDir = path.join(home, 'spaces');
-  if (!fs.existsSync(spacesDir)) return [];
-
-  const entries = fs.readdirSync(spacesDir, { withFileTypes: true });
-  const spaces = [];
-  for (const entry of entries) {
-    if (entry.isDirectory()) {
-      const configPath = path.join(spacesDir, entry.name, 'space.json');
-      if (fs.existsSync(configPath)) {
-        try {
-          const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-          spaces.push(config);
-        } catch (e) {
-          // skip invalid
-        }
-      }
-    }
-  }
-  return spaces;
+  return state.getAllSpaces(home);
 }
 
 function isSpaceRunning(slug) {
-  try {
-    const output = execSync(`tmux list-windows -t superbot3 -F "#{window_name}" 2>/dev/null`, { encoding: 'utf-8' });
-    return output.split('\n').map(s => s.trim()).includes(slug);
-  } catch {
-    return false;
-  }
+  return isSpaceWindowAlive(slug);
 }
 
 module.exports = function spaceList(home) {
@@ -42,21 +18,20 @@ module.exports = function spaceList(home) {
   }
 
   console.log('');
-  console.log('Spaces:');
-  console.log('');
-  console.log('  Name              Status    Active    Code Dir');
-  console.log('  ────              ──────    ──────    ────────');
+  console.log('  Name              Status      Model              Code Dir');
+  console.log('  ────              ──────      ─────              ────────');
 
   for (const space of spaces) {
+    if (space.archived) continue;
     const running = isSpaceRunning(space.slug);
     const status = running ? '● running' : '○ stopped';
-    const active = space.active ? 'yes' : 'no';
+    const model = space.model || '(default)';
     const codeDir = space.codeDir || '(none)';
-    console.log(`  ${space.name.padEnd(18)}${status.padEnd(12)}${active.padEnd(10)}${codeDir}`);
+    console.log(`  ${(space.name || space.slug).padEnd(18)}${status.padEnd(12)}${model.padEnd(19)}${codeDir}`);
   }
 
   console.log('');
-  console.log(`Total: ${spaces.length} space(s)`);
+  console.log(`Total: ${spaces.filter(s => !s.archived).length} space(s)`);
 };
 
 module.exports.getSpaces = getSpaces;

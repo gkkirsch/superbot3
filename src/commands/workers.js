@@ -1,70 +1,43 @@
-const fs = require('fs');
-const path = require('path');
 const { execSync } = require('child_process');
-const { readWorkerRegistry } = require('../tmuxMessage');
+const { isPaneAlive, getPaneInfo } = require('../tmuxMessage');
+const state = require('../state');
 
-/**
- * List workers for a space (or all spaces).
- * Cross-references worker registry with tmux pane liveness.
- */
 module.exports = function workers(home, spaceName) {
-  const spacesDir = path.join(home, 'spaces');
+  const spaces = spaceName
+    ? [state.getSpace(home, spaceName)].filter(Boolean)
+    : state.getAllSpaces(home).filter(s => !s.archived);
 
-  // Collect spaces to check
-  let spaceNames;
-  if (spaceName) {
-    spaceNames = [spaceName];
-  } else {
-    try {
-      spaceNames = fs.readdirSync(spacesDir, { withFileTypes: true })
-        .filter(d => d.isDirectory() && fs.existsSync(path.join(spacesDir, d.name, 'space.json')))
-        .map(d => d.name);
-    } catch {
-      console.log('No spaces found.');
-      return;
-    }
+  if (!spaces.length) {
+    console.log(spaceName ? `Space "${spaceName}" not found.` : 'No spaces found.');
+    return;
   }
 
-  // Get all live tmux pane IDs in one call
-  const livePanes = new Set();
-  try {
-    const output = execSync('tmux list-panes -a -F "#{pane_id}" 2>/dev/null', { encoding: 'utf-8' });
-    output.split('\n').filter(Boolean).forEach(id => livePanes.add(id.trim()));
-  } catch {
-    // tmux not running — all panes are dead
-  }
+  let total = 0;
+  for (const space of spaces) {
+    const ws = space.workers || [];
+    if (!ws.length) continue;
 
-  let totalWorkers = 0;
-
-  for (const name of spaceNames) {
-    const registry = readWorkerRegistry(home, name);
-    const workers = registry.workers || [];
-    if (workers.length === 0) continue;
-
-    console.log(`\n  ${name}`);
+    console.log(`\n  ${space.slug}`);
     console.log('  ' + '─'.repeat(60));
 
-    for (const w of workers) {
-      const alive = w.paneId && w.paneId !== 'pending' && livePanes.has(w.paneId);
+    for (const w of ws) {
+      const alive = w.paneId && isPaneAlive(w.paneId);
       const status = alive ? '● alive' : '○ dead';
+      const info = w.paneId ? getPaneInfo(w.paneId) : null;
       const uptime = w.spawnedAt ? timeSince(w.spawnedAt) : '?';
-      const model = w.model || '?';
-      const pane = w.paneId || 'none';
-
-      console.log(`  ${status}  ${w.name}  pane=${pane}  model=${model}  up=${uptime}`);
-      totalWorkers++;
+      const pid = info ? `  pid=${info.pid}` : '';
+      console.log(`  ${status}  ${w.name}  pane=${w.paneId || 'none'}  model=${w.model || '?'}  up=${uptime}${pid}`);
+      total++;
     }
   }
 
-  if (totalWorkers === 0) {
-    console.log('No workers found.');
-  }
+  if (total === 0) console.log('No workers found.');
 };
 
 function timeSince(epochMs) {
-  const seconds = Math.floor((Date.now() - epochMs) / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  return `${Math.floor(seconds / 86400)}d`;
+  const s = Math.floor((Date.now() - epochMs) / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
 }

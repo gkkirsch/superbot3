@@ -1,12 +1,10 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
-const path = require('path');
+const state = require('../state');
 
-module.exports = async function spaceRemove(home, name, opts = {}) {
-  const spaceDir = path.join(home, 'spaces', name);
-  const configPath = path.join(spaceDir, 'space.json');
-
-  if (!fs.existsSync(configPath)) {
+module.exports = async function spaceRemove(home, name) {
+  const space = state.getSpace(home, name);
+  if (!space) {
     console.error(`Error: Space "${name}" not found.`);
     process.exit(1);
   }
@@ -16,14 +14,21 @@ module.exports = async function spaceRemove(home, name, opts = {}) {
   // Stop the space first (kill tmux window)
   try {
     execSync(`tmux kill-window -t superbot3:${name} 2>/dev/null`);
-    console.log(`  Stopped tmux window for "${name}"`);
+    console.log(`  Stopped tmux window`);
   } catch {
-    console.log(`  No tmux window running for "${name}"`);
+    console.log(`  No tmux window running`);
   }
 
-  // Remove the space directory
-  fs.rmSync(spaceDir, { recursive: true, force: true });
-  console.log(`  Removed directory: ${spaceDir}`);
+  // Remove from state
+  state.removeSpace(home, name);
+  console.log(`  Removed from state`);
 
-  console.log(`\nSpace "${name}" has been removed.`);
+  // Remove the space directory
+  const spaceDir = state.spaceDir(home, name);
+  if (fs.existsSync(spaceDir)) {
+    fs.rmSync(spaceDir, { recursive: true, force: true });
+    console.log(`  Removed directory: ${spaceDir}`);
+  }
+
+  console.log(`\nSpace "${name}" removed.`);
 };

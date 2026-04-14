@@ -45,14 +45,17 @@ function readJsonSafe(filePath) {
 }
 
 function getSpaceConfig(name) {
-  const configPath = path.join(SUPERBOT3_HOME, 'spaces', name, 'space.json');
-  const config = readJsonSafe(configPath);
-  if (!config) return null;
-  config.running = isWindowRunning(name);
-  return config;
+  const space = state.getSpace(SUPERBOT3_HOME, name);
+  if (!space) return null;
+  space.running = isWindowRunning(name);
+  // Compute paths for backward compat
+  space.spaceDir = state.spaceDir(SUPERBOT3_HOME, name);
+  space.claudeConfigDir = state.claudeConfigDir(SUPERBOT3_HOME, name);
+  return space;
 }
 
-const { sendToPane, getSpacePaneTarget, getMasterPaneTarget, isSpaceWindowAlive, getWorkerPane, isPaneAlive, readWorkerRegistry, writeWorkerRegistry } = require('../src/tmuxMessage');
+const { sendToPane, getSpacePaneTarget, getMasterPaneTarget, isSpaceWindowAlive, isPaneAlive, capturePaneOutput, getPaneInfo } = require('../src/tmuxMessage');
+const state = require('../src/state');
 
 // ── Health ───────────────────────────────────────────────────────────────────
 
@@ -69,20 +72,15 @@ app.get('/health', (req, res) => {
 // ── Spaces ───────────────────────────────────────────────────────────────────
 
 app.get('/api/spaces', (req, res) => {
-  const spacesDir = path.join(SUPERBOT3_HOME, 'spaces');
-  try {
-    const entries = fs.readdirSync(spacesDir, { withFileTypes: true });
-    const spaces = [];
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        const config = getSpaceConfig(entry.name);
-        if (config) spaces.push(config);
-      }
-    }
-    res.json(spaces);
-  } catch {
-    res.json([]);
-  }
+  const spaces = state.getAllSpaces(SUPERBOT3_HOME)
+    .filter(s => !s.archived)
+    .map(s => {
+      s.running = isWindowRunning(s.slug);
+      s.spaceDir = state.spaceDir(SUPERBOT3_HOME, s.slug);
+      s.claudeConfigDir = state.claudeConfigDir(SUPERBOT3_HOME, s.slug);
+      return s;
+    });
+  res.json(spaces);
 });
 
 app.get('/api/spaces/:name', (req, res) => {
@@ -420,13 +418,12 @@ app.get('/api/spaces/:name/workers', (req, res) => {
     output.split('\n').filter(Boolean).forEach(id => livePanes.add(id.trim()));
   } catch {}
 
-  const registry = readWorkerRegistry(SUPERBOT3_HOME, req.params.name);
-  const members = (registry.workers || [])
-    .map(w => ({
-      ...w,
-      tmuxPaneId: w.paneId,
-      alive: w.paneId && w.paneId !== 'pending' && livePanes.has(w.paneId),
-    }));
+  const workers = state.getWorkers(SUPERBOT3_HOME, req.params.name);
+  const members = workers.map(w => ({
+    ...w,
+    tmuxPaneId: w.paneId,
+    alive: w.paneId && w.paneId !== 'pending' && livePanes.has(w.paneId),
+  }));
 
   res.json({ members });
 });
@@ -440,26 +437,11 @@ app.post('/api/spaces/:name/workers', (req, res) => {
   if (!workerName || !prompt) return res.status(400).json({ error: 'workerName and prompt are required' });
 
   try {
-    const scriptPath = path.join(__dirname, '..', 'scripts', 'spawn-worker.sh');
-    const args = ['--space', config.slug, '--name', workerName, '--prompt', prompt];
-    if (model) args.push('--model', model);
-    if (cwd) args.push('--cwd', cwd);
-
-    const result = execSync(
-      `bash ${scriptPath} ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`,
-      { encoding: 'utf-8', env: { ...process.env, SUPERBOT3_HOME: SUPERBOT3_HOME } }
-    );
-
-    // Parse key=value output
-    const output = {};
-    result.trim().split('\n').forEach(line => {
-      const [k, ...v] = line.split('=');
-      if (k) output[k] = v.join('=');
-    });
-
-    res.json({ ok: true, ...output });
+    const spawnWorker = require('../src/commands/spawn-worker');
+    spawnWorker(SUPERBOT3_HOME, config.slug, workerName, prompt, { model, cwd });
+    res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: err.stderr?.trim() || err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -471,15 +453,15 @@ app.post('/api/spaces/:name/workers/:worker/message', (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'text is required' });
 
-  const result = getWorkerPane(SUPERBOT3_HOME, req.params.name, req.params.worker);
-  if (!result) return res.status(404).json({ error: 'Worker not found' });
+  const worker = state.getWorker(SUPERBOT3_HOME, req.params.name, req.params.worker);
+  if (!worker) return res.status(404).json({ error: 'Worker not found' });
 
-  if (!isPaneAlive(result.paneId)) {
+  if (!worker.paneId || !isPaneAlive(worker.paneId)) {
     return res.status(400).json({ error: 'Worker pane is not alive' });
   }
 
   try {
-    sendToPane(result.paneId, text);
+    sendToPane(worker.paneId, text);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -491,53 +473,62 @@ app.delete('/api/spaces/:name/workers/:worker', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const registry = readWorkerRegistry(SUPERBOT3_HOME, req.params.name);
-  const worker = (registry.workers || []).find(w => w.name === req.params.worker);
+  const worker = state.getWorker(SUPERBOT3_HOME, req.params.name, req.params.worker);
   if (!worker) return res.status(404).json({ error: 'Worker not found' });
 
-  // Kill tmux pane
   if (worker.paneId && worker.paneId !== 'pending') {
     try { execSync(`tmux kill-pane -t ${worker.paneId} 2>/dev/null`); } catch {}
   }
 
-  // Remove from registry
+  state.removeWorker(SUPERBOT3_HOME, req.params.name, req.params.worker);
+  res.json({ ok: true });
+});
+
+// Interrupt a worker
+app.post('/api/spaces/:name/workers/:worker/interrupt', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const worker = state.getWorker(SUPERBOT3_HOME, req.params.name, req.params.worker);
+  if (!worker) return res.status(404).json({ error: 'Worker not found' });
+
+  if (!worker.paneId || worker.paneId === 'pending') {
+    return res.status(400).json({ error: 'Worker has no active tmux pane' });
+  }
+
   try {
-    registry.workers = (registry.workers || []).filter(w => w.name !== req.params.worker);
-    writeWorkerRegistry(SUPERBOT3_HOME, req.params.name, registry);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
+    execSync(`tmux send-keys -t ${worker.paneId} Escape`);
+  } catch {
+    return res.status(500).json({ error: 'Failed to send Escape' });
+  }
+
+  const { message } = req.body || {};
+  if (message) {
+    setTimeout(() => { try { sendToPane(worker.paneId, message); } catch {} }, 1000);
   }
 
   res.json({ ok: true });
 });
 
-// Interrupt a worker (send Escape to tmux pane)
-app.post('/api/spaces/:name/workers/:worker/interrupt', (req, res) => {
+// ── Peek ─────────────────────────────────────────────────────────────────────
+
+app.get('/api/spaces/:name/peek', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const result = getWorkerPane(SUPERBOT3_HOME, req.params.name, req.params.worker);
-  if (!result) return res.status(404).json({ error: 'Worker not found' });
+  const output = capturePaneOutput(getSpacePaneTarget(req.params.name), 50);
+  if (output === null) return res.status(400).json({ error: 'Could not capture pane output' });
+  res.json({ output });
+});
 
-  if (!result.paneId || result.paneId === 'pending') {
-    return res.status(400).json({ error: 'Worker has no active tmux pane' });
-  }
+app.get('/api/spaces/:name/workers/:worker/peek', (req, res) => {
+  const worker = state.getWorker(SUPERBOT3_HOME, req.params.name, req.params.worker);
+  if (!worker) return res.status(404).json({ error: 'Worker not found' });
+  if (!worker.paneId || !isPaneAlive(worker.paneId)) return res.status(400).json({ error: 'Worker pane not alive' });
 
-  try {
-    execSync(`tmux send-keys -t ${result.paneId} Escape`);
-  } catch {
-    return res.status(500).json({ error: 'Failed to send Escape to pane' });
-  }
-
-  // Optional follow-up message via send-keys
-  const { message } = req.body || {};
-  if (message) {
-    setTimeout(() => {
-      try { sendToPane(result.paneId, message); } catch {}
-    }, 1000);
-  }
-
-  res.json({ ok: true });
+  const output = capturePaneOutput(worker.paneId, 50);
+  if (output === null) return res.status(400).json({ error: 'Could not capture pane output' });
+  res.json({ output });
 });
 
 // ── Schedules ────────────────────────────────────────────────────────────────
@@ -1945,15 +1936,11 @@ function runSchedulerTick() {
   const nowMinuteKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}-${now.getMinutes()}`;
 
   try {
-    const spacesDir = path.join(SUPERBOT3_HOME, 'spaces');
-    if (!fs.existsSync(spacesDir)) return;
+    const allSpaces = state.getAllSpaces(SUPERBOT3_HOME).filter(s => s.active && !s.archived);
 
-    const spaceSlugs = fs.readdirSync(spacesDir).filter(s => {
-      return fs.existsSync(path.join(spacesDir, s, 'space.json'));
-    });
-
-    for (const slug of spaceSlugs) {
-      const tasksPath = path.join(spacesDir, slug, '.claude', 'scheduled_tasks.json');
+    for (const space of allSpaces) {
+      const slug = space.slug;
+      const tasksPath = path.join(state.claudeConfigDir(SUPERBOT3_HOME, slug), 'scheduled_tasks.json');
       let data;
       try {
         data = JSON.parse(fs.readFileSync(tasksPath, 'utf-8'));

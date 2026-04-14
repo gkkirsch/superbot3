@@ -10,335 +10,163 @@ program
   .description('AI orchestration platform built on Claude Code')
   .version('0.1.0');
 
-// init
-program
-  .command('init')
-  .description('Create ~/.superbot3/ skeleton')
-  .action(() => {
-    require('../src/commands/init')(SUPERBOT3_HOME);
-  });
+// ── init ────────────────────────────────────────────────────────────────────
+program.command('init').description('Create ~/.superbot3/ skeleton')
+  .action(() => require('../src/commands/init')(SUPERBOT3_HOME));
 
-// space commands
+// ── start / stop ────────────────────────────────────────────────────────────
+program.command('start').description('Boot broker + master + all active spaces')
+  .action(() => require('../src/commands/start')(SUPERBOT3_HOME));
+
+program.command('stop').description('Stop everything')
+  .action(() => require('../src/commands/stop-all')(SUPERBOT3_HOME));
+
+program.command('reload').description('Restart broker only — spaces stay alive')
+  .action(() => require('../src/commands/reload')(SUPERBOT3_HOME));
+
+program.command('update').description('Pull latest, install deps, rebuild dashboard')
+  .action(() => require('../src/commands/update')());
+
+// ── space ───────────────────────────────────────────────────────────────────
 const space = program.command('space').description('Manage spaces');
 
-space
-  .command('create <name>')
+space.command('create <name>')
   .description('Create a new space')
-  .option('--code-dir <path>', 'Path to the code directory for this space')
-  .action((name, opts) => {
-    require('../src/commands/space-create')(SUPERBOT3_HOME, name, opts);
-  });
+  .option('--code-dir <path>', 'Working directory for this space')
+  .option('--model <model>', 'Claude model (opus, sonnet, haiku)')
+  .option('--system-prompt <file>', 'Custom system prompt file')
+  .option('--agent <name>', 'Agent definition to use')
+  .action((name, opts) => require('../src/commands/space-create')(SUPERBOT3_HOME, name, opts));
 
-space
-  .command('list')
-  .description('List all spaces')
-  .action(() => {
-    require('../src/commands/space-list')(SUPERBOT3_HOME);
-  });
+space.command('list').description('List all spaces')
+  .action(() => require('../src/commands/space-list')(SUPERBOT3_HOME));
 
-space
-  .command('status <name>')
-  .description('Show detailed space status')
+space.command('status <name>').description('Show detailed space status')
+  .action((name) => require('../src/commands/space-status')(SUPERBOT3_HOME, name));
+
+space.command('start <name>').description('Start a space')
   .action((name) => {
-    require('../src/commands/space-status')(SUPERBOT3_HOME, name);
+    const { launchSpace } = require('../src/launchSpace');
+    const ok = launchSpace(SUPERBOT3_HOME, name);
+    if (ok) console.log(`Space "${name}" started.`);
+    else { console.error(`Failed to start "${name}".`); process.exit(1); }
   });
 
-space
-  .command('stop <name>')
-  .description('Stop a running space')
-  .option('--force', 'Force stop without waiting for graceful shutdown')
-  .action((name, opts) => {
-    require('../src/commands/stop')(SUPERBOT3_HOME, name, opts);
-  });
+space.command('stop <name>').description('Stop a space')
+  .option('--force', 'Force stop')
+  .action((name, opts) => require('../src/commands/stop')(SUPERBOT3_HOME, name, opts));
 
-space
-  .command('remove <name>')
-  .description('Stop a space and remove its directory')
-  .action((name) => {
-    require('../src/commands/space-remove')(SUPERBOT3_HOME, name);
-  });
+space.command('restart <name>').description('Restart a space')
+  .action((name) => require('../src/commands/restart')(SUPERBOT3_HOME, name));
 
+space.command('remove <name>').description('Remove a space and its directory')
+  .action((name) => require('../src/commands/space-remove')(SUPERBOT3_HOME, name));
 
-// start
-program
-  .command('start')
-  .description('Boot broker + master orchestrator + all active spaces')
-  .action(() => {
-    require('../src/commands/start')(SUPERBOT3_HOME);
-  });
+space.command('peek <name>').description('Show last 50 lines of space output')
+  .action((name) => require('../src/commands/peek')(SUPERBOT3_HOME, name));
 
-// stop (all)
-program
-  .command('stop')
-  .description('Stop everything (all spaces + master + broker)')
-  .action(() => {
-    require('../src/commands/stop-all')(SUPERBOT3_HOME);
-  });
+// ── worker ──────────────────────────────────────────────────────────────────
+const worker = program.command('worker').description('Manage workers');
 
-// restart
-program
-  .command('restart <space>')
-  .description('Restart a space (stop + relaunch)')
-  .action((space) => {
-    require('../src/commands/restart')(SUPERBOT3_HOME, space);
-  });
+worker.command('spawn <space> <name> <prompt>')
+  .description('Spawn a worker in a space')
+  .option('--cwd <path>', 'Working directory')
+  .option('--model <model>', 'Claude model')
+  .option('--agent <name>', 'Agent definition')
+  .option('--color <color>', 'Pane border color')
+  .action((space, name, prompt, opts) => require('../src/commands/spawn-worker')(SUPERBOT3_HOME, space, name, prompt, opts));
 
-// update
-program
-  .command('update')
-  .description('Pull latest code, install deps, rebuild dashboard')
-  .action(() => {
-    require('../src/commands/update')();
-  });
+worker.command('list [space]').description('List workers')
+  .action((space) => require('../src/commands/workers')(SUPERBOT3_HOME, space));
 
-// reload (broker only, spaces stay alive)
-program
-  .command('reload')
-  .description('Restart the broker/dashboard only — spaces and master stay alive')
-  .action(() => {
-    require('../src/commands/reload')(SUPERBOT3_HOME);
-  });
+worker.command('message <space> <worker> <text>').description('Message a worker')
+  .action(async (space, workerName, text) => require('../src/commands/message-worker')(SUPERBOT3_HOME, space, workerName, text));
 
-// message
-program
-  .command('message <args...>')
-  .description('Send a message: message <space> "text" OR message "text" (to master)')
+worker.command('kill <space> <name>').description('Kill a worker')
+  .action(async (space, name) => require('../src/commands/kill-worker')(SUPERBOT3_HOME, space, name));
+
+worker.command('restart <space> <name>').description('Restart a worker')
+  .action(async (space, name) => require('../src/commands/restart-worker')(SUPERBOT3_HOME, space, name));
+
+worker.command('interrupt <space> <name>').description('Interrupt a worker')
+  .option('-m, --message <text>', 'Follow-up message')
+  .action(async (space, name, opts) => require('../src/commands/interrupt-worker')(SUPERBOT3_HOME, space, name, opts));
+
+worker.command('peek <space> <name>').description('Show last 50 lines of worker output')
+  .action((space, name) => require('../src/commands/peek')(SUPERBOT3_HOME, space, name));
+
+// ── message (shortcut) ─────────────────────────────────────────────────────
+program.command('message <args...>')
+  .description('Send message: message <space> "text" OR message "text" (to master)')
   .action((args) => {
-    let spaceName = null;
-    let text;
-    if (args.length === 1) {
-      text = args[0];
-    } else {
-      spaceName = args[0];
-      text = args.slice(1).join(' ');
-    }
+    let spaceName = null, text;
+    if (args.length === 1) { text = args[0]; }
+    else { spaceName = args[0]; text = args.slice(1).join(' '); }
     require('../src/commands/message')(SUPERBOT3_HOME, spaceName, text);
   });
 
-// spawn-worker
-program
-  .command('spawn-worker <space> <name> <prompt>')
-  .description('Spawn a tmux-based worker in a space')
-  .option('--cwd <path>', 'Working directory for the worker')
-  .option('--model <model>', 'Claude model to use')
-  .option('--type <type>', 'Agent type (default: space-worker)')
-  .option('--color <color>', 'Pane border color')
-  .action((space, name, prompt, opts) => {
-    require('../src/commands/spawn-worker')(SUPERBOT3_HOME, space, name, prompt, opts);
-  });
+// ── peek (shortcut) ────────────────────────────────────────────────────────
+program.command('peek <space> [worker]')
+  .description('Peek at space or worker output')
+  .action((space, workerName) => require('../src/commands/peek')(SUPERBOT3_HOME, space, workerName));
 
-// workers (list)
-program
-  .command('workers [space]')
-  .description('List workers for a space (or all spaces)')
-  .action((space) => {
-    require('../src/commands/workers')(SUPERBOT3_HOME, space);
-  });
-
-// kill-worker
-program
-  .command('kill-worker <space> <name>')
-  .description('Kill a worker (destroy pane + remove from config)')
-  .action(async (space, name) => {
-    await require('../src/commands/kill-worker')(SUPERBOT3_HOME, space, name);
-  });
-
-// restart-worker
-program
-  .command('restart-worker <space> <name>')
-  .description('Kill and re-spawn a worker with the same config')
-  .action(async (space, name) => {
-    await require('../src/commands/restart-worker')(SUPERBOT3_HOME, space, name);
-  });
-
-// message-worker
-program
-  .command('message-worker <space> <worker> <text>')
-  .description('Send a message to a specific worker')
-  .action(async (space, worker, text) => {
-    await require('../src/commands/message-worker')(SUPERBOT3_HOME, space, worker, text);
-  });
-
-// interrupt-worker
-program
-  .command('interrupt <space> <worker>')
-  .description('Interrupt a worker (send Escape to cancel current generation)')
-  .option('-m, --message <text>', 'Follow-up message to send after interrupting')
-  .action(async (space, worker, opts) => {
-    await require('../src/commands/interrupt-worker')(SUPERBOT3_HOME, space, worker, opts);
-  });
-
-// skill commands
+// ── self-management ─────────────────────────────────────────────────────────
 const skill = program.command('skill').description('Manage space skills');
+skill.command('create <space> <name>').option('--description <desc>').option('--body <body>')
+  .action((s, n, o) => require('../src/commands/skill').create(SUPERBOT3_HOME, s, n, o));
+skill.command('list <space>').action((s) => require('../src/commands/skill').list(SUPERBOT3_HOME, s));
+skill.command('remove <space> <name>').action((s, n) => require('../src/commands/skill').remove(SUPERBOT3_HOME, s, n));
 
-skill
-  .command('create <space> <name>')
-  .description('Create a new skill in a space')
-  .option('--description <desc>', 'Skill description')
-  .option('--body <body>', 'Skill body content')
-  .action((space, name, opts) => {
-    require('../src/commands/skill').create(SUPERBOT3_HOME, space, name, opts);
-  });
+const agent = program.command('agent').description('Manage agent definitions');
+agent.command('create <space> <name>').option('--description <desc>').option('--model <model>').option('--body <body>')
+  .action((s, n, o) => require('../src/commands/agent').create(SUPERBOT3_HOME, s, n, o));
+agent.command('list <space>').action((s) => require('../src/commands/agent').list(SUPERBOT3_HOME, s));
+agent.command('show <space> <name>').action((s, n) => require('../src/commands/agent').show(SUPERBOT3_HOME, s, n));
+agent.command('remove <space> <name>').action((s, n) => require('../src/commands/agent').remove(SUPERBOT3_HOME, s, n));
 
-skill
-  .command('list <space>')
-  .description('List skills in a space')
-  .action((space) => {
-    require('../src/commands/skill').list(SUPERBOT3_HOME, space);
-  });
-
-skill
-  .command('remove <space> <name>')
-  .description('Remove a skill from a space')
-  .action((space, name) => {
-    require('../src/commands/skill').remove(SUPERBOT3_HOME, space, name);
-  });
-
-// agent commands
-const agent = program.command('agent').description('Manage space agent definitions');
-
-agent
-  .command('create <space> <name>')
-  .description('Create a new agent definition')
-  .option('--description <desc>', 'Agent description')
-  .option('--model <model>', 'Model override')
-  .option('--body <body>', 'Agent prompt body')
-  .action((space, name, opts) => {
-    require('../src/commands/agent').create(SUPERBOT3_HOME, space, name, opts);
-  });
-
-agent
-  .command('list <space>')
-  .description('List agent definitions in a space')
-  .action((space) => {
-    require('../src/commands/agent').list(SUPERBOT3_HOME, space);
-  });
-
-agent
-  .command('show <space> <name>')
-  .description('Show an agent definition')
-  .action((space, name) => {
-    require('../src/commands/agent').show(SUPERBOT3_HOME, space, name);
-  });
-
-agent
-  .command('remove <space> <name>')
-  .description('Remove an agent definition')
-  .action((space, name) => {
-    require('../src/commands/agent').remove(SUPERBOT3_HOME, space, name);
-  });
-
-// settings commands
 const settings = program.command('settings').description('Manage space settings');
+settings.command('get <space> [key]').action((s, k) => require('../src/commands/settings').get(SUPERBOT3_HOME, s, k));
+settings.command('set <space> <key> <value>').action((s, k, v) => require('../src/commands/settings').set(SUPERBOT3_HOME, s, k, v));
+settings.command('unset <space> <key>').action((s, k) => require('../src/commands/settings').unset(SUPERBOT3_HOME, s, k));
 
-settings
-  .command('get <space> [key]')
-  .description('Get settings (all or by dot-path key)')
-  .action((space, key) => {
-    require('../src/commands/settings').get(SUPERBOT3_HOME, space, key);
-  });
-
-settings
-  .command('set <space> <key> <value>')
-  .description('Set a settings value (dot-path key, JSON or string value)')
-  .action((space, key, value) => {
-    require('../src/commands/settings').set(SUPERBOT3_HOME, space, key, value);
-  });
-
-settings
-  .command('unset <space> <key>')
-  .description('Remove a settings key')
-  .action((space, key) => {
-    require('../src/commands/settings').unset(SUPERBOT3_HOME, space, key);
-  });
-
-// hook commands
 const hook = program.command('hook').description('Manage space hooks');
+hook.command('add <space> <event> <command>').action((s, e, c) => require('../src/commands/settings').hookAdd(SUPERBOT3_HOME, s, e, c));
+hook.command('list <space>').action((s) => require('../src/commands/settings').hookList(SUPERBOT3_HOME, s));
+hook.command('remove <space> <event> <index>').action((s, e, i) => require('../src/commands/settings').hookRemove(SUPERBOT3_HOME, s, e, i));
 
-hook
-  .command('add <space> <event> <command>')
-  .description('Add a hook (events: PreToolUse, PostToolUse, Notification, Stop)')
-  .action((space, event, command) => {
-    require('../src/commands/settings').hookAdd(SUPERBOT3_HOME, space, event, command);
-  });
-
-hook
-  .command('list <space>')
-  .description('List all hooks')
-  .action((space) => {
-    require('../src/commands/settings').hookList(SUPERBOT3_HOME, space);
-  });
-
-hook
-  .command('remove <space> <event> <index>')
-  .description('Remove a hook by event and index')
-  .action((space, event, index) => {
-    require('../src/commands/settings').hookRemove(SUPERBOT3_HOME, space, event, index);
-  });
-
-// mcp commands
 const mcp = program.command('mcp').description('Manage MCP servers');
+mcp.command('add <space> <name> <command> [args...]').action((s, n, c, a) => require('../src/commands/settings').mcpAdd(SUPERBOT3_HOME, s, n, c, a));
+mcp.command('list <space>').action((s) => require('../src/commands/settings').mcpList(SUPERBOT3_HOME, s));
+mcp.command('remove <space> <name>').action((s, n) => require('../src/commands/settings').mcpRemove(SUPERBOT3_HOME, s, n));
 
-mcp
-  .command('add <space> <name> <command> [args...]')
-  .description('Add an MCP server')
-  .action((space, name, command, args) => {
-    require('../src/commands/settings').mcpAdd(SUPERBOT3_HOME, space, name, command, args);
-  });
+program.command('permit <space> <rule>').description('Add a permission rule')
+  .action((s, r) => require('../src/commands/settings').permitAdd(SUPERBOT3_HOME, s, r));
 
-mcp
-  .command('list <space>')
-  .description('List MCP servers')
-  .action((space) => {
-    require('../src/commands/settings').mcpList(SUPERBOT3_HOME, space);
-  });
+program.command('logs <space>').description('Tail space log')
+  .action((s) => require('../src/commands/logs')(SUPERBOT3_HOME, s));
 
-mcp
-  .command('remove <space> <name>')
-  .description('Remove an MCP server')
-  .action((space, name) => {
-    require('../src/commands/settings').mcpRemove(SUPERBOT3_HOME, space, name);
-  });
+const schedule = program.command('schedule').description('Manage schedules');
+schedule.command('add <space> <cron> <prompt>').option('--once')
+  .action((s, c, p, o) => require('../src/commands/schedule').add(SUPERBOT3_HOME, s, c, p, o));
+schedule.command('list <space>').action((s) => require('../src/commands/schedule').list(SUPERBOT3_HOME, s));
+schedule.command('remove <space> <id>').action((s, i) => require('../src/commands/schedule').remove(SUPERBOT3_HOME, s, i));
 
-// permission shortcut
-program
-  .command('permit <space> <rule>')
-  .description('Add a permission rule (e.g. "Bash(npm *)")')
-  .action((space, rule) => {
-    require('../src/commands/settings').permitAdd(SUPERBOT3_HOME, space, rule);
-  });
-
-// logs
-program
-  .command('logs <space>')
-  .description('Tail a space\'s daily log')
-  .action((space) => {
-    require('../src/commands/logs')(SUPERBOT3_HOME, space);
-  });
-
-// schedule commands
-const schedule = program.command('schedule').description('Manage space schedules');
-
-schedule
-  .command('add <space> <cron> <prompt>')
-  .description('Add a scheduled task to a space')
-  .option('--once', 'One-time schedule that self-cleans after execution')
-  .action((space, cron, prompt, opts) => {
-    require('../src/commands/schedule').add(SUPERBOT3_HOME, space, cron, prompt, opts);
-  });
-
-schedule
-  .command('list <space>')
-  .description('List scheduled tasks for a space')
-  .action((space) => {
-    require('../src/commands/schedule').list(SUPERBOT3_HOME, space);
-  });
-
-schedule
-  .command('remove <space> <id>')
-  .description('Remove a scheduled task')
-  .action((space, id) => {
-    require('../src/commands/schedule').remove(SUPERBOT3_HOME, space, id);
-  });
+// ── Legacy aliases (backwards compat) ───────────────────────────────────────
+program.command('restart <space>', { hidden: true })
+  .action((s) => require('../src/commands/restart')(SUPERBOT3_HOME, s));
+program.command('spawn-worker <space> <name> <prompt>', { hidden: true })
+  .option('--cwd <path>').option('--model <model>').option('--color <color>')
+  .action((s, n, p, o) => require('../src/commands/spawn-worker')(SUPERBOT3_HOME, s, n, p, o));
+program.command('workers [space]', { hidden: true })
+  .action((s) => require('../src/commands/workers')(SUPERBOT3_HOME, s));
+program.command('kill-worker <space> <name>', { hidden: true })
+  .action(async (s, n) => require('../src/commands/kill-worker')(SUPERBOT3_HOME, s, n));
+program.command('restart-worker <space> <name>', { hidden: true })
+  .action(async (s, n) => require('../src/commands/restart-worker')(SUPERBOT3_HOME, s, n));
+program.command('message-worker <space> <worker> <text>', { hidden: true })
+  .action(async (s, w, t) => require('../src/commands/message-worker')(SUPERBOT3_HOME, s, w, t));
+program.command('interrupt <space> <worker>', { hidden: true })
+  .option('-m, --message <text>')
+  .action(async (s, w, o) => require('../src/commands/interrupt-worker')(SUPERBOT3_HOME, s, w, o));
 
 program.parse();

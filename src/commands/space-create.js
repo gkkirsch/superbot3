@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const { setupConfigDir } = require('../auth');
-const { tmuxSessionExists, launchSpace } = require('../launchSpace');
+const { launchSpace } = require('../launchSpace');
+const { tmuxSessionExists } = require('../tmuxMessage');
+const state = require('../state');
 
 function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -24,11 +26,6 @@ function copyTemplate(templateDir, targetDir) {
   }
 }
 
-/**
- * Core space creation logic. Returns the spaceConfig object on success.
- * Throws on error instead of calling process.exit (safe for both CLI and server).
- */
-// Distinct colors for browser profile bars — each space gets a unique one
 const SPACE_COLORS = [
   { name: 'blue',    rgb: [66, 133, 244],  hex: '#4285f4', avatar: 0 },
   { name: 'red',     rgb: [234, 67, 53],   hex: '#ea4335', avatar: 6 },
@@ -52,17 +49,18 @@ function titleCase(str) {
   return str.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function createSpace(home, name, codeDir) {
+function createSpace(home, name, opts = {}) {
   const slug = name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-  // Use the original name as the friendly name (preserves casing/spaces)
-  // Fall back to title-cased slug if name is already a slug
   const friendlyName = name.includes(' ') || name !== name.toLowerCase() ? name : titleCase(slug);
-  const spaceDir = path.join(home, 'spaces', slug);
+  const spaceDir = state.spaceDir(home, slug);
+  const configDir = state.claudeConfigDir(home, slug);
 
-  if (fs.existsSync(path.join(spaceDir, 'space.json'))) {
-    throw new Error(`Space "${slug}" already exists at ${spaceDir}`);
+  // Check if space already exists in state
+  if (state.getSpace(home, slug)) {
+    throw new Error(`Space "${slug}" already exists`);
   }
 
+  const codeDir = opts.codeDir || null;
   if (codeDir && !fs.existsSync(codeDir)) {
     throw new Error(`Code directory does not exist: ${codeDir}`);
   }
@@ -77,7 +75,6 @@ function createSpace(home, name, codeDir) {
     path.join(spaceDir, '.claude', 'agents'),
     path.join(spaceDir, '.claude', 'hooks'),
     path.join(spaceDir, '.claude', 'plugins'),
-    path.join(spaceDir, '.claude', 'teams'),
     path.join(spaceDir, '.claude', 'scratchpad'),
     path.join(spaceDir, 'memory', 'topics'),
     path.join(spaceDir, 'memory', 'sessions'),
@@ -96,33 +93,32 @@ function createSpace(home, name, codeDir) {
     copyTemplate(templateDir, spaceDir);
   }
 
-  // Assign a color to this space
   const spaceColor = getSpaceColor(slug);
 
-  // Generate space.json
-  const spaceConfig = {
-    $schema: 'superbot3-space-v1',
+  // Write space to central state.json
+  const spaceData = {
     name: friendlyName,
-    slug: slug,
-    codeDir: codeDir || null,
-    spaceDir: spaceDir,
-    claudeConfigDir: path.join(spaceDir, '.claude'),
+    slug,
+    codeDir,
+    model: opts.model || null,
     active: true,
+    archived: false,
     created: new Date().toISOString(),
     sessionId: null,
+    paneId: null,
     color: spaceColor.hex,
-    browser: {
-      maxConcurrent: 1,
-    },
+    systemPrompt: opts.systemPrompt || null,
+    agent: opts.agent || null,
+    workers: [],
   };
-  fs.writeFileSync(path.join(spaceDir, 'space.json'), JSON.stringify(spaceConfig, null, 2), 'utf-8');
+  state.setSpace(home, slug, spaceData);
 
-  // Default plugins from superbot3 marketplace on superchargeclaudecode.com
+  // Default plugins
   const SUPERBOT3_MARKETPLACE = 'superbot3';
   const SUPERBOT3_MARKETPLACE_URL = 'https://superchargeclaudecode.com/api/marketplaces/superbot3/marketplace.json';
   const defaultPlugins = ['memory-knowledge', 'browser'];
 
-  // Copy system prompt template (must happen before template replacement below)
+  // Copy and customize system prompt template
   const systemPromptPath = path.join(spaceDir, 'system-prompt.md');
   if (!fs.existsSync(systemPromptPath)) {
     const templatePath = path.join(__dirname, '..', 'templates', 'space-system-prompt.md');
@@ -131,7 +127,6 @@ function createSpace(home, name, codeDir) {
     }
   }
 
-  // Customize templates with space name, slug, and code dir
   const templateFiles = [
     path.join(spaceDir, '.claude', 'CLAUDE.md'),
     path.join(spaceDir, 'system-prompt.md'),
@@ -152,68 +147,40 @@ function createSpace(home, name, codeDir) {
     }
   }
 
-  // Set up auth (credentials + config) so CLAUDE_CONFIG_DIR works
-  const claudeConfigDir = path.join(spaceDir, '.claude');
-  setupConfigDir(claudeConfigDir, spaceDir, codeDir);
+  // Auth setup
+  setupConfigDir(configDir, spaceDir, codeDir);
 
-  // Enable built-in plugins in settings.json and installed_plugins.json
-  const settingsPath = path.join(claudeConfigDir, 'settings.json');
+  // Settings: plugins + marketplace
+  const settingsPath = path.join(configDir, 'settings.json');
   let settings = {};
   try { settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8')); } catch {}
-
-  // Enable default plugins from superbot3 marketplace
   if (!settings.enabledPlugins) settings.enabledPlugins = {};
   for (const pluginName of defaultPlugins) {
     settings.enabledPlugins[`${pluginName}@${SUPERBOT3_MARKETPLACE}`] = true;
   }
-
-  // Register the superbot3 marketplace so Claude Code can fetch and load plugins
   if (!settings.extraKnownMarketplaces) settings.extraKnownMarketplaces = {};
   settings.extraKnownMarketplaces[SUPERBOT3_MARKETPLACE] = {
     source: { source: 'url', url: SUPERBOT3_MARKETPLACE_URL },
   };
-
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 
-  // Team config and inbox are created at launch time by launchSpace().
-  // Just ensure the teams directory exists here.
-  ensureDir(path.join(spaceDir, '.claude', 'teams'));
+  // Scheduled tasks
+  const schedulePath = path.join(configDir, 'scheduled_tasks.json');
+  const now = Date.now();
+  fs.writeFileSync(schedulePath, JSON.stringify({
+    tasks: [
+      { id: 'mem-nightly', cron: '0 3 * * *', prompt: 'Run memory consolidation: spawn the memory-consolidator agent to review today\'s session transcripts, extract key decisions/learnings/preferences, update topic files in memory/topics/, and rebuild memory/MEMORY.md index.', createdAt: now, recurring: true, permanent: true },
+      { id: 'kb-nightly', cron: '0 4 * * *', prompt: 'Run knowledge consolidation: spawn the knowledge-consolidator agent to check knowledge/raw/ for unprocessed sources, compile them into knowledge/wiki/ (summaries, concepts, connections), and update knowledge/wiki/index.md.', createdAt: now, recurring: true, permanent: true },
+    ],
+  }, null, 2) + '\n', 'utf-8');
 
-  // Always write scheduled_tasks.json with nightly consolidation crons
-  // (overwrites the empty template copy)
-  const schedulePath = path.join(spaceDir, '.claude', 'scheduled_tasks.json');
-  {
-    const now = Date.now();
-    const defaultSchedule = {
-      tasks: [
-        {
-          id: 'mem-nightly',
-          cron: '0 3 * * *',
-          prompt: 'Run memory consolidation: spawn the memory-consolidator agent to review today\'s session transcripts, extract key decisions/learnings/preferences, update topic files in memory/topics/, and rebuild memory/MEMORY.md index.',
-          createdAt: now,
-          recurring: true,
-          permanent: true,
-        },
-        {
-          id: 'kb-nightly',
-          cron: '0 4 * * *',
-          prompt: 'Run knowledge consolidation: spawn the knowledge-consolidator agent to check knowledge/raw/ for unprocessed sources, compile them into knowledge/wiki/ (summaries, concepts, connections), and update knowledge/wiki/index.md.',
-          createdAt: now,
-          recurring: true,
-          permanent: true,
-        },
-      ],
-    };
-    fs.writeFileSync(schedulePath, JSON.stringify(defaultSchedule, null, 2) + '\n', 'utf-8');
-  } // end schedule block
-
-  // Create initial memory files
+  // Memory
   const memoryMdPath = path.join(spaceDir, 'memory', 'MEMORY.md');
   if (!fs.existsSync(memoryMdPath)) {
     fs.writeFileSync(memoryMdPath, '# Memory\n\nNo memories yet.\n', 'utf-8');
   }
 
-  // Seed Chrome profile with space name and color
+  // Chrome profile
   const profileDir = path.join(spaceDir, 'browser-profile', 'Default');
   ensureDir(profileDir);
   const prefsPath = path.join(profileDir, 'Preferences');
@@ -231,73 +198,38 @@ function createSpace(home, name, codeDir) {
   prefs.browser.theme.color_scheme = 2;
   fs.writeFileSync(prefsPath, JSON.stringify(prefs, null, 2), 'utf-8');
 
-  return spaceConfig;
+  return spaceData;
 }
 
-/**
- * CLI entry point — wraps createSpace with console output and process.exit on error.
- */
 function spaceCreateCli(home, name, opts) {
-  let codeDir = null;
-  if (opts.codeDir) {
-    codeDir = path.resolve(opts.codeDir);
-  }
+  let codeDir = opts.codeDir ? path.resolve(opts.codeDir) : null;
 
   console.log(`Creating space "${name}"...`);
 
-  let spaceConfig;
+  let spaceData;
   try {
-    spaceConfig = createSpace(home, name, codeDir);
+    spaceData = createSpace(home, name, { codeDir, model: opts.model, systemPrompt: opts.systemPrompt, agent: opts.agent });
   } catch (err) {
     console.error(`Error: ${err.message}`);
     process.exit(1);
   }
 
-  if (codeDir) {
-    console.log('  Auth configured from default keychain');
-  }
-
+  const spaceDir = state.spaceDir(home, spaceData.slug);
   console.log('');
-  console.log(`Space "${spaceConfig.slug}" created successfully!`);
-  console.log('');
-  console.log(`  Space dir:  ${spaceConfig.spaceDir}`);
-  if (spaceConfig.codeDir) {
-    console.log(`  Code dir:   ${spaceConfig.codeDir}`);
-  }
-  console.log(`  Config dir: ${spaceConfig.claudeConfigDir}`);
-  console.log('');
-  console.log('Contents:');
-  console.log('  ├── space.json');
-  console.log('  ├── .claude/');
-  console.log('  │   ├── CLAUDE.md');
-  console.log('  │   ├── settings.json');
-  console.log('  │   ├── scheduled_tasks.json (nightly memory + knowledge consolidation)');
-  console.log('  │   ├── agents/ (planner, coder, researcher, reviewer, knowledge-consolidator, memory-consolidator)');
-  console.log('  │   ├── skills/ (core-methodology, space-cli, schedule-manager, knowledge-base, memory)');
-  console.log('  │   ├── hooks/ (session-start-memory, session-start-knowledge)');
-  console.log('  │   └── plugins/');
-  console.log('  ├── memory/');
-  console.log('  │   ├── MEMORY.md');
-  console.log('  │   ├── topics/');
-  console.log('  │   └── sessions/');
-  console.log('  └── knowledge/');
-  console.log('      ├── raw/');
-  console.log('      ├── wiki/ (concepts, summaries, connections)');
-  console.log('      ├── queries/ (reflections)');
-  console.log('      └── logs/');
+  console.log(`Space "${spaceData.slug}" created.`);
+  console.log(`  Dir:   ${spaceDir}`);
+  if (spaceData.codeDir) console.log(`  Code:  ${spaceData.codeDir}`);
+  if (spaceData.model) console.log(`  Model: ${spaceData.model}`);
 
   // Auto-launch if superbot3 is already running
   if (tmuxSessionExists('superbot3')) {
     console.log('');
-    const config = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf-8'));
-    const model = config.model || 'claude-opus-4-6';
-    const launched = launchSpace(spaceConfig, model);
+    const launched = launchSpace(home, spaceData.slug);
     if (launched) {
-      console.log(`  Started "${spaceConfig.slug}" in tmux window superbot3:${spaceConfig.slug}`);
+      console.log(`  Started in tmux window superbot3:${spaceData.slug}`);
     }
   }
 }
 
-// Export both — CLI uses the default export, server uses createSpace
 module.exports = spaceCreateCli;
 module.exports.createSpace = createSpace;

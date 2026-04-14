@@ -1,61 +1,70 @@
 const fs = require('fs');
 const path = require('path');
-const { isSpaceRunning } = require('./space-list');
+const { isSpaceWindowAlive, getPaneInfo, isPaneAlive } = require('../tmuxMessage');
+const state = require('../state');
 
 module.exports = function spaceStatus(home, name) {
-  const spaceDir = path.join(home, 'spaces', name);
-  const configPath = path.join(spaceDir, 'space.json');
-
-  if (!fs.existsSync(configPath)) {
-    console.error(`Error: Space "${name}" not found at ${spaceDir}`);
+  const space = state.getSpace(home, name);
+  if (!space) {
+    console.error(`Error: Space "${name}" not found`);
     process.exit(1);
   }
 
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  const running = isSpaceRunning(config.slug);
+  const spaceDir = state.spaceDir(home, space.slug);
+  const running = isSpaceWindowAlive(space.slug);
+  const paneInfo = space.paneId ? getPaneInfo(space.paneId) : null;
 
   console.log('');
-  console.log(`Space: ${config.name}`);
-  console.log('─'.repeat(40));
+  console.log(`Space: ${space.name || space.slug}`);
+  console.log('─'.repeat(50));
   console.log(`  Status:      ${running ? '● running' : '○ stopped'}`);
-  console.log(`  Active:      ${config.active ? 'yes' : 'no'}`);
-  console.log(`  Code dir:    ${config.codeDir || '(none)'}`);
-  console.log(`  Space dir:   ${config.spaceDir}`);
-  console.log(`  Config dir:  ${config.claudeConfigDir}`);
-  console.log(`  Session ID:  ${config.sessionId || '(none)'}`);
-  console.log(`  Created:     ${config.created}`);
-  console.log('');
+  console.log(`  Slug:        ${space.slug}`);
+  console.log(`  Model:       ${space.model || '(global default)'}`);
+  console.log(`  Code dir:    ${space.codeDir || '(none)'}`);
+  console.log(`  Space dir:   ${spaceDir}`);
+  console.log(`  Session ID:  ${space.sessionId || '(none)'}`);
+  console.log(`  Pane ID:     ${space.paneId || '(none)'}`);
+  if (paneInfo) {
+    console.log(`  Pane PID:    ${paneInfo.pid}`);
+    console.log(`  Pane cmd:    ${paneInfo.command}`);
+  }
+  console.log(`  Color:       ${space.color}`);
+  console.log(`  Created:     ${space.created}`);
 
-  // Show agents
+  // Workers
+  const workers = space.workers || [];
+  if (workers.length > 0) {
+    console.log('');
+    console.log('  Workers:');
+    for (const w of workers) {
+      const alive = w.paneId && isPaneAlive(w.paneId);
+      const status = alive ? '● alive' : '○ dead';
+      const wInfo = w.paneId ? getPaneInfo(w.paneId) : null;
+      console.log(`    ${status}  ${w.name}  pane=${w.paneId || 'none'}  model=${w.model || '?'}  ${wInfo ? `pid=${wInfo.pid}` : ''}`);
+    }
+  }
+
+  // Agents
   const agentsDir = path.join(spaceDir, '.claude', 'agents');
   if (fs.existsSync(agentsDir)) {
     const agents = fs.readdirSync(agentsDir).filter(f => f.endsWith('.md'));
-    console.log(`  Agents:      ${agents.map(a => a.replace('.md', '')).join(', ')}`);
+    if (agents.length) console.log(`\n  Agents:      ${agents.map(a => a.replace('.md', '')).join(', ')}`);
   }
 
-  // Show skills
+  // Skills
   const skillsDir = path.join(spaceDir, '.claude', 'skills');
   if (fs.existsSync(skillsDir)) {
     const skills = fs.readdirSync(skillsDir, { withFileTypes: true }).filter(e => e.isDirectory()).map(e => e.name);
-    console.log(`  Skills:      ${skills.join(', ')}`);
+    if (skills.length) console.log(`  Skills:      ${skills.join(', ')}`);
   }
 
-  // Show knowledge files
-  const knowledgeDir = path.join(spaceDir, 'knowledge');
-  if (fs.existsSync(knowledgeDir)) {
-    const files = fs.readdirSync(knowledgeDir).filter(f => f.endsWith('.md'));
-    console.log(`  Knowledge:   ${files.length} file(s)`);
-  }
-
-  // Show scheduled tasks
+  // Schedules
   const schedulePath = path.join(spaceDir, '.claude', 'scheduled_tasks.json');
   if (fs.existsSync(schedulePath)) {
     try {
       const schedule = JSON.parse(fs.readFileSync(schedulePath, 'utf-8'));
       console.log(`  Schedules:   ${schedule.tasks.length} task(s)`);
-    } catch {
-      console.log('  Schedules:   (invalid)');
-    }
+    } catch {}
   }
 
   console.log('');

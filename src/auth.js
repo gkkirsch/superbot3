@@ -153,21 +153,15 @@ function setupConfigDir(configDir, workDir, codeDir) {
  * Refresh credentials and config in all existing space config dirs.
  */
 function refreshAllSpaceCredentials(home) {
-  const spacesDir = path.join(home, 'spaces');
-  if (!fs.existsSync(spacesDir)) return;
-
   const credsJson = readDefaultCredentials();
   if (!credsJson) return;
 
-  const entries = fs.readdirSync(spacesDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const configPath = path.join(spacesDir, entry.name, 'space.json');
-    if (!fs.existsSync(configPath)) continue;
-
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    // Re-run full setup for each space (updates credentials + config)
-    setupConfigDir(config.claudeConfigDir, config.spaceDir, config.codeDir);
+  const st = require('./state');
+  const spaces = st.getAllSpaces(home);
+  for (const space of spaces) {
+    const configDir = st.claudeConfigDir(home, space.slug);
+    const spaceDir = st.spaceDir(home, space.slug);
+    setupConfigDir(configDir, spaceDir, space.codeDir);
   }
 
   // Also update orchestrator

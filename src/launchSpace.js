@@ -1,30 +1,20 @@
-/**
- * Shared space launch logic — used by both `space create` and `start`.
- * Handles writing the launch script and spawning the tmux window.
- */
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { tmuxSessionExists, tmuxWindowExists } = require('./tmuxMessage');
+const state = require('./state');
 
-/**
- * Write a launcher script that starts Claude in interactive mode.
- * Sets CLAUDE_CONFIG_DIR for full isolation.
- */
 function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, opts = {}) {
   const scriptDir = path.join(require('os').homedir(), '.superbot3', '.tmp');
   fs.mkdirSync(scriptDir, { recursive: true });
-
   const scriptPath = path.join(scriptDir, `launch-${name}.sh`);
 
   const claudeArgs = ['--dangerously-skip-permissions', `--model ${model}`];
-  // Resume previous session if available
   if (resumeSessionId) claudeArgs.push(`--resume '${resumeSessionId}'`);
-  // Custom system prompt file replaces the entire default Claude Code system prompt
   if (opts.systemPromptFile && fs.existsSync(opts.systemPromptFile)) {
     claudeArgs.push(`--system-prompt-file '${opts.systemPromptFile}'`);
   }
 
-  // Browser env from shared config
   const { getBrowserEnv } = require('./browserEnv');
   const spaceDir = opts.spaceDir || cwd;
   const browserEnv = getBrowserEnv(opts.browserSession || name, spaceDir);
@@ -36,48 +26,31 @@ export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
 ${browserExports}
 exec claude ${claudeArgs.join(' ')}
 `;
-
   fs.writeFileSync(scriptPath, script, { mode: 0o755 });
   return scriptPath;
 }
 
-/**
- * Check if a tmux session exists.
- */
-function tmuxSessionExists(name) {
-  try {
-    execSync(`tmux has-session -t ${name} 2>/dev/null`);
-    return true;
-  } catch {
+function launchSpace(home, slug, tmuxSession = 'superbot3') {
+  const space = state.getSpace(home, slug);
+  if (!space) {
+    console.log(`  Space "${slug}" not found in state`);
     return false;
   }
-}
 
-/**
- * Check if a tmux window exists in a session.
- */
-function tmuxWindowExists(session, windowName) {
-  try {
-    const output = execSync(`tmux list-windows -t ${session} -F "#{window_name}" 2>/dev/null`, { encoding: 'utf-8' });
-    return output.split('\n').map(s => s.trim()).includes(windowName);
-  } catch {
-    return false;
+  const spaceDir = state.spaceDir(home, slug);
+  const configDir = state.claudeConfigDir(home, slug);
+  const cwd = space.codeDir || spaceDir;
+
+  // Resolve model: space override > global config > default
+  let model = space.model;
+  if (!model) {
+    try {
+      const gc = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf-8'));
+      model = gc.model || 'claude-sonnet-4-6';
+    } catch {
+      model = 'claude-sonnet-4-6';
+    }
   }
-}
-
-/**
- * Launch a space in a tmux window.
- * Creates the window, writes the launch script, and starts Claude.
- *
- * @param {object} space - Space config from space.json
- * @param {string} model - Claude model to use
- * @param {string} tmuxSession - tmux session name (default: 'superbot3')
- * @returns {boolean} true if launched successfully
- */
-function launchSpace(space, model, tmuxSession = 'superbot3') {
-  const slug = space.slug;
-  const cwd = space.codeDir || space.spaceDir;
-  const claudeConfigDir = space.claudeConfigDir;
 
   if (!tmuxSessionExists(tmuxSession)) {
     console.log(`  tmux session "${tmuxSession}" not running — cannot launch space`);
@@ -89,21 +62,29 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
     return false;
   }
 
-  const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
-  const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, claudeConfigDir, {
+  const systemPromptFile = space.systemPrompt || path.join(spaceDir, 'system-prompt.md');
+  const scriptPath = writeLaunchScript(slug, cwd, model, space.sessionId, configDir, {
     systemPromptFile: fs.existsSync(systemPromptFile) ? systemPromptFile : null,
-    spaceDir: space.spaceDir,
+    spaceDir,
   });
 
-  // Create tmux window and run the launch script
   execSync(`tmux new-window -t ${tmuxSession} -n ${slug} "bash ${scriptPath}"`);
+
+  // Capture the pane ID of the new window
+  try {
+    const paneId = execSync(
+      `tmux list-panes -t ${tmuxSession}:${slug} -F "#{pane_id}" 2>/dev/null`,
+      { encoding: 'utf-8' }
+    ).trim().split('\n')[0];
+    if (paneId) {
+      state.updateSpace(home, slug, { paneId });
+    }
+  } catch {}
 
   return true;
 }
 
 module.exports = {
   writeLaunchScript,
-  tmuxSessionExists,
-  tmuxWindowExists,
   launchSpace,
 };
