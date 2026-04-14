@@ -12,16 +12,17 @@ const TMUX_SESSION = 'superbot3';
  * @param {string} text - message text to send
  */
 function sendToPane(paneTarget, text) {
-  // Use tmux's literal flag (-l) to avoid interpreting special keys,
-  // then send Enter separately. We pass the text via a temp file to avoid
-  // any shell escaping issues with quotes, newlines, semicolons, etc.
+  // Use tmux's load-buffer + paste-buffer to inject text without shell escaping issues.
+  // Newlines must be collapsed to spaces because Claude Code's input treats each newline
+  // as a submission (Enter), which would split a multi-line message into separate turns.
+  const sanitized = text.replace(/\r?\n/g, ' ');
+
   const tmpDir = path.join(require('os').tmpdir(), 'superbot3-msg');
   fs.mkdirSync(tmpDir, { recursive: true });
   const tmpFile = path.join(tmpDir, `msg-${process.pid}-${Date.now()}.txt`);
 
   try {
-    fs.writeFileSync(tmpFile, text, 'utf-8');
-    // Use load-buffer + paste-buffer to inject text without shell escaping issues
+    fs.writeFileSync(tmpFile, sanitized, 'utf-8');
     execSync(`tmux load-buffer "${tmpFile}"`);
     execSync(`tmux paste-buffer -t ${paneTarget}`);
     execSync(`tmux send-keys -t ${paneTarget} Enter`);

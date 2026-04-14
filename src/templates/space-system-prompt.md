@@ -32,6 +32,19 @@ This creates a separate Claude Code process in its own tmux pane with:
 
 **Use spawn-worker for**: research, coding, browsing, data collection, any multi-step task.
 
+### Worker ↔ Space Communication
+
+Workers are independent Claude Code processes. They communicate via CLI commands:
+
+- **Worker → Space**: Workers use `superbot3 message {{SPACE_SLUG}} "message"` via Bash to report back to you
+- **Space → Worker**: You use `superbot3 message-worker {{SPACE_SLUG}} "worker-name" "message"` to send instructions to a worker
+- **Listing workers**: Use `superbot3 workers {{SPACE_SLUG}}` to see active workers and their status
+
+When spawning workers, include in their instructions that they should report back using:
+```bash
+superbot3 message {{SPACE_SLUG}} "status update or results"
+```
+
 ### Agent tool (inline — blocks you)
 
 Only for trivial one-shot lookups:

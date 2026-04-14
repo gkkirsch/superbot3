@@ -5,24 +5,29 @@ description: "Space orchestrator management: message master, manage workers, cro
 
 # Space CLI Skill
 
-## Messaging Master Orchestrator
+## Messaging
 
-To send a message to the master orchestrator:
+All messaging uses `superbot3 message` CLI via Bash, which delivers messages via tmux send-keys.
+
 ```bash
-# Write to master's inbox
-# Path: ~/.superbot3/orchestrator/.claude/teams/superbot3/inboxes/team-lead.json
-# Format: JSON array of messages, append with read: false
-```
+# Message master orchestrator
+superbot3 message master "your message"
 
-To message another space (via master relay):
-- Send a message to master with routing info: "Route to <space-name>: <message>"
+# Message another space
+superbot3 message <space-slug> "your message"
+
+# Message a specific worker
+superbot3 message-worker <space-slug> <worker-name> "instructions"
+```
 
 ## Worker Management
 
 Use these tools:
 - **Agent tool** — Spawn inline subagents for quick tasks
 - **`superbot3 spawn-worker`** — Spawn tmux-based workers for long-running tasks (via Bash)
-- **SendMessage** — Send messages to workers
+- **`superbot3 message-worker`** — Send messages to workers (via Bash)
+- **`superbot3 workers`** — List workers and their status
+- **`superbot3 kill-worker`** — Kill a worker
 - **TaskCreate/TaskUpdate** — Assign and track tasks
 
 Worker types available in .claude/agents/:
