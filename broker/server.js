@@ -462,17 +462,132 @@ app.get('/api/spaces/:name/workers', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const teamsDir = path.join(config.claudeConfigDir, 'teams');
-  let members = [];
+  // Get live tmux panes
+  const livePanes = new Set();
   try {
-    const teamDirs = fs.readdirSync(teamsDir, { withFileTypes: true });
-    for (const d of teamDirs) {
-      if (!d.isDirectory()) continue;
-      const teamConfig = readJsonSafe(path.join(teamsDir, d.name, 'config.json'));
-      if (teamConfig?.members) members = members.concat(teamConfig.members);
-    }
+    const output = execSync('tmux list-panes -a -F "#{pane_id}" 2>/dev/null', { encoding: 'utf-8' });
+    output.split('\n').filter(Boolean).forEach(id => livePanes.add(id.trim()));
   } catch {}
+
+  const teamConfigPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'config.json');
+  const teamConfig = readJsonSafe(teamConfigPath);
+  const members = (teamConfig?.members || [])
+    .filter(m => m.name !== 'team-lead')
+    .map(m => ({
+      ...m,
+      alive: m.tmuxPaneId && m.tmuxPaneId !== 'pending' && livePanes.has(m.tmuxPaneId),
+    }));
+
   res.json({ members });
+});
+
+// Spawn a worker
+app.post('/api/spaces/:name/workers', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const { workerName, prompt, model, cwd } = req.body;
+  if (!workerName || !prompt) return res.status(400).json({ error: 'workerName and prompt are required' });
+
+  try {
+    const scriptPath = path.join(__dirname, '..', 'scripts', 'spawn-worker.sh');
+    const args = ['--space', config.slug, '--name', workerName, '--prompt', prompt];
+    if (model) args.push('--model', model);
+    if (cwd) args.push('--cwd', cwd);
+
+    const result = execSync(
+      `bash ${scriptPath} ${args.map(a => `'${a.replace(/'/g, "'\\''")}'`).join(' ')}`,
+      { encoding: 'utf-8', env: { ...process.env, SUPERBOT3_HOME: SUPERBOT3_HOME } }
+    );
+
+    // Parse key=value output
+    const output = {};
+    result.trim().split('\n').forEach(line => {
+      const [k, ...v] = line.split('=');
+      if (k) output[k] = v.join('=');
+    });
+
+    res.json({ ok: true, ...output });
+  } catch (err) {
+    res.status(500).json({ error: err.stderr?.trim() || err.message });
+  }
+});
+
+// Message a specific worker
+app.post('/api/spaces/:name/workers/:worker/message', async (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: 'text is required' });
+
+  const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', `${req.params.worker}.json`);
+  try {
+    await writeToInbox(inboxPath, { from: 'team-lead', text, color: 'blue', summary: text.slice(0, 80) });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Kill a worker
+app.delete('/api/spaces/:name/workers/:worker', async (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const teamConfigPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'config.json');
+  const teamConfig = readJsonSafe(teamConfigPath);
+  if (!teamConfig) return res.status(500).json({ error: 'Team config not found' });
+
+  const member = (teamConfig.members || []).find(m => m.name === req.params.worker);
+  if (!member) return res.status(404).json({ error: 'Worker not found' });
+
+  // Kill tmux pane
+  if (member.tmuxPaneId && member.tmuxPaneId !== 'pending') {
+    try { execSync(`tmux kill-pane -t ${member.tmuxPaneId} 2>/dev/null`); } catch {}
+  }
+
+  // Remove from config
+  try {
+    teamConfig.members = (teamConfig.members || []).filter(m => m.name !== req.params.worker);
+    fs.writeFileSync(teamConfigPath, JSON.stringify(teamConfig, null, 2), 'utf-8');
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+
+  res.json({ ok: true });
+});
+
+// Interrupt a worker (send Escape to tmux pane)
+app.post('/api/spaces/:name/workers/:worker/interrupt', async (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const teamConfigPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'config.json');
+  const teamConfig = readJsonSafe(teamConfigPath);
+  const member = (teamConfig?.members || []).find(m => m.name === req.params.worker);
+  if (!member) return res.status(404).json({ error: 'Worker not found' });
+
+  if (!member.tmuxPaneId || member.tmuxPaneId === 'pending') {
+    return res.status(400).json({ error: 'Worker has no active tmux pane' });
+  }
+
+  try {
+    execSync(`tmux send-keys -t ${member.tmuxPaneId} Escape`);
+  } catch {
+    return res.status(500).json({ error: 'Failed to send Escape to pane' });
+  }
+
+  // Optional follow-up message
+  const { message } = req.body || {};
+  if (message) {
+    const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', `${req.params.worker}.json`);
+    try {
+      await writeToInbox(inboxPath, { from: 'team-lead', text: message, color: 'blue', summary: message.slice(0, 80) });
+    } catch {}
+  }
+
+  res.json({ ok: true });
 });
 
 // ── Schedules ────────────────────────────────────────────────────────────────

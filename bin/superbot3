@@ -127,6 +127,47 @@ program
     require('../src/commands/spawn-worker')(SUPERBOT3_HOME, space, name, prompt, opts);
   });
 
+// workers (list)
+program
+  .command('workers [space]')
+  .description('List workers for a space (or all spaces)')
+  .action((space) => {
+    require('../src/commands/workers')(SUPERBOT3_HOME, space);
+  });
+
+// kill-worker
+program
+  .command('kill-worker <space> <name>')
+  .description('Kill a worker (destroy pane + remove from config)')
+  .action(async (space, name) => {
+    await require('../src/commands/kill-worker')(SUPERBOT3_HOME, space, name);
+  });
+
+// restart-worker
+program
+  .command('restart-worker <space> <name>')
+  .description('Kill and re-spawn a worker with the same config')
+  .action(async (space, name) => {
+    await require('../src/commands/restart-worker')(SUPERBOT3_HOME, space, name);
+  });
+
+// message-worker
+program
+  .command('message-worker <space> <worker> <text>')
+  .description('Send a message to a specific worker')
+  .action(async (space, worker, text) => {
+    await require('../src/commands/message-worker')(SUPERBOT3_HOME, space, worker, text);
+  });
+
+// interrupt-worker
+program
+  .command('interrupt <space> <worker>')
+  .description('Interrupt a worker (send Escape to cancel current generation)')
+  .option('-m, --message <text>', 'Follow-up message to send after interrupting')
+  .action(async (space, worker, opts) => {
+    await require('../src/commands/interrupt-worker')(SUPERBOT3_HOME, space, worker, opts);
+  });
+
 // skill commands
 const skill = program.command('skill').description('Manage space skills');
 
