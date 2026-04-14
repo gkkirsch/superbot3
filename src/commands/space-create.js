@@ -175,9 +175,8 @@ function createSpace(home, name, codeDir) {
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 
-  // Don't pre-create team config — TeamCreate runs as the first interactive prompt
-  // and needs a clean slate to properly set appState.teamContext.
-  // Just ensure the teams directory exists.
+  // Team config and inbox are created at launch time by launchSpace().
+  // Just ensure the teams directory exists here.
   ensureDir(path.join(spaceDir, '.claude', 'teams'));
 
   // Always write scheduled_tasks.json with nightly consolidation crons

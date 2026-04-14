@@ -19,9 +19,9 @@ To message another space (via master relay):
 
 ## Worker Management
 
-Use the built-in team tools:
-- **TeamCreate** — Create a new team (done automatically on first run)
-- **Agent tool** — Spawn workers using agent definitions from .claude/agents/
+Use these tools:
+- **Agent tool** — Spawn inline subagents for quick tasks
+- **`superbot3 spawn-worker`** — Spawn tmux-based workers for long-running tasks (via Bash)
 - **SendMessage** — Send messages to workers
 - **TaskCreate/TaskUpdate** — Assign and track tasks
 
