@@ -17,10 +17,16 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   const scriptPath = path.join(scriptDir, `launch-${name}.sh`);
 
   const claudeArgs = ['--dangerously-skip-permissions', `--model ${model}`];
-  // Don't resume — TeamCreate as positional prompt needs a fresh session
-  // (resumed sessions already have teamContext and would error)
-  // No --agent-id/--agent-name/--team-name — TeamCreate runs as first prompt
-  // and sets up team context properly (isTeammate()=false, isTeamLead()=true)
+  // Use --agent-id and --team-name to bootstrap team context at launch.
+  // This activates inbox polling immediately (agent polls its own inbox file).
+  // Trade-off: isTeammate()=true prevents spawning NAMED teammates, but
+  // unnamed subagents (via Agent tool) work fine. This is far more reliable
+  // than depending on TeamCreate running as a tool call.
+  if (teamArgs?.agentId) claudeArgs.push(`--agent-id '${teamArgs.agentId}'`);
+  if (teamArgs?.agentName) claudeArgs.push(`--agent-name '${teamArgs.agentName}'`);
+  if (teamArgs?.teamName) claudeArgs.push(`--team-name '${teamArgs.teamName}'`);
+  // Resume previous session if available
+  if (resumeSessionId) claudeArgs.push(`--resume '${resumeSessionId}'`);
   // Custom system prompt file replaces the entire default Claude Code system prompt
   if (opts.systemPromptFile && fs.existsSync(opts.systemPromptFile)) {
     claudeArgs.push(`--system-prompt-file '${opts.systemPromptFile}'`);
@@ -32,10 +38,8 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   const browserEnv = getBrowserEnv(opts.browserSession || name, spaceDir);
   const browserExports = Object.entries(browserEnv).map(([k, v]) => `export ${k}="${v}"`).join('\n');
 
-  // Don't pass a positional prompt — let the space launch idle so the dashboard
-  // shows the empty state. The first real user message will be delivered via
-  // tmux send-keys (since inbox polling isn't active until TeamCreate runs).
-  // The system prompt instructs Claude to call TeamCreate on first message.
+  // No positional prompt — space launches idle, preserving the dashboard empty state.
+  // Messages arrive via inbox (polling is active from --agent-id/--team-name flags).
 
   const script = `#!/bin/bash
 cd "${cwd}"
@@ -129,11 +133,11 @@ function launchSpace(space, model, tmuxSession = 'superbot3') {
     return false;
   }
 
-  // Don't pre-create team config — let TeamCreate do it via the positional prompt
-  // so appState.teamContext gets set properly (enables inbox polling + teammate spawning).
-  // Only ensure the teams directory exists so TeamCreate can write to it.
-  const teamDir = path.join(claudeConfigDir, 'teams');
-  fs.mkdirSync(teamDir, { recursive: true });
+  // Pre-create team config and inbox so Claude Code's inbox poller works immediately.
+  // With --agent-id/--team-name flags, the poller reads the agent name from CLI args
+  // and polls the matching inbox file. No TeamCreate tool call needed.
+  ensureTeamConfig(claudeConfigDir, slug);
+  ensureInbox(claudeConfigDir, slug, 'team-lead');
 
   const teamArgs = { agentId: 'team-lead', agentName: 'team-lead', teamName: slug };
   const systemPromptFile = path.join(space.spaceDir, 'system-prompt.md');
