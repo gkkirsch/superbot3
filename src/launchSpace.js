@@ -32,6 +32,11 @@ function writeLaunchScript(name, cwd, model, resumeSessionId, claudeConfigDir, t
   const browserEnv = getBrowserEnv(opts.browserSession || name, spaceDir);
   const browserExports = Object.entries(browserEnv).map(([k, v]) => `export ${k}="${v}"`).join('\n');
 
+  // Don't pass a positional prompt — let the space launch idle so the dashboard
+  // shows the empty state. The first real user message will be delivered via
+  // tmux send-keys (since inbox polling isn't active until TeamCreate runs).
+  // The system prompt instructs Claude to call TeamCreate on first message.
+
   const script = `#!/bin/bash
 cd "${cwd}"
 export CLAUDE_CONFIG_DIR="${claudeConfigDir}"
@@ -39,7 +44,7 @@ export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
 export CLAUDE_CODE_SYNC_PLUGIN_INSTALL=1
 export ENABLE_CLAUDEAI_MCP_SERVERS=0
 ${browserExports}
-exec claude ${claudeArgs.join(' ')} 'TeamCreate({ team_name: "${teamArgs?.teamName || name}" })'
+exec claude ${claudeArgs.join(' ')}
 `;
 
   fs.writeFileSync(scriptPath, script, { mode: 0o755 });

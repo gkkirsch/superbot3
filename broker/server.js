@@ -193,9 +193,43 @@ app.post('/api/spaces/:name/message', async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
-  const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
-  await writeToInbox(inboxPath, { from: 'user', text, summary: text.slice(0, 80) });
-  res.json({ ok: true });
+  const teamConfigPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'config.json');
+  const hasTeamConfig = fs.existsSync(teamConfigPath);
+
+  if (hasTeamConfig) {
+    // Normal path: inbox polling is active, write to inbox file
+    const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
+    try {
+      await writeToInbox(inboxPath, { from: 'user', text, summary: text.slice(0, 80) });
+      console.log(`[inbox] Message written to space "${config.slug}" via inbox`);
+      res.json({ ok: true, delivery: 'inbox' });
+    } catch (err) {
+      console.error(`[inbox] Failed to write to space "${config.slug}": ${err.message}`);
+      res.status(500).json({ error: `Failed to write message: ${err.message}` });
+    }
+  } else {
+    // Bootstrap path: TeamCreate hasn't run yet, so inbox polling isn't active.
+    // Deliver via tmux send-keys so Claude receives it as direct CLI input.
+    // The system prompt tells Claude to call TeamCreate before responding.
+    const tmuxSession = 'superbot3';
+    const escaped = text.replace(/'/g, "'\\''");
+    try {
+      execSync(`tmux send-keys -t ${tmuxSession}:${config.slug} '${escaped}' Enter`, { timeout: 5000 });
+      console.log(`[inbox] Message delivered to space "${config.slug}" via tmux send-keys (bootstrap — no team config yet)`);
+      res.json({ ok: true, delivery: 'tmux' });
+    } catch (err) {
+      console.error(`[inbox] tmux send-keys failed for "${config.slug}": ${err.message}`);
+      // Fall back to inbox write anyway — message will be picked up after TeamCreate eventually runs
+      try {
+        const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
+        await writeToInbox(inboxPath, { from: 'user', text, summary: text.slice(0, 80) });
+        console.log(`[inbox] Fallback: message written to inbox for "${config.slug}"`);
+        res.json({ ok: true, delivery: 'inbox-fallback' });
+      } catch (err2) {
+        res.status(500).json({ error: `Failed to deliver message: ${err2.message}` });
+      }
+    }
+  }
 });
 
 app.get('/api/spaces/:name/messages', (req, res) => {
@@ -219,9 +253,36 @@ app.post('/api/master/message', async (req, res) => {
   const { text } = req.body;
   if (!text) return res.status(400).json({ error: 'Text is required' });
 
-  const inboxPath = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
-  await writeToInbox(inboxPath, { from: 'user', text, summary: text.slice(0, 80) });
-  res.json({ ok: true });
+  const masterConfigPath = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'config.json');
+  const hasTeamConfig = fs.existsSync(masterConfigPath);
+
+  if (hasTeamConfig) {
+    const inboxPath = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
+    try {
+      await writeToInbox(inboxPath, { from: 'user', text, summary: text.slice(0, 80) });
+      console.log(`[inbox] Message written to master via inbox`);
+      res.json({ ok: true, delivery: 'inbox' });
+    } catch (err) {
+      console.error(`[inbox] Failed to write to master: ${err.message}`);
+      res.status(500).json({ error: `Failed to write message: ${err.message}` });
+    }
+  } else {
+    const escaped = text.replace(/'/g, "'\\''");
+    try {
+      execSync(`tmux send-keys -t superbot3:master '${escaped}' Enter`, { timeout: 5000 });
+      console.log(`[inbox] Message delivered to master via tmux send-keys (bootstrap)`);
+      res.json({ ok: true, delivery: 'tmux' });
+    } catch (err) {
+      console.error(`[inbox] tmux send-keys failed for master: ${err.message}`);
+      const inboxPath = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json');
+      try {
+        await writeToInbox(inboxPath, { from: 'user', text, summary: text.slice(0, 80) });
+        res.json({ ok: true, delivery: 'inbox-fallback' });
+      } catch (err2) {
+        res.status(500).json({ error: `Failed to deliver message: ${err2.message}` });
+      }
+    }
+  }
 });
 
 app.get('/api/master/messages', (req, res) => {
@@ -240,6 +301,35 @@ app.get('/api/master/messages', (req, res) => {
 
 app.get('/api/master/status', (req, res) => {
   res.json({ running: isWindowRunning('master') });
+});
+
+// Inbox health: check if team config exists (needed for inbox polling to work)
+app.get('/api/spaces/:name/inbox-health', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+
+  const teamConfigPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'config.json');
+  const inboxPath = path.join(config.claudeConfigDir, 'teams', config.slug, 'inboxes', 'team-lead.json');
+  const hasTeamConfig = fs.existsSync(teamConfigPath);
+  const hasInbox = fs.existsSync(inboxPath);
+  const running = isWindowRunning(config.slug);
+
+  let unreadCount = 0;
+  if (hasInbox) {
+    try {
+      const msgs = JSON.parse(fs.readFileSync(inboxPath, 'utf-8'));
+      unreadCount = Array.isArray(msgs) ? msgs.filter(m => m.read === false).length : 0;
+    } catch {}
+  }
+
+  res.json({
+    running,
+    hasTeamConfig,
+    hasInbox,
+    unreadCount,
+    healthy: running && hasTeamConfig,
+    issue: !hasTeamConfig ? 'TeamCreate has not run — inbox polling inactive. Restart the space.' : null,
+  });
 });
 
 // ── Conversation Logs ────────────────────────────────────────────────────────
