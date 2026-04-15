@@ -149,7 +149,7 @@ app.post('/api/spaces', async (req, res) => {
   try {
     const { createSpace } = require(path.join(__dirname, '..', 'src', 'commands', 'space-create'));
     const resolvedCodeDir = codeDir ? path.resolve(codeDir) : null;
-    const spaceConfig = createSpace(SUPERBOT3_HOME, name, resolvedCodeDir);
+    const spaceConfig = createSpace(SUPERBOT3_HOME, name, { codeDir: resolvedCodeDir });
 
     // Auto-start the space using the shared launchSpace module
     try {
@@ -421,6 +421,22 @@ function parseRichConversation(jsonlPath) {
 
         if (blocks.length === 0) continue;
 
+        // Skip internal notification messages (e.g. idle_notification, heartbeat)
+        const firstTextBlock = blocks.find(b => b.type === 'text');
+        if (firstTextBlock) {
+          try {
+            const parsed = JSON.parse(firstTextBlock.text);
+            if (parsed && typeof parsed === 'object' && parsed.type && (
+              parsed.type === 'idle_notification' ||
+              parsed.type === 'heartbeat' ||
+              parsed.type === 'status_update' ||
+              parsed.type.endsWith('_notification')
+            )) {
+              continue;
+            }
+          } catch { /* not JSON, proceed normally */ }
+        }
+
         // Check for teammate message XML in the first text block
         let origin = obj.origin || null;
         let teammateId = null;
@@ -439,6 +455,19 @@ function parseRichConversation(jsonlPath) {
             teammateSummary = summaryMatch ? summaryMatch[1] : null;
             origin = 'teammate';
             firstText.text = tmMatch[2].trim();
+
+            // Skip internal notification messages wrapped in teammate XML
+            try {
+              const parsed = JSON.parse(firstText.text);
+              if (parsed && typeof parsed === 'object' && parsed.type && (
+                parsed.type === 'idle_notification' ||
+                parsed.type === 'heartbeat' ||
+                parsed.type === 'status_update' ||
+                parsed.type.endsWith('_notification')
+              )) {
+                continue;
+              }
+            } catch { /* not JSON, proceed normally */ }
           }
         }
 
@@ -490,11 +519,14 @@ function parseRichConversation(jsonlPath) {
       } else if (obj.type === 'system') {
         // Skip noise subtypes
         if (obj.subtype === 'turn_duration') continue;
+        // Skip transient API error retries (they auto-resolve)
+        if (obj.subtype === 'api_error' && obj.retryAttempt && obj.retryAttempt < obj.maxRetries) continue;
         messages.push({
           type: 'system',
           subtype: obj.subtype || 'informational',
           text: typeof obj.content === 'string' ? obj.content : '',
           timestamp: obj.timestamp || '',
+          level: obj.level || null,
         });
       }
     }
