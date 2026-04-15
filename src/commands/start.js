@@ -2,7 +2,7 @@ const { execSync, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { refreshAllSpaceCredentials } = require('../auth');
-const { sendToPane, getMasterPaneTarget, tmuxSessionExists, tmuxWindowExists } = require('../tmuxMessage');
+const { tmuxSessionExists, tmuxWindowExists } = require('../tmuxMessage');
 const { writeLaunchScript, launchSpace } = require('../launchSpace');
 const state = require('../state');
 
@@ -115,14 +115,6 @@ module.exports = async function start(home) {
       }
     }
   }
-
-  // Startup prompt to master
-  console.log('\nSending startup prompt to master...');
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  try {
-    sendToPane(getMasterPaneTarget(), 'Scan ~/.superbot3/state.json to discover all spaces. Note what spaces exist but do NOT message them — spaces wait for the user to talk first.');
-    console.log('  Sent');
-  } catch { console.log('  Could not send'); }
 
   console.log(`\nsuperbot3 is running!\n`);
   console.log(`  Broker:  http://localhost:${port}`);
