@@ -576,7 +576,16 @@ function parseAllRichConversations(projectsDir, { limit = 200 } = {}) {
   return deduped.slice(-limit);
 }
 
-// Detect if a space is currently thinking by reading the raw tail of the latest JSONL
+// Detect if a space is currently thinking by reading the raw tail of the latest JSONL.
+//
+// JSONL entry types during a turn:
+//   stream_request_start → waiting for API
+//   stream_event (message_start, content_block_start/delta/stop, message_delta, message_stop) → streaming
+//   assistant (stop_reason: "end_turn") → response complete
+//   assistant (stop_reason: "tool_use") → tool about to execute
+//   user (tool_result blocks) → tool finished, Claude will continue
+//   system (subtype: "turn_duration") → turn fully complete
+//
 function detectThinkingState(projectsDir) {
   const sessionFiles = findAllSessions(projectsDir);
   if (sessionFiles.length === 0) return { isThinking: false };
@@ -602,8 +611,8 @@ function detectThinkingState(projectsDir) {
     const lines = content.split('\n').filter(Boolean);
     if (lines.length === 0) return { isThinking: false };
 
-    // Parse the last ~20 lines to find the tail state
-    const tailLines = lines.slice(-20);
+    // Parse the last ~30 lines to find the tail state (need enough to see tool_use + tool_result pairs)
+    const tailLines = lines.slice(-30);
     const tailEntries = [];
     for (const line of tailLines) {
       try { tailEntries.push(JSON.parse(line)); } catch { continue; }
@@ -612,17 +621,28 @@ function detectThinkingState(projectsDir) {
 
     const last = tailEntries[tailEntries.length - 1];
 
-    // If the last entry is turn_duration, the turn is complete
+    // ── Definitive "done" signals ──
+
+    // turn_duration means the turn is fully complete
     if (last.type === 'system' && last.subtype === 'turn_duration') {
       return { isThinking: false };
     }
 
-    // If the last entry is permission-mode or other non-conversation type, not thinking
-    if (!['user', 'assistant', 'system'].includes(last.type)) {
+    // Final assistant message with end_turn followed by turn_duration = done.
+    // But end_turn alone (without turn_duration after) means the session may still
+    // be wrapping up. Check if turn_duration exists anywhere after the last assistant.
+    if (last.type === 'assistant' && last.message?.stop_reason === 'end_turn') {
       return { isThinking: false };
     }
 
-    // Find the last turn_duration in the tail to know if we're mid-turn
+    // Non-conversation metadata entries (permission-mode, attachment, etc.)
+    if (!['user', 'assistant', 'system', 'stream_event', 'stream_request_start'].includes(last.type)) {
+      return { isThinking: false };
+    }
+
+    // ── Find current turn boundaries ──
+
+    // Find the last turn_duration in the tail to know where the current turn starts
     let lastTurnDurationIdx = -1;
     for (let i = tailEntries.length - 1; i >= 0; i--) {
       if (tailEntries[i].type === 'system' && tailEntries[i].subtype === 'turn_duration') {
@@ -631,29 +651,38 @@ function detectThinkingState(projectsDir) {
       }
     }
 
-    // Get entries after the last turn_duration (current turn)
     const currentTurn = lastTurnDurationIdx >= 0
       ? tailEntries.slice(lastTurnDurationIdx + 1)
       : tailEntries;
 
     if (currentTurn.length === 0) return { isThinking: false };
 
-    // Find timestamp of the start of the current turn (first entry after turn_duration)
+    // Timestamp of the first entry in the current turn
     const turnStart = currentTurn[0].timestamp || null;
-
-    // Check for active tool execution: assistant with stop_reason=tool_use
-    // followed by user tool_result, but no subsequent assistant response
     const lastCurrent = currentTurn[currentTurn.length - 1];
 
-    // Look for unresolved tool_use: find the last assistant message with tool_use blocks
-    // and check if all tool_use ids have matching tool_results
+    // ── Streaming states ──
+
+    // stream_request_start → waiting for the API to respond
+    if (lastCurrent.type === 'stream_request_start') {
+      return { isThinking: true, turnStart };
+    }
+
+    // stream_event → actively streaming response from Claude
+    if (lastCurrent.type === 'stream_event') {
+      return { isThinking: true, turnStart };
+    }
+
+    // ── Tool execution detection ──
+
+    // Scan current turn for tool_use and tool_result pairs
     const toolUseIds = new Set();
     const toolResultIds = new Set();
     let lastToolName = null;
     for (const entry of currentTurn) {
       if (entry.type === 'assistant' && entry.message?.content) {
-        const content = Array.isArray(entry.message.content) ? entry.message.content : [];
-        for (const block of content) {
+        const blocks = Array.isArray(entry.message.content) ? entry.message.content : [];
+        for (const block of blocks) {
           if (block.type === 'tool_use') {
             toolUseIds.add(block.id);
             lastToolName = block.name;
@@ -661,8 +690,8 @@ function detectThinkingState(projectsDir) {
         }
       }
       if (entry.type === 'user' && entry.message?.content) {
-        const content = Array.isArray(entry.message.content) ? entry.message.content : [];
-        for (const block of content) {
+        const blocks = Array.isArray(entry.message.content) ? entry.message.content : [];
+        for (const block of blocks) {
           if (block.type === 'tool_result') {
             toolResultIds.add(block.tool_use_id);
           }
@@ -670,11 +699,10 @@ function detectThinkingState(projectsDir) {
       }
     }
 
-    // Check if there are unresolved tool calls
+    // Unresolved tool_use (tool is currently executing)
     let unresolvedTool = null;
     for (const id of toolUseIds) {
       if (!toolResultIds.has(id)) {
-        // Find the tool name for this unresolved id
         for (const entry of currentTurn) {
           if (entry.type === 'assistant' && entry.message?.content) {
             for (const block of (Array.isArray(entry.message.content) ? entry.message.content : [])) {
@@ -689,30 +717,31 @@ function detectThinkingState(projectsDir) {
     }
 
     if (unresolvedTool) {
-      return {
-        isThinking: true,
-        activeTool: unresolvedTool,
-        turnStart,
-      };
+      return { isThinking: true, activeTool: unresolvedTool, turnStart };
     }
 
-    // If the last entry is a user message with real text (not just tool_results),
-    // and there's no assistant reply yet — the space is thinking
+    // assistant with stop_reason=tool_use but all tools resolved → Claude is about to continue
+    if (lastCurrent.type === 'assistant' && lastCurrent.message?.stop_reason === 'tool_use') {
+      return { isThinking: true, activeTool: lastToolName, turnStart };
+    }
+
+    // user message with tool_result → tool just finished, Claude about to think
     if (lastCurrent.type === 'user') {
-      const content = lastCurrent.message?.content;
-      const hasText = typeof content === 'string'
-        || (Array.isArray(content) && content.some(b => b.type === 'text'));
+      const blocks = Array.isArray(lastCurrent.message?.content) ? lastCurrent.message.content : [];
+      const hasToolResult = blocks.some(b => b.type === 'tool_result');
+      if (hasToolResult) {
+        return { isThinking: true, turnStart };
+      }
+      // Real user text message with no assistant reply yet → space is thinking
+      const hasText = typeof lastCurrent.message?.content === 'string'
+        || blocks.some(b => b.type === 'text');
       if (hasText) {
         return { isThinking: true, turnStart: lastCurrent.timestamp || turnStart };
       }
     }
 
-    // If the last assistant message has stop_reason=tool_use, tools are being processed
-    if (lastCurrent.type === 'assistant' && lastCurrent.message?.stop_reason === 'tool_use') {
-      return { isThinking: true, activeTool: lastToolName, turnStart };
-    }
-
-    // If there's recent activity but no turn_duration yet, still thinking
+    // assistant without stop_reason → still generating (shouldn't happen often since
+    // stream_events usually precede the final assistant entry, but handle edge case)
     if (lastCurrent.type === 'assistant' && !lastCurrent.message?.stop_reason) {
       return { isThinking: true, turnStart };
     }
