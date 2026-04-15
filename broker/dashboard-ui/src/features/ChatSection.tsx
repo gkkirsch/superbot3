@@ -1,23 +1,22 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowUp, Search, Globe, FileText, Mail, Code, BarChart3, Lightbulb, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowUp, Search, Globe, FileText, Mail, Code, BarChart3, Lightbulb, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { InboxMessage } from '@/lib/types'
-import type { ConversationMessage } from '@/lib/api'
-import Markdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import type { ChatMessage } from '@/lib/types'
+import type { RichMessage } from '@/lib/api'
+import { RichMessageBubble, consolidateMessages } from './RichMessage'
 
 interface ChatSectionProps {
-  messages: InboxMessage[]
-  conversation: ConversationMessage[]
+  messages: ChatMessage[]
+  richConversation: RichMessage[]
   sendFn: (text: string) => Promise<unknown>
   queryKey: string[]
   title?: string
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 30
 
-export function ChatSection({ messages, conversation, sendFn, queryKey, title }: ChatSectionProps) {
+export function ChatSection({ messages, richConversation, sendFn, queryKey, title }: ChatSectionProps) {
   const [text, setText] = useState('')
   const [waitingForReply, setWaitingForReply] = useState(false)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
@@ -38,64 +37,68 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
     },
   })
 
-  // Merge inbox messages + conversation log, deduplicate by text + timestamp proximity
-  const merged = useMemo(() => {
-    type Msg = { from: string; text: string; timestamp: string; role: 'user' | 'assistant' | 'system' }
-    const all: Msg[] = []
+  // Consolidate assistant messages and add pending inbox messages
+  const consolidated = useMemo(() => {
+    const rich = consolidateMessages(richConversation)
 
-    // Add conversation messages, deduplicating within the conversation itself
-    // (tmux fallback + inbox poller can create duplicate user messages)
-    for (const msg of conversation) {
-      const isDupe = all.some(existing =>
-        existing.role === msg.role
-        && existing.text === msg.text
-        && Math.abs(new Date(existing.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 10000
-      )
-      if (!isDupe) {
-        all.push({ from: msg.from, text: msg.text, timestamp: msg.timestamp, role: msg.role })
-      }
-    }
-
-    // Add inbox messages not yet in the conversation (pending pickup)
+    // Add pending inbox messages not yet in the conversation
+    const pendingMessages: RichMessage[] = []
     for (const msg of messages) {
       const isFromUser = msg.from === 'user' || msg.from === 'dashboard' || msg.from === 'superbot3-cli'
       const isFromScheduler = msg.from === 'scheduler'
       if (!isFromUser && !isFromScheduler) continue
-      const role = isFromScheduler ? 'system' as const : 'user' as const
-      const alreadyInConvo = all.some(c =>
+
+      // Check if already in rich conversation
+      const alreadyInConvo = rich.some(c =>
         Math.abs(new Date(c.timestamp).getTime() - new Date(msg.timestamp).getTime()) < 10000
-        && c.text.includes(msg.text.slice(0, 40))
       )
-      if (!alreadyInConvo) {
-        all.push({ from: msg.from, text: msg.text, timestamp: msg.timestamp, role })
+      if (alreadyInConvo) continue
+
+      if (isFromScheduler) {
+        pendingMessages.push({
+          type: 'system',
+          subtype: 'scheduled',
+          text: msg.text,
+          timestamp: msg.timestamp,
+        })
+      } else {
+        pendingMessages.push({
+          type: 'user',
+          blocks: [{ type: 'text', text: msg.text }],
+          timestamp: msg.timestamp,
+          origin: null,
+          teammateId: null,
+          teammateColor: null,
+          teammateSummary: null,
+        })
       }
     }
 
+    const all = [...rich, ...pendingMessages]
     all.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     return all
-  }, [messages, conversation])
+  }, [richConversation, messages])
 
   // Clear typing indicator when a new assistant message arrives
   useEffect(() => {
-    if (waitingForReply && merged.length > 0 && merged[merged.length - 1].role === 'assistant') {
+    if (waitingForReply && consolidated.length > 0 && consolidated[consolidated.length - 1].type === 'assistant') {
       setWaitingForReply(false)
     }
-  }, [merged, waitingForReply])
+  }, [consolidated, waitingForReply])
 
   // Auto-scroll: instant on first load, smooth for new messages
   const initialLoadRef = useRef(true)
   useEffect(() => {
-    if (merged.length > prevLenRef.current || waitingForReply) {
+    if (consolidated.length > prevLenRef.current || waitingForReply) {
       if (initialLoadRef.current) {
-        // Jump to bottom instantly on mount — no visible scroll
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
         initialLoadRef.current = false
       } else {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
       }
     }
-    prevLenRef.current = merged.length
-  }, [merged.length, waitingForReply])
+    prevLenRef.current = consolidated.length
+  }, [consolidated.length, waitingForReply])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -126,7 +129,7 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
   const [suggestionPage, setSuggestionPage] = useState(() => Math.floor(Math.random() * (allSuggestions.length / 2)))
   const visibleSuggestions = allSuggestions.slice((suggestionPage * 2) % allSuggestions.length, (suggestionPage * 2) % allSuggestions.length + 2)
 
-  const isEmpty = merged.length === 0
+  const isEmpty = consolidated.length === 0
 
   return (
     <div className="flex flex-col h-full">
@@ -204,58 +207,19 @@ export function ChatSection({ messages, conversation, sendFn, queryKey, title }:
       ) : (
       <div ref={scrollRef} className="flex-1 overflow-y-auto py-4 scrollbar-auto">
       <div className="max-w-[790px] mx-auto px-4 space-y-3">
-        {false && (null)}
-        {merged.length > visibleCount && (
+        {consolidated.length > visibleCount && (
           <div className="text-center pb-2">
             <button
               onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
               className="text-xs text-stone hover:text-parchment transition-colors"
             >
-              Load earlier messages ({merged.length - visibleCount} more)
+              Load earlier messages ({consolidated.length - visibleCount} more)
             </button>
           </div>
         )}
-        {merged.slice(-visibleCount).map((msg, i) => {
-          const isUser = msg.role === 'user'
-          const isAssistant = msg.role === 'assistant'
-          const isScheduled = msg.role === 'system' || msg.from === 'scheduler'
-          return (
-            <div
-              key={`${msg.timestamp}-${i}`}
-              className={cn(
-                'animate-fade-up',
-                isUser && !isScheduled ? 'flex justify-end' : ''
-              )}
-            >
-              {isScheduled ? (
-                <div className="flex items-start gap-2 px-5 py-2 my-1 rounded-lg bg-surface/60 border border-border-custom/50">
-                  <span className="text-stone/60 text-xs mt-0.5">⏱</span>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[10px] font-medium text-stone/50 uppercase tracking-wider">Scheduled</span>
-                    <p className="text-xs text-stone leading-relaxed mt-0.5">{msg.text}</p>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className={cn(
-                    'rounded-2xl text-[0.9375rem] leading-relaxed',
-                    isUser
-                      ? 'bg-sand/15 text-parchment px-5 py-3 max-w-md'
-                      : 'text-parchment px-5 py-3'
-                  )}
-                >
-                  {isAssistant ? (
-                    <div className="markdown-compact">
-                      <Markdown remarkPlugins={[remarkGfm]}>{msg.text}</Markdown>
-                    </div>
-                  ) : (
-                    <div className="whitespace-pre-wrap break-words">{msg.text}</div>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
+        {consolidated.slice(-visibleCount).map((msg, i) => (
+          <RichMessageBubble key={`${msg.timestamp}-${i}`} message={msg} />
+        ))}
         {waitingForReply && (
           <div className="animate-fade-up">
             <div className="flex items-center gap-1.5 px-5 py-3">

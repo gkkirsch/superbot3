@@ -132,3 +132,20 @@ export function useSpaceConversation(name: string) {
     refetchInterval: 3_000,
   })
 }
+
+export function useSpaceRichConversation(name: string) {
+  return useQuery({
+    queryKey: ['space-rich-conversation', name],
+    queryFn: () => api.fetchSpaceRichConversation(name),
+    enabled: !!name,
+    refetchInterval: 3_000,
+  })
+}
+
+export function useMasterRichConversation() {
+  return useQuery({
+    queryKey: ['master-rich-conversation'],
+    queryFn: () => api.fetchMasterRichConversation(),
+    refetchInterval: 3_000,
+  })
+}

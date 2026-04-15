@@ -306,7 +306,7 @@ function parseAllConversations(projectsDir, { limit = 100, before = null } = {})
   return filtered.slice(-limit);
 }
 
-// Strip <teammate-message> XML wrapper from inbox-delivered messages
+// Strip <teammate-message> XML wrapper from legacy messages
 function unwrapTeammateMessage(text) {
   const match = text.match(/<teammate-message[^>]*>\n?([\s\S]*?)\n?<\/teammate-message>/);
   if (match) {
@@ -332,7 +332,7 @@ function parseConversation(jsonlPath) {
         text = text.trim();
         if (!text) continue;
 
-        // Unwrap teammate-message XML if present (inbox-delivered messages)
+        // Unwrap teammate-message XML if present (legacy messages)
         const unwrapped = unwrapTeammateMessage(text);
         if (unwrapped) {
           messages.push({
@@ -385,6 +385,180 @@ function parseConversation(jsonlPath) {
   } catch {}
   return messages;
 }
+
+// Rich conversation parser — preserves tool calls, thinking blocks, system messages
+function parseRichConversation(jsonlPath) {
+  if (!jsonlPath) return [];
+  const messages = [];
+  try {
+    const lines = fs.readFileSync(jsonlPath, 'utf-8').split('\n').filter(Boolean);
+    for (const line of lines) {
+      let obj;
+      try { obj = JSON.parse(line); } catch { continue; }
+
+      if (obj.type === 'user' && obj.message?.role === 'user') {
+        const content = obj.message.content;
+        const blocks = [];
+
+        if (typeof content === 'string') {
+          if (content.trim()) blocks.push({ type: 'text', text: content.trim() });
+        } else if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'text' && block.text?.trim()) {
+              blocks.push({ type: 'text', text: block.text.trim() });
+            } else if (block.type === 'tool_result') {
+              blocks.push({
+                type: 'tool_result',
+                tool_use_id: block.tool_use_id,
+                content: typeof block.content === 'string' ? block.content
+                  : Array.isArray(block.content) ? block.content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+                  : '',
+                is_error: block.is_error || false,
+              });
+            }
+          }
+        }
+
+        if (blocks.length === 0) continue;
+
+        // Check for teammate message XML in the first text block
+        let origin = obj.origin || null;
+        let teammateId = null;
+        let teammateColor = null;
+        let teammateSummary = null;
+        const firstText = blocks.find(b => b.type === 'text');
+        if (firstText) {
+          const tmMatch = firstText.text.match(/<teammate-message\s+([^>]*)>([\s\S]*?)<\/teammate-message>/);
+          if (tmMatch) {
+            const attrs = tmMatch[1];
+            const idMatch = attrs.match(/teammate_id="([^"]+)"/);
+            const colorMatch = attrs.match(/color="([^"]+)"/);
+            const summaryMatch = attrs.match(/summary="([^"]+)"/);
+            teammateId = idMatch ? idMatch[1] : null;
+            teammateColor = colorMatch ? colorMatch[1] : null;
+            teammateSummary = summaryMatch ? summaryMatch[1] : null;
+            origin = 'teammate';
+            firstText.text = tmMatch[2].trim();
+          }
+        }
+
+        messages.push({
+          type: 'user',
+          blocks,
+          timestamp: obj.timestamp || '',
+          origin,
+          teammateId,
+          teammateColor,
+          teammateSummary,
+        });
+
+      } else if (obj.type === 'assistant' && obj.message?.role === 'assistant') {
+        const content = obj.message.content;
+        const blocks = [];
+        if (Array.isArray(content)) {
+          for (const block of content) {
+            if (block.type === 'text' && block.text?.trim()) {
+              blocks.push({ type: 'text', text: block.text.trim() });
+            } else if (block.type === 'tool_use') {
+              blocks.push({
+                type: 'tool_use',
+                id: block.id,
+                name: block.name,
+                input: block.input || {},
+              });
+            } else if (block.type === 'thinking' && block.thinking?.trim()) {
+              blocks.push({ type: 'thinking', thinking: block.thinking.trim() });
+            }
+          }
+        }
+        if (blocks.length === 0) continue;
+
+        messages.push({
+          type: 'assistant',
+          blocks,
+          timestamp: obj.timestamp || '',
+          model: obj.message.model || null,
+          usage: obj.message.usage ? {
+            input_tokens: obj.message.usage.input_tokens || 0,
+            output_tokens: obj.message.usage.output_tokens || 0,
+            cache_read: obj.message.usage.cache_read_input_tokens || 0,
+            cache_creation: obj.message.usage.cache_creation_input_tokens || 0,
+          } : null,
+          stopReason: obj.message.stop_reason || null,
+        });
+
+      } else if (obj.type === 'system') {
+        // Skip noise subtypes
+        if (obj.subtype === 'turn_duration') continue;
+        messages.push({
+          type: 'system',
+          subtype: obj.subtype || 'informational',
+          text: typeof obj.content === 'string' ? obj.content : '',
+          timestamp: obj.timestamp || '',
+        });
+      }
+    }
+  } catch {}
+  return messages;
+}
+
+function parseAllRichConversations(projectsDir, { limit = 200 } = {}) {
+  const sessionFiles = findAllSessions(projectsDir);
+  const allMessages = [];
+  for (const filePath of sessionFiles) {
+    allMessages.push(...parseRichConversation(filePath));
+  }
+  allMessages.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  // Deduplicate by timestamp + type (some messages appear across sessions)
+  const deduped = [];
+  for (const msg of allMessages) {
+    const isDupe = deduped.some(existing =>
+      existing.type === msg.type
+      && existing.timestamp === msg.timestamp
+    );
+    if (!isDupe) deduped.push(msg);
+  }
+
+  // Link tool_result blocks back to their tool_use via id
+  const toolUseMap = new Map();
+  for (const msg of deduped) {
+    if (msg.type === 'assistant') {
+      for (const block of msg.blocks) {
+        if (block.type === 'tool_use') toolUseMap.set(block.id, block);
+      }
+    }
+  }
+  for (const msg of deduped) {
+    if (msg.type === 'user') {
+      for (const block of msg.blocks) {
+        if (block.type === 'tool_result' && toolUseMap.has(block.tool_use_id)) {
+          const toolUse = toolUseMap.get(block.tool_use_id);
+          toolUse.result = block.content;
+          toolUse.is_error = block.is_error;
+        }
+      }
+    }
+  }
+
+  return deduped.slice(-limit);
+}
+
+app.get('/api/spaces/:name/conversation/rich', (req, res) => {
+  const config = getSpaceConfig(req.params.name);
+  if (!config) return res.status(404).json({ error: 'Space not found' });
+  const projectsDir = path.join(config.claudeConfigDir, 'projects');
+  const limit = parseInt(req.query.limit) || 200;
+  const messages = parseAllRichConversations(projectsDir, { limit });
+  res.json(messages);
+});
+
+app.get('/api/master/conversation/rich', (req, res) => {
+  const projectsDir = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'projects');
+  const limit = parseInt(req.query.limit) || 200;
+  const messages = parseAllRichConversations(projectsDir, { limit });
+  res.json(messages);
+});
 
 app.get('/api/spaces/:name/conversation', (req, res) => {
   const config = getSpaceConfig(req.params.name);

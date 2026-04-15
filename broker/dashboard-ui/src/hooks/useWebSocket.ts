@@ -32,9 +32,11 @@ export function useWebSocket() {
           if (data.type === 'conversation_update') {
             if (data.source === 'master') {
               queryClient.invalidateQueries({ queryKey: ['master-conversation'] })
+              queryClient.invalidateQueries({ queryKey: ['master-rich-conversation'] })
               notify('superbot3', 'New activity from master')
             } else if (data.source === 'space' && data.space) {
               queryClient.invalidateQueries({ queryKey: ['space-conversation', data.space] })
+              queryClient.invalidateQueries({ queryKey: ['space-rich-conversation', data.space] })
               notify(data.space, data.preview || 'New activity')
             }
           }

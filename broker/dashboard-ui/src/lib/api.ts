@@ -1,4 +1,4 @@
-import type { Space, InboxMessage, ScheduledTask, KnowledgeFile, KnowledgeItem, AgentDef, SkillDef, PluginInfo, SkillDetail, AgentDetail, CredentialDeclaration, MemoryFile, MemoryStats } from './types'
+import type { Space, ChatMessage, ScheduledTask, KnowledgeFile, KnowledgeItem, AgentDef, SkillDef, PluginInfo, SkillDetail, AgentDetail, CredentialDeclaration, MemoryFile, MemoryStats } from './types'
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url)
@@ -38,9 +38,9 @@ export const sendSpaceMessage = (name: string, text: string) =>
 export const sendMasterMessage = (text: string) =>
   postJson<{ ok: boolean }>('/api/master/message', { text })
 export const fetchSpaceMessages = (name: string) =>
-  fetchJson<InboxMessage[]>(`/api/spaces/${name}/messages`)
+  fetchJson<ChatMessage[]>(`/api/spaces/${name}/messages`)
 export const fetchMasterMessages = () =>
-  fetchJson<InboxMessage[]>('/api/master/messages')
+  fetchJson<ChatMessage[]>('/api/master/messages')
 
 // Master
 export const fetchMasterStatus = () =>
@@ -162,3 +162,43 @@ export const fetchSpaceConversation = (name: string) =>
   fetchJson<ConversationMessage[]>(`/api/spaces/${name}/conversation`)
 export const fetchMasterConversation = () =>
   fetchJson<ConversationMessage[]>('/api/master/conversation')
+
+// Rich conversation types (preserves tool calls, thinking blocks, etc.)
+export interface RichTextBlock { type: 'text'; text: string }
+export interface RichToolUseBlock { type: 'tool_use'; id: string; name: string; input: Record<string, unknown>; result?: string; is_error?: boolean }
+export interface RichToolResultBlock { type: 'tool_result'; tool_use_id: string; content: string; is_error: boolean }
+export interface RichThinkingBlock { type: 'thinking'; thinking: string }
+export type RichBlock = RichTextBlock | RichToolUseBlock | RichToolResultBlock | RichThinkingBlock
+
+export interface RichUserMessage {
+  type: 'user'
+  blocks: (RichTextBlock | RichToolResultBlock)[]
+  timestamp: string
+  origin: string | null
+  teammateId: string | null
+  teammateColor: string | null
+  teammateSummary: string | null
+}
+
+export interface RichAssistantMessage {
+  type: 'assistant'
+  blocks: (RichTextBlock | RichToolUseBlock | RichThinkingBlock)[]
+  timestamp: string
+  model: string | null
+  usage: { input_tokens: number; output_tokens: number; cache_read: number; cache_creation: number } | null
+  stopReason: string | null
+}
+
+export interface RichSystemMessage {
+  type: 'system'
+  subtype: string
+  text: string
+  timestamp: string
+}
+
+export type RichMessage = RichUserMessage | RichAssistantMessage | RichSystemMessage
+
+export const fetchSpaceRichConversation = (name: string, limit = 200) =>
+  fetchJson<RichMessage[]>(`/api/spaces/${name}/conversation/rich?limit=${limit}`)
+export const fetchMasterRichConversation = (limit = 200) =>
+  fetchJson<RichMessage[]>(`/api/master/conversation/rich?limit=${limit}`)

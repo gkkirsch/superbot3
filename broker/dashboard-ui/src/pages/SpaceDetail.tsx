@@ -7,7 +7,7 @@ import { SchedulesTab } from '@/features/SchedulesTab'
 import { PluginsTab } from '@/features/PluginsTab'
 import { SettingsTab } from '@/features/SettingsTab'
 // SkillsTab removed — skills shown inside PluginsTab
-import { useSpace, useSpaceMessages, useSpaceConversation } from '@/hooks/useSpaces'
+import { useSpace, useSpaceMessages, useSpaceRichConversation } from '@/hooks/useSpaces'
 import { sendSpaceMessage } from '@/lib/api'
 import { usePanel } from '@/hooks/usePanel'
 import { PanelRight, X, Puzzle, FolderOpen, Clock, Settings, Brain, Globe } from 'lucide-react'
@@ -46,7 +46,7 @@ export function SpaceDetail() {
   const { slug } = useParams<{ slug: string }>()
   const { data: space, isLoading } = useSpace(slug!)
   const { data: messages } = useSpaceMessages(slug!)
-  const { data: conversation } = useSpaceConversation(slug!)
+  const { data: richConversation } = useSpaceRichConversation(slug!)
   const { open: panelOpen, toggle: togglePanel, close: closePanel } = usePanel()
 
   if (isLoading) {
@@ -83,7 +83,7 @@ export function SpaceDetail() {
         <div className="flex-1 min-h-0">
           <ChatSection
             messages={messages || []}
-            conversation={conversation || []}
+            richConversation={richConversation || []}
             sendFn={(text: string) => sendSpaceMessage(slug!, text)}
             queryKey={['space-messages', slug!]}
           />
