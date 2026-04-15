@@ -576,20 +576,169 @@ function parseAllRichConversations(projectsDir, { limit = 200 } = {}) {
   return deduped.slice(-limit);
 }
 
+// Detect if a space is currently thinking by reading the raw tail of the latest JSONL
+function detectThinkingState(projectsDir) {
+  const sessionFiles = findAllSessions(projectsDir);
+  if (sessionFiles.length === 0) return { isThinking: false };
+
+  // Find the most recently modified session file
+  let latestFile = sessionFiles[0];
+  let latestMtime = 0;
+  for (const f of sessionFiles) {
+    try {
+      const stat = fs.statSync(f);
+      if (stat.mtimeMs > latestMtime) {
+        latestMtime = stat.mtimeMs;
+        latestFile = f;
+      }
+    } catch {}
+  }
+
+  // If file hasn't been modified in >5 minutes, not thinking
+  if (Date.now() - latestMtime > 5 * 60 * 1000) return { isThinking: false };
+
+  try {
+    const content = fs.readFileSync(latestFile, 'utf-8');
+    const lines = content.split('\n').filter(Boolean);
+    if (lines.length === 0) return { isThinking: false };
+
+    // Parse the last ~20 lines to find the tail state
+    const tailLines = lines.slice(-20);
+    const tailEntries = [];
+    for (const line of tailLines) {
+      try { tailEntries.push(JSON.parse(line)); } catch { continue; }
+    }
+    if (tailEntries.length === 0) return { isThinking: false };
+
+    const last = tailEntries[tailEntries.length - 1];
+
+    // If the last entry is turn_duration, the turn is complete
+    if (last.type === 'system' && last.subtype === 'turn_duration') {
+      return { isThinking: false };
+    }
+
+    // If the last entry is permission-mode or other non-conversation type, not thinking
+    if (!['user', 'assistant', 'system'].includes(last.type)) {
+      return { isThinking: false };
+    }
+
+    // Find the last turn_duration in the tail to know if we're mid-turn
+    let lastTurnDurationIdx = -1;
+    for (let i = tailEntries.length - 1; i >= 0; i--) {
+      if (tailEntries[i].type === 'system' && tailEntries[i].subtype === 'turn_duration') {
+        lastTurnDurationIdx = i;
+        break;
+      }
+    }
+
+    // Get entries after the last turn_duration (current turn)
+    const currentTurn = lastTurnDurationIdx >= 0
+      ? tailEntries.slice(lastTurnDurationIdx + 1)
+      : tailEntries;
+
+    if (currentTurn.length === 0) return { isThinking: false };
+
+    // Find timestamp of the start of the current turn (first entry after turn_duration)
+    const turnStart = currentTurn[0].timestamp || null;
+
+    // Check for active tool execution: assistant with stop_reason=tool_use
+    // followed by user tool_result, but no subsequent assistant response
+    const lastCurrent = currentTurn[currentTurn.length - 1];
+
+    // Look for unresolved tool_use: find the last assistant message with tool_use blocks
+    // and check if all tool_use ids have matching tool_results
+    const toolUseIds = new Set();
+    const toolResultIds = new Set();
+    let lastToolName = null;
+    for (const entry of currentTurn) {
+      if (entry.type === 'assistant' && entry.message?.content) {
+        const content = Array.isArray(entry.message.content) ? entry.message.content : [];
+        for (const block of content) {
+          if (block.type === 'tool_use') {
+            toolUseIds.add(block.id);
+            lastToolName = block.name;
+          }
+        }
+      }
+      if (entry.type === 'user' && entry.message?.content) {
+        const content = Array.isArray(entry.message.content) ? entry.message.content : [];
+        for (const block of content) {
+          if (block.type === 'tool_result') {
+            toolResultIds.add(block.tool_use_id);
+          }
+        }
+      }
+    }
+
+    // Check if there are unresolved tool calls
+    let unresolvedTool = null;
+    for (const id of toolUseIds) {
+      if (!toolResultIds.has(id)) {
+        // Find the tool name for this unresolved id
+        for (const entry of currentTurn) {
+          if (entry.type === 'assistant' && entry.message?.content) {
+            for (const block of (Array.isArray(entry.message.content) ? entry.message.content : [])) {
+              if (block.type === 'tool_use' && block.id === id) {
+                unresolvedTool = block.name;
+              }
+            }
+          }
+        }
+        break;
+      }
+    }
+
+    if (unresolvedTool) {
+      return {
+        isThinking: true,
+        activeTool: unresolvedTool,
+        turnStart,
+      };
+    }
+
+    // If the last entry is a user message with real text (not just tool_results),
+    // and there's no assistant reply yet — the space is thinking
+    if (lastCurrent.type === 'user') {
+      const content = lastCurrent.message?.content;
+      const hasText = typeof content === 'string'
+        || (Array.isArray(content) && content.some(b => b.type === 'text'));
+      if (hasText) {
+        return { isThinking: true, turnStart: lastCurrent.timestamp || turnStart };
+      }
+    }
+
+    // If the last assistant message has stop_reason=tool_use, tools are being processed
+    if (lastCurrent.type === 'assistant' && lastCurrent.message?.stop_reason === 'tool_use') {
+      return { isThinking: true, activeTool: lastToolName, turnStart };
+    }
+
+    // If there's recent activity but no turn_duration yet, still thinking
+    if (lastCurrent.type === 'assistant' && !lastCurrent.message?.stop_reason) {
+      return { isThinking: true, turnStart };
+    }
+
+    return { isThinking: false };
+  } catch {
+    return { isThinking: false };
+  }
+}
+
 app.get('/api/spaces/:name/conversation/rich', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
   const projectsDir = path.join(config.claudeConfigDir, 'projects');
   const limit = parseInt(req.query.limit) || 200;
   const messages = parseAllRichConversations(projectsDir, { limit });
-  res.json(messages);
+  const thinking = detectThinkingState(projectsDir);
+  res.json({ messages, thinking });
 });
 
 app.get('/api/master/conversation/rich', (req, res) => {
   const projectsDir = path.join(SUPERBOT3_HOME, 'orchestrator', '.claude', 'projects');
   const limit = parseInt(req.query.limit) || 200;
   const messages = parseAllRichConversations(projectsDir, { limit });
-  res.json(messages);
+  const thinking = detectThinkingState(projectsDir);
+  res.json({ messages, thinking });
 });
 
 app.get('/api/spaces/:name/conversation', (req, res) => {

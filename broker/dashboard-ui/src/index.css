@@ -146,6 +146,27 @@ body {
   animation: typing-bounce 1.2s ease-in-out infinite;
 }
 
+/* Thinking indicator shimmer */
+@keyframes thinking-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.thinking-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-stone) 0%,
+    var(--color-stone) 35%,
+    var(--color-parchment) 50%,
+    var(--color-stone) 65%,
+    var(--color-stone) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: thinking-shimmer 3s ease-in-out infinite;
+}
+
 /* Markdown in chat messages */
 .markdown-compact { font-size: inherit; line-height: 1.7; overflow-wrap: anywhere; }
 .markdown-compact h1, .markdown-compact h2 { font-family: var(--font-heading); font-size: 0.875rem; color: var(--color-parchment); margin-top: 0.75rem; margin-bottom: 0.375rem; font-weight: 600; }

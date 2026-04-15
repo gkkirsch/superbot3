@@ -4,12 +4,13 @@ import { ChatSection } from '@/features/ChatSection'
 
 export function Dashboard() {
   const { data: messages } = useMasterMessages()
-  const { data: richConversation } = useMasterRichConversation()
+  const { data: richData } = useMasterRichConversation()
 
   return (
     <ChatSection
       messages={messages ?? []}
-      richConversation={richConversation ?? []}
+      richConversation={richData?.messages ?? []}
+      thinkingState={richData?.thinking}
       sendFn={sendMasterMessage}
       queryKey={['master-messages']}
     />

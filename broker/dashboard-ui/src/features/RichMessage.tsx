@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, Terminal, FileText, Pencil, Search, FolderSearch, Globe, Brain, CheckCircle2, XCircle, Users, Clock } from 'lucide-react'
+import { ChevronRight, Terminal, FileText, Pencil, Search, FolderSearch, Globe, Brain, Check, X, Users, Clock, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RichMessage, RichAssistantMessage, RichUserMessage, RichSystemMessage, RichToolUseBlock, RichThinkingBlock } from '@/lib/api'
 import Markdown from 'react-markdown'
@@ -49,19 +49,19 @@ function ToolDetail({ block }: { block: RichToolUseBlock }) {
   return (
     <div className="py-1">
       <div className="flex items-center gap-2">
-        <Icon className="w-3 h-3 text-stone/50 shrink-0" />
-        <span className="text-[11px] text-stone/60 font-mono truncate flex-1">{summary}</span>
         {hasResult && (
           isError
-            ? <XCircle className="w-3 h-3 text-ember/60 shrink-0" />
-            : <CheckCircle2 className="w-3 h-3 text-moss/60 shrink-0" />
+            ? <X className="w-3 h-3 text-ember/60 shrink-0" />
+            : <Check className="w-3 h-3 text-moss/60 shrink-0" />
         )}
+        <Icon className="w-3 h-3 text-stone/50 shrink-0" />
+        <span className="text-[11px] text-stone/60 font-mono truncate flex-1">{summary}</span>
         {hasResult && (
           <button
             onClick={() => setShowResult(r => !r)}
             className="text-[10px] text-stone/30 hover:text-stone/50 transition-colors"
           >
-            {showResult ? 'hide' : 'output'}
+            {showResult ? 'hide' : 'see result'}
           </button>
         )}
       </div>
@@ -89,8 +89,8 @@ function ToolGroup({ tools }: { tools: RichToolUseBlock[] }) {
         onClick={() => setExpanded(e => !e)}
         className="flex items-center gap-2 text-stone/40 hover:text-stone/60 transition-colors"
       >
-        <ChevronRight className={cn('w-3 h-3 transition-transform shrink-0', expanded && 'rotate-90')} />
-        <span className="text-[11px]">
+        <ChevronRight className={cn('w-4 h-4 transition-transform shrink-0', expanded && 'rotate-90')} />
+        <span className="text-[13px]">
           {tools.length} tool call{tools.length !== 1 ? 's' : ''}
         </span>
         {errorCount > 0 && (
@@ -98,7 +98,7 @@ function ToolGroup({ tools }: { tools: RichToolUseBlock[] }) {
         )}
       </button>
       {expanded && (
-        <div className="ml-5 mt-1 pl-3 border-l border-stone/10 space-y-0.5">
+        <div className="ml-5 mt-1 pl-3 space-y-0.5">
           {tools.map((block, i) => (
             <ToolDetail key={block.id || `tool-${i}`} block={block} />
           ))}
@@ -177,6 +177,25 @@ function UserMessage({ msg }: { msg: RichUserMessage }) {
 
   // Regular user message
   const isSlashCommand = text.startsWith('/')
+  const isScheduled = !!msg.scheduledPrompt
+
+  if (isScheduled) {
+    return (
+      <div className="animate-fade-up my-8 px-4">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 border-t border-border-custom/50" />
+          <div className="flex items-center gap-2">
+            <Clock className="w-3 h-3 shrink-0 text-stone/40" />
+            <span className="text-[10px] font-medium text-stone/30 uppercase tracking-wider">Scheduled</span>
+          </div>
+          <div className="flex-1 border-t border-border-custom/50" />
+        </div>
+        <div className="mt-2 text-center">
+          <span className="text-[12px] font-mono text-stone/40">{text}</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="animate-fade-up flex justify-end">
@@ -234,11 +253,39 @@ function AssistantMessage({ msg }: { msg: RichAssistantMessage }) {
           <ToolGroup tools={visibleTools} />
         )}
 
-        {/* Footer: timestamp */}
-        <div className="px-4 mt-1">
-          <Timestamp ts={msg.timestamp} />
-        </div>
+        {/* Footer spacer */}
+        <div className="px-4 mt-1" />
       </div>
+    </div>
+  )
+}
+
+// ── Scheduled Message (expandable prompt) ──
+
+function ScheduledMessage({ msg }: { msg: RichSystemMessage }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="animate-fade-up my-3 px-4">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="flex items-center gap-3 w-full group"
+      >
+        <div className="flex-1 border-t border-border-custom/50" />
+        <div className="flex items-center gap-2 text-xs whitespace-nowrap">
+          <Clock className="w-3 h-3 shrink-0 text-stone/40" />
+          <span className="text-[10px] font-medium text-stone/30 uppercase tracking-wider">Scheduled</span>
+          {msg.text && !expanded && (
+            <ChevronRight className="w-3 h-3 text-stone/30 group-hover:text-stone/50 transition-colors" />
+          )}
+        </div>
+        <div className="flex-1 border-t border-border-custom/50" />
+      </button>
+      {expanded && msg.text && (
+        <div className="mt-2 mx-auto max-w-md">
+          <pre className="text-[11px] font-mono text-stone/40 whitespace-pre-wrap break-words text-center">{msg.text}</pre>
+        </div>
+      )}
     </div>
   )
 }
@@ -257,16 +304,7 @@ function SystemMessage({ msg }: { msg: RichSystemMessage }) {
   }
 
   if (msg.subtype === 'scheduled_task_fire' || msg.subtype === 'scheduled') {
-    return (
-      <div className="animate-fade-up px-4 my-1">
-        <div className="flex items-center gap-2 px-3 py-2 text-xs whitespace-nowrap">
-          <Clock className="w-3 h-3 shrink-0 text-stone/40" />
-          <span className="text-[10px] font-medium text-stone/30 uppercase tracking-wider">Scheduled</span>
-          {msg.text && <span className="text-stone/50 truncate">{msg.text}</span>}
-          <Timestamp ts={msg.timestamp} />
-        </div>
-      </div>
-    )
+    return <ScheduledMessage msg={msg} />
   }
 
   if (msg.subtype === 'stop_hook_summary') {
@@ -279,10 +317,24 @@ function SystemMessage({ msg }: { msg: RichSystemMessage }) {
     )
   }
 
+  const isError = msg.level === 'error' || msg.subtype?.includes('error')
+  const label = msg.text || msg.subtype
+
+  if (isError) {
+    return (
+      <div className="animate-fade-up px-4 my-2">
+        <div className="flex items-center gap-2 px-4 py-2.5 text-[0.875rem] text-ember/70 leading-relaxed">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-ember/50" />
+          <span>{label}</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="animate-fade-up px-4 my-1">
       <div className="flex items-start gap-2 px-3 py-2 text-xs text-stone/40">
-        <span>{msg.text || msg.subtype}</span>
+        <span>{label}</span>
       </div>
     </div>
   )
@@ -306,6 +358,7 @@ export function RichMessageBubble({ message }: { message: RichMessage }) {
 export function consolidateMessages(messages: RichMessage[]): RichMessage[] {
   const result: RichMessage[] = []
   let pendingAssistant: RichAssistantMessage | null = null
+  let pendingScheduledPrompt: string | null = null
 
   for (const msg of messages) {
     if (msg.type === 'assistant') {
@@ -344,8 +397,26 @@ export function consolidateMessages(messages: RichMessage[]): RichMessage[] {
         result.push(pendingAssistant)
         pendingAssistant = null
       }
-      result.push(msg)
+      // Attach pending scheduled prompt to this user message
+      if (pendingScheduledPrompt && hasText) {
+        const uMsg = msg as RichUserMessage
+        result.push({ ...uMsg, scheduledPrompt: pendingScheduledPrompt })
+        pendingScheduledPrompt = null
+      } else {
+        result.push(msg)
+      }
     } else {
+      // System messages
+      const sMsg = msg as RichSystemMessage
+      if (sMsg.subtype === 'scheduled_task_fire' || sMsg.subtype === 'scheduled') {
+        // Hold the scheduled prompt to attach to the next user message
+        if (pendingAssistant) {
+          result.push(pendingAssistant)
+          pendingAssistant = null
+        }
+        pendingScheduledPrompt = sMsg.text || 'Scheduled task'
+        continue
+      }
       if (pendingAssistant) {
         result.push(pendingAssistant)
         pendingAssistant = null
@@ -354,8 +425,18 @@ export function consolidateMessages(messages: RichMessage[]): RichMessage[] {
     }
   }
 
+  // Flush remaining
   if (pendingAssistant) {
     result.push(pendingAssistant)
+  }
+  // If a scheduled prompt is still pending (no assistant followed), render it standalone
+  if (pendingScheduledPrompt) {
+    result.push({
+      type: 'system' as const,
+      subtype: 'scheduled',
+      text: pendingScheduledPrompt,
+      timestamp: '',
+    })
   }
 
   return result

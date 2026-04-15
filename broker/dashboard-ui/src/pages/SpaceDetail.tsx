@@ -46,7 +46,7 @@ export function SpaceDetail() {
   const { slug } = useParams<{ slug: string }>()
   const { data: space, isLoading } = useSpace(slug!)
   const { data: messages } = useSpaceMessages(slug!)
-  const { data: richConversation } = useSpaceRichConversation(slug!)
+  const { data: richData } = useSpaceRichConversation(slug!)
   const { open: panelOpen, toggle: togglePanel, close: closePanel } = usePanel()
 
   if (isLoading) {
@@ -83,7 +83,8 @@ export function SpaceDetail() {
         <div className="flex-1 min-h-0">
           <ChatSection
             messages={messages || []}
-            richConversation={richConversation || []}
+            richConversation={richData?.messages || []}
+            thinkingState={richData?.thinking}
             sendFn={(text: string) => sendSpaceMessage(slug!, text)}
             queryKey={['space-messages', slug!]}
           />

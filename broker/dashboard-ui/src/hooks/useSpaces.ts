@@ -138,7 +138,10 @@ export function useSpaceRichConversation(name: string) {
     queryKey: ['space-rich-conversation', name],
     queryFn: () => api.fetchSpaceRichConversation(name),
     enabled: !!name,
-    refetchInterval: 3_000,
+    refetchInterval: (query) => {
+      const thinking = query.state.data?.thinking
+      return thinking?.isThinking ? 1_500 : 3_000
+    },
   })
 }
 
@@ -146,6 +149,9 @@ export function useMasterRichConversation() {
   return useQuery({
     queryKey: ['master-rich-conversation'],
     queryFn: () => api.fetchMasterRichConversation(),
-    refetchInterval: 3_000,
+    refetchInterval: (query) => {
+      const thinking = query.state.data?.thinking
+      return thinking?.isThinking ? 1_500 : 3_000
+    },
   })
 }

@@ -178,6 +178,7 @@ export interface RichUserMessage {
   teammateId: string | null
   teammateColor: string | null
   teammateSummary: string | null
+  scheduledPrompt?: string | null
 }
 
 export interface RichAssistantMessage {
@@ -194,11 +195,23 @@ export interface RichSystemMessage {
   subtype: string
   text: string
   timestamp: string
+  level?: string | null
 }
 
 export type RichMessage = RichUserMessage | RichAssistantMessage | RichSystemMessage
 
+export interface ThinkingState {
+  isThinking: boolean
+  activeTool?: string | null
+  turnStart?: string | null
+}
+
+export interface RichConversationResponse {
+  messages: RichMessage[]
+  thinking: ThinkingState
+}
+
 export const fetchSpaceRichConversation = (name: string, limit = 200) =>
-  fetchJson<RichMessage[]>(`/api/spaces/${name}/conversation/rich?limit=${limit}`)
+  fetchJson<RichConversationResponse>(`/api/spaces/${name}/conversation/rich?limit=${limit}`)
 export const fetchMasterRichConversation = (limit = 200) =>
-  fetchJson<RichMessage[]>(`/api/master/conversation/rich?limit=${limit}`)
+  fetchJson<RichConversationResponse>(`/api/master/conversation/rich?limit=${limit}`)

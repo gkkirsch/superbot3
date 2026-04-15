@@ -3,12 +3,14 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowUp, Search, Globe, FileText, Mail, Code, BarChart3, Lightbulb, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ChatMessage } from '@/lib/types'
-import type { RichMessage } from '@/lib/api'
+import type { RichMessage, ThinkingState } from '@/lib/api'
 import { RichMessageBubble, consolidateMessages } from './RichMessage'
+import { ThinkingIndicator } from './ThinkingIndicator'
 
 interface ChatSectionProps {
   messages: ChatMessage[]
   richConversation: RichMessage[]
+  thinkingState?: ThinkingState
   sendFn: (text: string) => Promise<unknown>
   queryKey: string[]
   title?: string
@@ -16,7 +18,7 @@ interface ChatSectionProps {
 
 const PAGE_SIZE = 30
 
-export function ChatSection({ messages, richConversation, sendFn, queryKey, title }: ChatSectionProps) {
+export function ChatSection({ messages, richConversation, thinkingState, sendFn, queryKey, title }: ChatSectionProps) {
   const [text, setText] = useState('')
   const [waitingForReply, setWaitingForReply] = useState(false)
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
@@ -79,17 +81,22 @@ export function ChatSection({ messages, richConversation, sendFn, queryKey, titl
     return all
   }, [richConversation, messages])
 
-  // Clear typing indicator when a new assistant message arrives
+  // Clear typing indicator when a new assistant message arrives or backend reports not thinking
   useEffect(() => {
-    if (waitingForReply && consolidated.length > 0 && consolidated[consolidated.length - 1].type === 'assistant') {
-      setWaitingForReply(false)
+    if (waitingForReply) {
+      const lastIsAssistant = consolidated.length > 0 && consolidated[consolidated.length - 1].type === 'assistant'
+      const backendNotThinking = thinkingState && !thinkingState.isThinking && consolidated.length > 0
+      if (lastIsAssistant || backendNotThinking) {
+        setWaitingForReply(false)
+      }
     }
-  }, [consolidated, waitingForReply])
+  }, [consolidated, waitingForReply, thinkingState])
 
   // Auto-scroll: instant on first load, smooth for new messages
+  const isThinking = thinkingState?.isThinking || waitingForReply
   const initialLoadRef = useRef(true)
   useEffect(() => {
-    if (consolidated.length > prevLenRef.current || waitingForReply) {
+    if (consolidated.length > prevLenRef.current || isThinking) {
       if (initialLoadRef.current) {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight })
         initialLoadRef.current = false
@@ -98,7 +105,7 @@ export function ChatSection({ messages, richConversation, sendFn, queryKey, titl
       }
     }
     prevLenRef.current = consolidated.length
-  }, [consolidated.length, waitingForReply])
+  }, [consolidated.length, isThinking])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -220,14 +227,11 @@ export function ChatSection({ messages, richConversation, sendFn, queryKey, titl
         {consolidated.slice(-visibleCount).map((msg, i) => (
           <RichMessageBubble key={`${msg.timestamp}-${i}`} message={msg} />
         ))}
-        {waitingForReply && (
-          <div className="animate-fade-up">
-            <div className="flex items-center gap-1.5 px-5 py-3">
-              <span className="typing-dot" />
-              <span className="typing-dot" style={{ animationDelay: '0.15s' }} />
-              <span className="typing-dot" style={{ animationDelay: '0.3s' }} />
-            </div>
-          </div>
+        {(thinkingState?.isThinking || waitingForReply) && (
+          <ThinkingIndicator
+            activeTool={thinkingState?.activeTool}
+            turnStart={thinkingState?.turnStart}
+          />
         )}
       </div>
       </div>
