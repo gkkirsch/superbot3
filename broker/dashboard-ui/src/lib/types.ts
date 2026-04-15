@@ -13,7 +13,7 @@ export interface Space {
   running?: boolean
 }
 
-export interface InboxMessage {
+export interface ChatMessage {
   from: string
   text: string
   timestamp: string

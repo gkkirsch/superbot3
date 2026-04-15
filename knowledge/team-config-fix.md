@@ -6,18 +6,18 @@
 ## Problem
 
 Spaces were missing `teams/<slug>/config.json`, which caused Claude Code's `isTeamLead()` to always return `false`. This meant:
-- The inbox poller may not activate properly
+- The message system may not activate properly
 - Team functionality (spawning teammates, receiving messages) was degraded
 - Claude didn't fully recognize itself as the team leader
 
 ## Root Cause
 
-`space-create.js` created the `teams/` directory and `start.js` created the inbox file, but **neither created `config.json`**. Claude Code's internal `isTeamLead(config)` function checks `config.leadAgentId` against the current agent ID — without config.json, it returns `false`.
+`space-create.js` created the `teams/` directory but **neither it nor `start.js` created `config.json`**. Claude Code's internal `isTeamLead(config)` function checks `config.leadAgentId` against the current agent ID — without config.json, it returns `false`.
 
 ## Fix
 
 1. **`space-create.js`** — Now creates `teams/<slug>/config.json` with `leadAgentId: "team-lead@<slug>"` during space creation
-2. **`start.js`** — Added `ensureTeamConfig()` that creates config.json on startup for existing spaces (retroactive fix)
+2. **`start.js`** — Added team config creation on startup for existing spaces (retroactive fix)
 3. **Existing spaces** — Manually created config.json for all 4 existing spaces
 
 ## CronCreate Durable Issue (Separate)

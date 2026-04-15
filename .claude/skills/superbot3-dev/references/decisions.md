@@ -3,11 +3,11 @@
 These are final. Do not deviate without user approval.
 
 ## Core
-- **CLAUDE_CONFIG_DIR per space** for full isolation (teams, inboxes, plugins, skills, agents, settings)
+- **CLAUDE_CONFIG_DIR per space** for full isolation (teams, plugins, skills, agents, settings)
 - **Standard swarms/teams mode** — NOT coordinator mode (hardcoded prompt, no tools, feature-gated)
 - **File-based everything** — no database anywhere. Dashboard reads/writes files directly.
 - **tmux for process management** — required dependency. Workers spawn via tmux panes.
-- **Inbox for messaging** — no tmux send-keys for message delivery. Lockfile-protected JSON files.
+- **CLI messaging** — all messages delivered via `superbot3 message` CLI (uses tmux send-keys under the hood)
 
 ## Scheduling
 - **Built-in cron scheduler** (`scheduled_tasks.json`) — no external cron service
@@ -28,7 +28,7 @@ These are final. Do not deviate without user approval.
 - **Launcher + watchdog + message relay ONLY** — not a decision-maker
 - **No knowledge directory** — CLAUDE.md is all it needs
 - Has `master-cli` skill
-- Dashboard home chat writes to master inbox
+- Dashboard home chat sends messages to master via CLI
 
 ## Session Persistence
 - **`--resume <sessionId>`** for conversation continuity

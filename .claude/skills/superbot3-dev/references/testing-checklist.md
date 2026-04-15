@@ -24,15 +24,15 @@ Run through this before claiming any feature is complete.
 - [ ] Space sees its skills (send "list your skills")
 - [ ] Space sees its agents (send "list your agents")
 - [ ] Spaces with codeDir launch in code repo cwd
-- [ ] Inbox polling active (messages delivered within seconds)
+- [ ] Messages delivered within seconds via CLI
 
 ## Messaging
-- [ ] `superbot3 message <space> "text"` — delivered via inbox
+- [ ] `superbot3 message <space> "text"` — delivered via CLI
 - [ ] `superbot3 message "text"` — delivered to master
 - [ ] Dashboard chat — message sent + response appears
 - [ ] Typing indicator shows while waiting
 - [ ] No XML tags visible in chat
-- [ ] Lockfile prevents concurrent write corruption
+- [ ] Messages arrive in correct target pane
 
 ## Dashboard
 - [ ] Home page loads: master chat + space status grid

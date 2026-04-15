@@ -9,11 +9,11 @@ All endpoints served by `broker/server.js` at `http://localhost:3100`.
 - `GET /api/spaces` — List all spaces (scans `spaces/*/space.json`, checks tmux for running status)
 - `GET /api/spaces/:name` — Single space detail
 - `POST /api/spaces` — Create space `{ name, codeDir? }` — also auto-starts in tmux
-- `POST /api/spaces/:name/message` — Write to space inbox `{ message }` — uses shared `writeToInbox()`
+- `POST /api/spaces/:name/message` — Send message to space via tmux send-keys `{ text }`
 
 ## Master
 - `GET /api/master/status` — Master PID + running status
-- `POST /api/master/message` — Write to master inbox `{ message }`
+- `POST /api/master/message` — Send message to master via tmux send-keys `{ text }`
 
 ## Conversation (for chat)
 - `GET /api/spaces/:name/conversation` — Parse space's JSONL session file, return user+assistant messages
@@ -45,6 +45,6 @@ All endpoints served by `broker/server.js` at `http://localhost:3100`.
 
 ## WebSocket
 - `ws://localhost:3100/ws` — Real-time updates
-  - Watches inbox files via chokidar
-  - Watches JSONL session files for conversation updates
-  - Events: `inbox_update`, `conversation_update`
+  - Watches JSONL session files for conversation updates via chokidar
+  - Watches state.json for space list changes
+  - Events: `conversation_update`, `spaces_changed`

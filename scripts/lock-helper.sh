@@ -7,7 +7,7 @@
 # Usage:
 #   source "$(dirname "$0")/lock-helper.sh"
 #   locked_write "$CONFIG" '.members += [...]'           # jq expression
-#   locked_write "$INBOX" '. + [$msg]'                   # works on any JSON file
+#   locked_write "$CONFIG" '. + [$msg]'                   # works on any JSON file
 #   locked_write "$FILE" '.key = "val"' --arg k "v"      # extra jq args supported
 
 LOCK_DIR_BASE="/tmp/superbot3-locks"

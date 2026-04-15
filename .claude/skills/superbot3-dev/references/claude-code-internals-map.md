@@ -49,8 +49,8 @@ Source location: `~/dev/claude-code-internals-main/src/`
 ## Messaging
 | File | What it does |
 |------|-------------|
-| `utils/teammateMailbox.ts` | `writeToMailbox()`, `readMailbox()`, `readUnreadMessages()`, lockfile protocol |
-| `hooks/useInboxPoller.ts` | 1000ms polling, message routing (shutdown, permission, plan approval, regular) |
+| `utils/teammateMailbox.ts` | `writeToMailbox()`, `readMailbox()`, `readUnreadMessages()` (Claude Code internal — superbot3 uses CLI messaging instead) |
+| `hooks/useInboxPoller.ts` | 1000ms polling, message routing (Claude Code internal — not used by superbot3) |
 | `tools/SendMessageTool/SendMessageTool.ts` | SendMessage tool implementation |
 
 ## Cron / Scheduling
@@ -82,7 +82,7 @@ Source location: `~/dev/claude-code-internals-main/src/`
 | `bridge/replBridgeTransport.ts` | Transport abstraction (WS, SSE) |
 
 ## Key Constants
-- Inbox poll interval: 1000ms
+- Claude Code inbox poll interval: 1000ms (not used by superbot3)
 - Cron check interval: 1000ms
 - Cron jitter: 10% of interval, capped at 15min
 - Recurring task max age: 7 days (but we use `permanent: true`)

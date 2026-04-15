@@ -12,7 +12,7 @@ broker/dashboard-ui/dist/
 .credentials.json
 .claude.json
 
-# Lockfiles (proper-lockfile)
+# Lockfiles
 *.lock
 
 # Data directories (created by `superbot3 init`, not part of code)

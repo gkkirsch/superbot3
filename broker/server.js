@@ -199,7 +199,7 @@ app.post('/api/spaces/:name/message', (req, res) => {
 });
 
 app.get('/api/spaces/:name/messages', (req, res) => {
-  // Inbox messages are no longer used — conversation JSONL is the sole data source.
+  // Legacy endpoint — conversation JSONL is the sole data source.
   // Return empty array for backwards compatibility with dashboard.
   res.json([]);
 });
@@ -224,7 +224,7 @@ app.post('/api/master/message', (req, res) => {
 });
 
 app.get('/api/master/messages', (req, res) => {
-  // Inbox messages are no longer used — conversation JSONL is the sole data source.
+  // Legacy endpoint — conversation JSONL is the sole data source.
   res.json([]);
 });
 
@@ -2032,6 +2032,19 @@ try {
     }
 
     const payload = JSON.stringify({ type: 'conversation_update', source: type, space });
+    wss.clients.forEach(client => {
+      if (client.readyState === 1) client.send(payload);
+    });
+  });
+
+  // Watch state.json for space list changes (create, remove, update)
+  const stateWatcher = chokidar.watch(path.join(SUPERBOT3_HOME, 'state.json'), {
+    ignoreInitial: true,
+    awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 100 },
+  });
+
+  stateWatcher.on('change', () => {
+    const payload = JSON.stringify({ type: 'spaces_changed' });
     wss.clients.forEach(client => {
       if (client.readyState === 1) client.send(payload);
     });

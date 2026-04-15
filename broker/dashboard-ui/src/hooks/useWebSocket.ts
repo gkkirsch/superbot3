@@ -39,6 +39,8 @@ export function useWebSocket() {
               queryClient.invalidateQueries({ queryKey: ['space-rich-conversation', data.space] })
               notify(data.space, data.preview || 'New activity')
             }
+          } else if (data.type === 'spaces_changed') {
+            queryClient.invalidateQueries({ queryKey: ['spaces'] })
           }
         } catch {}
       }

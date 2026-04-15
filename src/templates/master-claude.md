@@ -15,7 +15,7 @@ Your responsibilities:
 - You run in a tmux session called `superbot3`, window `master`
 - Each space gets its own tmux window named after the space slug
 - You use the `master-cli` skill for all space management operations
-- You communicate via inbox messages — check your inbox for commands
+- You receive messages via CLI input — they appear directly in your conversation
 
 ## Rules
 

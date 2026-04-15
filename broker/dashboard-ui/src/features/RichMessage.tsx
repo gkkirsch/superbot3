@@ -47,7 +47,7 @@ function ToolCallCard({ block }: { block: RichToolUseBlock }) {
   const isError = block.is_error
 
   return (
-    <div className="my-1.5 rounded-lg border border-border-custom bg-surface/50 overflow-hidden">
+    <div className="my-1.5 rounded-lg border border-border-custom/50 overflow-hidden">
       <button
         onClick={() => setExpanded(e => !e)}
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface/80 transition-colors group"
@@ -275,11 +275,11 @@ function SystemMessage({ msg }: { msg: RichSystemMessage }) {
   if (msg.subtype === 'scheduled_task_fire' || msg.subtype === 'scheduled') {
     return (
       <div className="animate-fade-up px-4 my-1">
-        <div className="flex items-start gap-2 px-3 py-2 rounded-md bg-surface/40 border border-border-custom/30 text-xs">
-          <Clock className="w-3 h-3 mt-0.5 shrink-0 text-stone/50" />
+        <div className="flex items-start gap-2 px-3 py-2 text-xs">
+          <Clock className="w-3 h-3 mt-0.5 shrink-0 text-stone/40" />
           <div className="flex-1 min-w-0">
-            <span className="text-[10px] font-medium text-stone/40 uppercase tracking-wider">Scheduled</span>
-            {msg.text && <p className="text-stone/60 mt-0.5">{msg.text}</p>}
+            <span className="text-[10px] font-medium text-stone/30 uppercase tracking-wider">Scheduled</span>
+            {msg.text && <p className="text-stone/50 mt-0.5">{msg.text}</p>}
           </div>
           <Timestamp ts={msg.timestamp} />
         </div>
@@ -302,8 +302,8 @@ function SystemMessage({ msg }: { msg: RichSystemMessage }) {
   return (
     <div className="animate-fade-up px-4 my-1">
       <div className={cn(
-        'flex items-start gap-2 px-3 py-2 rounded-md text-xs',
-        isError ? 'bg-ember/5 text-ember/70' : 'bg-surface/40 text-stone/50'
+        'flex items-start gap-2 px-3 py-2 text-xs',
+        isError ? 'text-ember/60' : 'text-stone/40'
       )}>
         {isError ? <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" /> : null}
         <span>{msg.text || msg.subtype}</span>

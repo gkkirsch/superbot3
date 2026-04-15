@@ -24,7 +24,7 @@ pm2/launchd → Broker (Node/Express) → Master Orchestrator (Claude) → Space
 ## The Core Isolation Mechanism: CLAUDE_CONFIG_DIR
 
 Each space gets its own `CLAUDE_CONFIG_DIR` pointing to `spaces/{name}/.claude/`. This isolates:
-- Teams + inboxes (`$DIR/teams/`)
+- Teams (`$DIR/teams/`)
 - Plugins (`$DIR/plugins/`)
 - Skills (`$DIR/skills/`)
 - Agents (`$DIR/agents/`)
@@ -49,10 +49,10 @@ Workers get BOTH:
 5. **Dashboard writes `scheduled_tasks.json` directly** — chokidar picks up changes
 6. **Frontmatter is single source of truth for knowledge** — no separate index file, progressive enhancement
 7. **Master has NO knowledge directory** — CLAUDE.md only
-8. **PID check for heartbeat** — no inbox heartbeat protocol
+8. **PID check for heartbeat** — simple process liveness check
 9. **`--resume` for session persistence** — session ID stored in space.json
 10. **Two CLI skills** — master-cli (for master) and space-cli (for spaces)
-11. **Inbox messaging only** — no tmux send-keys for message delivery
+11. **CLI messaging** — all messages delivered via `superbot3 message` CLI (tmux send-keys under the hood)
 12. **Per-space plugin/skill isolation** — via CLAUDE_CONFIG_DIR
 
 ## Directory Structure
@@ -64,7 +64,7 @@ Workers get BOTH:
 ├── bin/superbot3                        # CLI entrypoint
 ├── src/
 │   ├── auth.js                          # Credential setup per space
-│   ├── inbox.js                         # Shared inbox write (lockfile protocol)
+│   ├── tmuxMessage.js                   # CLI messaging via tmux send-keys
 │   ├── commands/
 │   │   ├── init.js                      # superbot3 init
 │   │   ├── start.js                     # superbot3 start (broker + master + spaces)
@@ -105,7 +105,7 @@ Workers get BOTH:
 │       │   ├── plugins/                 # Per-space installed plugins
 │       │   └── teams/{name}/
 │       │       ├── config.json
-│       │       └── inboxes/team-lead.json
+│       │       └── config.json
 │       └── knowledge/
 │           └── logs/YYYY/MM/
 └── templates/default/                   # Templates copied during space create
@@ -143,7 +143,7 @@ sendToPane('%5', 'your message');
 
 - Uses `tmux load-buffer` + `paste-buffer` for safe escaping of special chars
 - Workers tracked in `spaces/{slug}/workers.json` (pane IDs, names, config)
-- No inbox files, no lockfiles, no team config needed
+- No inbox files, no lockfiles needed for messaging
 
 ## Authentication Setup
 
@@ -167,8 +167,8 @@ When you need to understand HOW Claude Code works internally, reference these so
 | Skill discovery | `src/skills/loadSkillsDir.ts` | `getSkillsPath()` — user vs project paths |
 | Agent discovery | `src/tools/AgentTool/loadAgentsDir.ts` | `getAgentDefinitionsWithOverrides()` |
 | Team config | `src/utils/swarm/teamHelpers.ts` | `readTeamFile()`, `writeTeamFileAsync()` |
-| Inbox protocol | `src/utils/teammateMailbox.ts` | `writeToMailbox()`, `readUnreadMessages()` |
-| Inbox polling | `src/hooks/useInboxPoller.ts` | 1000ms poll, message routing |
+| Teammate mailbox | `src/utils/teammateMailbox.ts` | `writeToMailbox()`, `readUnreadMessages()` (Claude Code internal, not used by superbot3) |
+| Message polling | `src/hooks/useInboxPoller.ts` | 1000ms poll, message routing (Claude Code internal, not used by superbot3) |
 | Spawn mechanics | `src/tools/shared/spawnMultiAgent.ts` | Tmux spawn command, env var forwarding |
 | Env var forwarding | `src/utils/swarm/spawnUtils.ts` | `TEAMMATE_ENV_VARS`, `buildInheritedEnvVars()` |
 | Cron scheduler | `src/utils/cronScheduler.ts` | `createCronScheduler()`, check/fire loop |
@@ -194,7 +194,7 @@ superbot3 space create test && ls -la ~/.superbot3/spaces/test/.claude/
 superbot3 start && tmux list-panes -t superbot3 -a
 
 # Check messaging
-superbot3 message test "hello" && cat ~/.superbot3/spaces/test/.claude/teams/test/inboxes/team-lead.json
+superbot3 message test "hello"  # Delivered via tmux send-keys
 
 # Check broker
 curl localhost:3100/health
@@ -223,8 +223,6 @@ cat ~/.superbot3/spaces/test/.claude/.claude.json
 # See what Claude is doing in a space
 tmux capture-pane -t superbot3:{space} -p | tail -50
 
-# Check inbox state
-cat ~/.superbot3/spaces/{name}/.claude/teams/{name}/inboxes/team-lead.json | python3 -m json.tool
 
 # Check if broker is serving dashboard
 curl -I localhost:3100
@@ -238,7 +236,7 @@ ls ~/.superbot3/spaces/{name}/.claude/projects/
 
 ## Known Gaps (as of Phase 2)
 
-1. **Cross-team messaging fragile** — spaces write to master inbox via raw bash. Need proper `crossTeamMessage` utility with lockfile.
+1. ~~**Cross-team messaging fragile**~~ — FIXED: all messaging now uses `superbot3 message` CLI via tmux send-keys.
 2. ~~**Session IDs not captured**~~ — FIXED: `start.js` now captures session IDs from newest JSONL file and stores in space.json. `--resume` works on restart.
 3. **Master cannot message spaces** — no utility for master-to-space messaging.
 4. **Plugin management UI** — needs work (install/uninstall/enable/disable per space).
@@ -248,6 +246,6 @@ ls ~/.superbot3/spaces/{name}/.claude/projects/
 - **CLI**: Node.js + Commander
 - **Broker**: Express + ws (WebSocket) + chokidar (file watching)
 - **Dashboard**: React + Vite + TypeScript + Tailwind v4 + shadcn/ui
-- **Dependencies**: proper-lockfile, commander, express, ws, chokidar, react-markdown, remark-gfm
+- **Dependencies**: commander, express, ws, chokidar, react-markdown, remark-gfm
 - **Process management**: tmux (required dependency)
 - **Theme**: ink (#0a0a0a), surface (#141414), parchment (#d4cdc4), stone (#706b63), sand (#c4a882), ember (#DC504A), moss (#8a9a7b) + Space Mono font

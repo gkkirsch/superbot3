@@ -26,17 +26,16 @@ cat ~/.superbot3/spaces/<slug>/space.json
 tmux new-window -t superbot3 -n <slug>
 
 # Launch Claude in the space's window
-tmux send-keys -t superbot3:<slug> "cd <codeDir> && env CLAUDECODE=1 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 CLAUDE_CONFIG_DIR=$HOME/.superbot3/spaces/<slug>/.claude claude --dangerously-skip-permissions --model claude-opus-4-6" Enter
+tmux send-keys -t superbot3:<slug> "cd <codeDir> && env CLAUDECODE=1 CLAUDE_CONFIG_DIR=$HOME/.superbot3/spaces/<slug>/.claude claude --dangerously-skip-permissions --model claude-opus-4-6" Enter
 ```
 
 After starting, update space.json with the session ID (you'll need to check the Claude process for this).
 
 ## Stopping a Space
 
-1. Write a shutdown message to the space's inbox:
+1. Send a shutdown message to the space via tmux:
    ```bash
-   # The space inbox is at:
-   # ~/.superbot3/spaces/<slug>/.claude/teams/<slug>/inboxes/team-lead.json
+   superbot3 message <slug> "Please shut down gracefully."
    ```
 2. Wait up to 30 seconds for graceful shutdown
 3. If no response, kill the tmux window:
@@ -64,7 +63,7 @@ To send a message to a space, use the CLI:
 superbot3 message <space-slug> "your message here"
 ```
 
-This handles the inbox protocol (locking, JSON format) correctly. Never write to inbox files directly.
+This sends the message via tmux send-keys to the space's pane.
 
 When a space sends you a message for another space:
 1. Read the routing info (target space name)

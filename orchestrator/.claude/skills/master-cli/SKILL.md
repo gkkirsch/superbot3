@@ -26,17 +26,16 @@ cat ~/.superbot3/spaces/<slug>/space.json
 tmux new-window -t superbot3 -n <slug>
 
 # Launch Claude in the space's window
-tmux send-keys -t superbot3:<slug> "cd <codeDir> && env CLAUDECODE=1 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 CLAUDE_CONFIG_DIR=$HOME/.superbot3/spaces/<slug>/.claude claude --dangerously-skip-permissions --model claude-opus-4-6" Enter
+tmux send-keys -t superbot3:<slug> "cd <codeDir> && env CLAUDECODE=1 CLAUDE_CONFIG_DIR=$HOME/.superbot3/spaces/<slug>/.claude claude --dangerously-skip-permissions --model claude-opus-4-6" Enter
 ```
 
 After starting, update space.json with the session ID (you'll need to check the Claude process for this).
 
 ## Stopping a Space
 
-1. Write a shutdown message to the space's inbox:
+1. Send a shutdown message to the space via CLI:
    ```bash
-   # The space inbox is at:
-   # ~/.superbot3/spaces/<slug>/.claude/teams/<slug>/inboxes/team-lead.json
+   superbot3 message <slug> "Please shut down gracefully."
    ```
 2. Wait up to 30 seconds for graceful shutdown
 3. If no response, kill the tmux window:
@@ -58,16 +57,17 @@ When triggered by the heartbeat cron:
 
 ## Message Routing
 
-When you receive a message intended for a space:
-1. Identify the target space from the message
-2. Write to the space's inbox using the inbox protocol:
-   - Inbox path: `~/.superbot3/spaces/<slug>/.claude/teams/<slug>/inboxes/team-lead.json`
-   - Read current messages, append new one, write back
-   - Use proper-lockfile if available, or atomic write
+To send a message to a space, use the CLI:
+
+```bash
+superbot3 message <space-slug> "your message here"
+```
+
+This sends the message via the CLI to the space's pane.
 
 When a space sends you a message for another space:
 1. Read the routing info (target space name)
-2. Write to the target space's inbox
+2. Use `superbot3 message <target-slug> "message"` to relay it
 3. Confirm routing to the sender
 
 ## Status Report

@@ -22,7 +22,7 @@ module.exports = function init(home) {
   const dirs = [
     path.join(home, '.tmp'),
     path.join(home, 'orchestrator', '.claude', 'skills', 'master-cli'),
-    path.join(home, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes'),
+    path.join(home, 'orchestrator', '.claude', 'teams', 'superbot3'),
     path.join(home, 'spaces'),
     path.join(home, 'templates', 'default', '.claude', 'skills', 'core-methodology'),
     path.join(home, 'templates', 'default', '.claude', 'skills', 'space-cli'),
@@ -116,12 +116,6 @@ module.exports = function init(home) {
       leadAgentId: 'team-lead',
       members: [],
     }, null, 2)
-  );
-
-  // Master inbox (empty)
-  writeIfNotExists(
-    path.join(home, 'orchestrator', '.claude', 'teams', 'superbot3', 'inboxes', 'team-lead.json'),
-    '[]'
   );
 
   // Set up auth (credentials + config) for orchestrator
