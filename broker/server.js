@@ -117,6 +117,9 @@ app.delete('/api/spaces/:name', (req, res) => {
       execSync(`tmux kill-window -t superbot3:${config.slug} 2>/dev/null`, { timeout: 5000 });
     } catch {}
 
+    // Remove from state.json
+    state.removeSpace(SUPERBOT3_HOME, config.slug);
+
     // Remove the space directory
     fs.rmSync(config.spaceDir, { recursive: true, force: true });
 
