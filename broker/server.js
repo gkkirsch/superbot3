@@ -151,14 +151,11 @@ app.post('/api/spaces', async (req, res) => {
     const resolvedCodeDir = codeDir ? path.resolve(codeDir) : null;
     const spaceConfig = createSpace(SUPERBOT3_HOME, name, { codeDir: resolvedCodeDir });
 
-    // Auto-start the space using the shared launchSpace module
+    // Auto-start the space
     try {
       const { launchSpace } = require(path.join(__dirname, '..', 'src', 'launchSpace'));
-      const config = JSON.parse(fs.readFileSync(path.join(SUPERBOT3_HOME, 'config.json'), 'utf-8'));
-      const model = config.model || 'claude-opus-4-6';
-      launchSpace(spaceConfig, model);
+      launchSpace(SUPERBOT3_HOME, spaceConfig.slug);
     } catch (startErr) {
-      // Space was created successfully but auto-start failed — not fatal
       console.log(`Note: Space created but auto-start failed: ${startErr.message}`);
     }
 
