@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, Terminal, FileText, Pencil, Search, FolderSearch, Globe, Brain, AlertCircle, CheckCircle2, XCircle, Users, Clock } from 'lucide-react'
+import { ChevronRight, Terminal, FileText, Pencil, Search, FolderSearch, Globe, Brain, CheckCircle2, XCircle, Users, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RichMessage, RichAssistantMessage, RichUserMessage, RichSystemMessage, RichToolUseBlock, RichThinkingBlock } from '@/lib/api'
 import Markdown from 'react-markdown'
@@ -34,19 +34,6 @@ function getToolSummary(block: RichToolUseBlock): string {
     case 'SendMessage': return typeof input.message === 'string' ? input.message.slice(0, 80) : 'message'
     default: return block.name
   }
-}
-
-// Build a human-readable summary of grouped tool calls
-function getGroupedToolSummary(tools: RichToolUseBlock[]): string {
-  const counts: Record<string, number> = {}
-  for (const t of tools) {
-    const label = TOOL_META[t.name]?.label || t.name
-    counts[label] = (counts[label] || 0) + 1
-  }
-  const parts = Object.entries(counts).map(([label, count]) =>
-    count > 1 ? `${count} ${label}` : label
-  )
-  return parts.join(', ')
 }
 
 // ── Individual Tool Detail (shown inside expanded group) ──
@@ -95,7 +82,6 @@ function ToolDetail({ block }: { block: RichToolUseBlock }) {
 function ToolGroup({ tools }: { tools: RichToolUseBlock[] }) {
   const [expanded, setExpanded] = useState(false)
   const errorCount = tools.filter(t => t.is_error).length
-  const summary = getGroupedToolSummary(tools)
 
   return (
     <div className="my-1 px-3">
@@ -107,7 +93,6 @@ function ToolGroup({ tools }: { tools: RichToolUseBlock[] }) {
         <span className="text-[11px]">
           {tools.length} tool call{tools.length !== 1 ? 's' : ''}
         </span>
-        <span className="text-[10px] text-stone/25">{summary}</span>
         {errorCount > 0 && (
           <span className="text-[10px] text-ember/50">{errorCount} error{errorCount !== 1 ? 's' : ''}</span>
         )}
@@ -250,7 +235,7 @@ function AssistantMessage({ msg }: { msg: RichAssistantMessage }) {
         )}
 
         {/* Footer: timestamp */}
-        <div className="flex items-center gap-2 px-4 mt-1">
+        <div className="px-4 mt-1">
           <Timestamp ts={msg.timestamp} />
         </div>
       </div>
@@ -274,12 +259,10 @@ function SystemMessage({ msg }: { msg: RichSystemMessage }) {
   if (msg.subtype === 'scheduled_task_fire' || msg.subtype === 'scheduled') {
     return (
       <div className="animate-fade-up px-4 my-1">
-        <div className="flex items-start gap-2 px-3 py-2 text-xs">
-          <Clock className="w-3 h-3 mt-0.5 shrink-0 text-stone/40" />
-          <div className="flex-1 min-w-0">
-            <span className="text-[10px] font-medium text-stone/30 uppercase tracking-wider">Scheduled</span>
-            {msg.text && <p className="text-stone/50 mt-0.5">{msg.text}</p>}
-          </div>
+        <div className="flex items-center gap-2 px-3 py-2 text-xs whitespace-nowrap">
+          <Clock className="w-3 h-3 shrink-0 text-stone/40" />
+          <span className="text-[10px] font-medium text-stone/30 uppercase tracking-wider">Scheduled</span>
+          {msg.text && <span className="text-stone/50 truncate">{msg.text}</span>}
           <Timestamp ts={msg.timestamp} />
         </div>
       </div>
@@ -296,15 +279,9 @@ function SystemMessage({ msg }: { msg: RichSystemMessage }) {
     )
   }
 
-  const isError = msg.subtype === 'api_error' || msg.subtype === 'error'
-
   return (
     <div className="animate-fade-up px-4 my-1">
-      <div className={cn(
-        'flex items-start gap-2 px-3 py-2 text-xs',
-        isError ? 'text-ember/60' : 'text-stone/40'
-      )}>
-        {isError ? <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" /> : null}
+      <div className="flex items-start gap-2 px-3 py-2 text-xs text-stone/40">
         <span>{msg.text || msg.subtype}</span>
       </div>
     </div>
