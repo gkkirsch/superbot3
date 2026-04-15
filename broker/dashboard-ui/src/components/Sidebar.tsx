@@ -53,7 +53,7 @@ export function Sidebar() {
 
   const isActive = (to: string, end?: boolean) => {
     if (end) return location.pathname === to
-    return location.pathname.startsWith(to)
+    return location.pathname === to || location.pathname.startsWith(to + '/')
   }
 
   return (
