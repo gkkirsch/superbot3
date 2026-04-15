@@ -32,7 +32,17 @@ function isPaneAlive(paneId) {
   }
 }
 
-function getSpacePaneTarget(slug) {
+function getSpacePaneTarget(slug, home) {
+  // If we have a paneId in state, use it directly (targets the orchestrator pane
+  // even when workers are split into the same window)
+  if (home) {
+    try {
+      const state = require('./state');
+      const space = state.getSpace(home, slug);
+      if (space && space.paneId) return space.paneId;
+    } catch {}
+  }
+  // Fallback to window target (only works when no workers are split in)
   return `${TMUX_SESSION}:${slug}`;
 }
 

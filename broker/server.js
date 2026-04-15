@@ -185,7 +185,7 @@ app.post('/api/spaces/:name/message', (req, res) => {
   }
 
   try {
-    const target = getSpacePaneTarget(req.params.name);
+    const target = getSpacePaneTarget(req.params.name, SUPERBOT3_HOME);
     sendToPane(target, text);
     console.log(`[tmux] Message sent to space "${config.slug}"`);
     res.json({ ok: true });
@@ -719,7 +719,7 @@ app.get('/api/spaces/:name/peek', (req, res) => {
   const config = getSpaceConfig(req.params.name);
   if (!config) return res.status(404).json({ error: 'Space not found' });
 
-  const output = capturePaneOutput(getSpacePaneTarget(req.params.name), 50);
+  const output = capturePaneOutput(getSpacePaneTarget(req.params.name, SUPERBOT3_HOME), 50);
   if (output === null) return res.status(400).json({ error: 'Could not capture pane output' });
   res.json({ output });
 });
@@ -2178,7 +2178,7 @@ function runSchedulerTick() {
           // Send the prompt to the space via tmux send-keys
           try {
             if (isSpaceWindowAlive(slug)) {
-              const target = getSpacePaneTarget(slug);
+              const target = getSpacePaneTarget(slug, SUPERBOT3_HOME);
               sendToPane(target, task.prompt);
             } else {
               console.error(`[scheduler] Space "${slug}" is not running — skipping`);

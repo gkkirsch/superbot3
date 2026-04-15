@@ -25,7 +25,7 @@ module.exports = async function message(home, spaceName, text) {
     }
 
     try {
-      sendToPane(getSpacePaneTarget(spaceName), text);
+      sendToPane(getSpacePaneTarget(spaceName, home), text);
       console.log(`Message sent to space "${spaceName}"`);
     } catch (err) {
       console.error(`Error: ${err.message}`);
