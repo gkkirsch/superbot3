@@ -1,15 +1,17 @@
-import { useMasterRichConversation } from '@/hooks/useSpaces'
+import { useMasterMessages, useMasterRichConversation } from '@/hooks/useSpaces'
 import { sendMasterMessage } from '@/lib/api'
 import { ChatSection } from '@/features/ChatSection'
 
 export function Dashboard() {
+  const { data: messages } = useMasterMessages()
   const { data: richConversation } = useMasterRichConversation()
 
   return (
     <ChatSection
+      messages={messages ?? []}
       richConversation={richConversation ?? []}
-      onSend={sendMasterMessage}
-      placeholder="Message the orchestrator..."
+      sendFn={sendMasterMessage}
+      queryKey={['master-messages']}
     />
   )
 }
