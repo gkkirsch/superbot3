@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, Terminal, FileText, Pencil, Search, FolderSearch, Globe, Brain, AlertCircle, CheckCircle2, XCircle, Users, Clock } from 'lucide-react'
+import { ChevronRight, Terminal, FileText, Pencil, Search, FolderSearch, Globe, Brain, AlertCircle, CheckCircle2, XCircle, Users, Clock, Wrench } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RichMessage, RichAssistantMessage, RichUserMessage, RichSystemMessage, RichToolUseBlock, RichThinkingBlock } from '@/lib/api'
 import Markdown from 'react-markdown'
@@ -36,10 +36,23 @@ function getToolSummary(block: RichToolUseBlock): string {
   }
 }
 
-// ── Tool Call Card ──
+// Build a human-readable summary of grouped tool calls
+function getGroupedToolSummary(tools: RichToolUseBlock[]): string {
+  const counts: Record<string, number> = {}
+  for (const t of tools) {
+    const label = TOOL_META[t.name]?.label || t.name
+    counts[label] = (counts[label] || 0) + 1
+  }
+  const parts = Object.entries(counts).map(([label, count]) =>
+    count > 1 ? `${count} ${label}` : label
+  )
+  return parts.join(', ')
+}
 
-function ToolCallCard({ block }: { block: RichToolUseBlock }) {
-  const [expanded, setExpanded] = useState(false)
+// ── Individual Tool Detail (shown inside expanded group) ──
+
+function ToolDetail({ block }: { block: RichToolUseBlock }) {
+  const [showResult, setShowResult] = useState(false)
   const meta = TOOL_META[block.name] || { icon: Terminal, label: block.name }
   const Icon = meta.icon
   const summary = getToolSummary(block)
@@ -47,47 +60,64 @@ function ToolCallCard({ block }: { block: RichToolUseBlock }) {
   const isError = block.is_error
 
   return (
-    <div className="my-1.5 rounded-lg border border-border-custom/50 overflow-hidden">
-      <button
-        onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface/80 transition-colors group"
-      >
-        <ChevronRight className={cn('w-3 h-3 text-stone/50 transition-transform shrink-0', expanded && 'rotate-90')} />
-        <Icon className="w-3.5 h-3.5 text-stone/70 shrink-0" />
-        <span className="text-xs font-medium text-stone/80">{meta.label}</span>
-        <span className="text-xs text-stone/50 truncate flex-1 font-mono">{summary}</span>
+    <div className="py-1">
+      <div className="flex items-center gap-2">
+        <Icon className="w-3 h-3 text-stone/50 shrink-0" />
+        <span className="text-[11px] text-stone/60 font-mono truncate flex-1">{summary}</span>
         {hasResult && (
           isError
-            ? <XCircle className="w-3 h-3 text-ember/70 shrink-0" />
-            : <CheckCircle2 className="w-3 h-3 text-moss/70 shrink-0" />
+            ? <XCircle className="w-3 h-3 text-ember/60 shrink-0" />
+            : <CheckCircle2 className="w-3 h-3 text-moss/60 shrink-0" />
+        )}
+        {hasResult && (
+          <button
+            onClick={() => setShowResult(r => !r)}
+            className="text-[10px] text-stone/30 hover:text-stone/50 transition-colors"
+          >
+            {showResult ? 'hide' : 'output'}
+          </button>
+        )}
+      </div>
+      {showResult && hasResult && (
+        <div className="mt-1 ml-5">
+          <pre className={cn(
+            'text-[11px] font-mono whitespace-pre-wrap break-all max-h-48 overflow-y-auto scrollbar-auto',
+            isError ? 'text-ember/60' : 'text-stone/50'
+          )}>{typeof block.result === 'string' ? block.result.slice(0, 3000) : JSON.stringify(block.result, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Grouped Tool Calls (collapsed summary, expandable) ──
+
+function ToolGroup({ tools }: { tools: RichToolUseBlock[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const errorCount = tools.filter(t => t.is_error).length
+  const summary = getGroupedToolSummary(tools)
+
+  return (
+    <div className="my-1 px-3">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="flex items-center gap-2 text-stone/40 hover:text-stone/60 transition-colors"
+      >
+        <ChevronRight className={cn('w-3 h-3 transition-transform shrink-0', expanded && 'rotate-90')} />
+        <Wrench className="w-3 h-3" />
+        <span className="text-[11px]">
+          {tools.length} tool call{tools.length !== 1 ? 's' : ''}
+        </span>
+        <span className="text-[10px] text-stone/25">{summary}</span>
+        {errorCount > 0 && (
+          <span className="text-[10px] text-ember/50">{errorCount} error{errorCount !== 1 ? 's' : ''}</span>
         )}
       </button>
       {expanded && (
-        <div className="border-t border-border-custom">
-          {block.name === 'Bash' && typeof block.input.command === 'string' && (
-            <div className="px-3 py-2 bg-codebg">
-              <pre className="text-[11px] font-mono text-parchment/80 whitespace-pre-wrap break-all">{block.input.command}</pre>
-            </div>
-          )}
-          {(block.name === 'Edit') && typeof block.input.old_string === 'string' && (
-            <div className="px-3 py-2 bg-codebg">
-              <div className="text-[10px] text-stone/50 mb-1">old</div>
-              <pre className="text-[11px] font-mono text-ember/60 whitespace-pre-wrap break-all line-through decoration-ember/20">{(block.input.old_string as string).slice(0, 500)}</pre>
-              <div className="text-[10px] text-stone/50 mt-2 mb-1">new</div>
-              <pre className="text-[11px] font-mono text-moss/70 whitespace-pre-wrap break-all">{(typeof block.input.new_string === 'string' ? block.input.new_string : '').slice(0, 500)}</pre>
-            </div>
-          )}
-          {hasResult && (
-            <div className={cn('px-3 py-2', isError ? 'bg-ember/5' : 'bg-codebg')}>
-              <pre className={cn(
-                'text-[11px] font-mono whitespace-pre-wrap break-all max-h-64 overflow-y-auto scrollbar-auto',
-                isError ? 'text-ember/80' : 'text-stone/70'
-              )}>{typeof block.result === 'string' ? block.result.slice(0, 3000) : JSON.stringify(block.result, null, 2)}</pre>
-              {typeof block.result === 'string' && block.result.length > 3000 && (
-                <div className="text-[10px] text-stone/40 mt-1">...truncated ({block.result.length} chars total)</div>
-              )}
-            </div>
-          )}
+        <div className="ml-5 mt-1 pl-3 border-l border-stone/10 space-y-0.5">
+          {tools.map((block, i) => (
+            <ToolDetail key={block.id || `tool-${i}`} block={block} />
+          ))}
         </div>
       )}
     </div>
@@ -100,7 +130,7 @@ function ThinkingBlock({ block }: { block: RichThinkingBlock }) {
   const [expanded, setExpanded] = useState(false)
 
   return (
-    <div className="my-1">
+    <div className="my-1 px-3">
       <button
         onClick={() => setExpanded(e => !e)}
         className="flex items-center gap-1.5 text-stone/40 hover:text-stone/60 transition-colors"
@@ -156,25 +186,22 @@ function UserMessage({ msg }: { msg: RichUserMessage }) {
   // Teammate message
   if (msg.origin === 'teammate' && msg.teammateId) {
     const colorMap: Record<string, string> = {
-      blue: 'border-blue-500/30 bg-blue-500/5',
-      green: 'border-moss/30 bg-moss/5',
-      red: 'border-ember/30 bg-ember/5',
-      yellow: 'border-sand/30 bg-sand/5',
-      purple: 'border-purple-500/30 bg-purple-500/5',
+      blue: 'border-l-blue-500/40',
+      green: 'border-l-moss/40',
+      red: 'border-l-ember/40',
+      yellow: 'border-l-sand/40',
+      purple: 'border-l-purple-500/40',
     }
-    const colorClass = msg.teammateColor ? (colorMap[msg.teammateColor] || 'border-stone/20 bg-surface/30') : 'border-stone/20 bg-surface/30'
+    const colorClass = msg.teammateColor ? (colorMap[msg.teammateColor] || 'border-l-stone/20') : 'border-l-stone/20'
 
     return (
       <div className="animate-fade-up">
-        <div className={cn('rounded-lg border px-4 py-3', colorClass)}>
-          <div className="flex items-center gap-2 mb-1.5">
-            <Users className="w-3 h-3 text-stone/50" />
-            <span className="text-[11px] font-medium text-stone/70">{msg.teammateId}</span>
+        <div className={cn('border-l-2 pl-4 py-2', colorClass)}>
+          <div className="flex items-center gap-2 mb-1">
+            <Users className="w-3 h-3 text-stone/40" />
+            <span className="text-[11px] font-medium text-stone/50">{msg.teammateId}</span>
             <Timestamp ts={msg.timestamp} />
           </div>
-          {msg.teammateSummary && (
-            <p className="text-xs text-stone/50 mb-1">{msg.teammateSummary}</p>
-          )}
           <div className="markdown-compact text-[0.875rem]">
             <Markdown remarkPlugins={[remarkGfm]}>{text}</Markdown>
           </div>
@@ -212,19 +239,17 @@ function AssistantMessage({ msg }: { msg: RichAssistantMessage }) {
   const toolBlocks = msg.blocks.filter((b): b is RichToolUseBlock => b.type === 'tool_use')
   const thinkingBlocks = msg.blocks.filter((b): b is RichThinkingBlock => b.type === 'thinking')
 
-  // Skip messages that are only tool_use with no text (intermediate step)
   const hasText = textBlocks.length > 0
-  const hasTools = toolBlocks.length > 0
   const hasThinking = thinkingBlocks.length > 0
 
-  if (!hasText && !hasTools && !hasThinking) return null
-
-  // Filter out SendMessage tool calls that echo the text content
+  // Filter out noise tools
   const visibleTools = toolBlocks.filter(t => t.name !== 'ToolSearch')
+
+  if (!hasText && visibleTools.length === 0 && !hasThinking) return null
 
   return (
     <div className="animate-fade-up">
-      <div className="text-parchment px-1">
+      <div className="text-parchment">
         {/* Thinking blocks */}
         {hasThinking && thinkingBlocks.map((block, i) => (
           <ThinkingBlock key={`think-${i}`} block={block} />
@@ -239,13 +264,9 @@ function AssistantMessage({ msg }: { msg: RichAssistantMessage }) {
           </div>
         )}
 
-        {/* Tool calls */}
+        {/* Tool calls — grouped into a single collapsible summary */}
         {visibleTools.length > 0 && (
-          <div className="px-2">
-            {visibleTools.map((block, i) => (
-              <ToolCallCard key={block.id || `tool-${i}`} block={block} />
-            ))}
-          </div>
+          <ToolGroup tools={visibleTools} />
         )}
 
         {/* Footer: model + usage */}
