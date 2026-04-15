@@ -44,37 +44,32 @@ module.exports = function update() {
     }
   }
 
-  // 4. Refresh space system prompts
-  const spacesDir = path.join(home, 'spaces');
+  // 4. Refresh space system prompts (from central state.json)
   const templatePath = path.join(appDir, 'src', 'templates', 'space-system-prompt.md');
-  if (fs.existsSync(spacesDir) && fs.existsSync(templatePath)) {
+  const state = require('../state');
+  if (fs.existsSync(templatePath)) {
     console.log('');
     console.log('Refreshing space system prompts...');
     const template = fs.readFileSync(templatePath, 'utf-8');
 
-    const entries = fs.readdirSync(spacesDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const spaceJsonPath = path.join(spacesDir, entry.name, 'space.json');
-      if (!fs.existsSync(spaceJsonPath)) continue;
+    const spaces = state.getAllSpaces(home);
+    for (const space of spaces) {
+      const spaceDir = state.spaceDir(home, space.slug);
+      const promptPath = path.join(spaceDir, 'system-prompt.md');
 
-      const spaceConfig = JSON.parse(fs.readFileSync(spaceJsonPath, 'utf-8'));
-      const promptPath = path.join(spacesDir, entry.name, 'system-prompt.md');
-
-      // Apply template replacements
       let content = template;
-      content = content.replace(/\{\{SPACE_NAME\}\}/g, spaceConfig.slug);
-      content = content.replace(/\{\{SPACE_SLUG\}\}/g, spaceConfig.slug);
-      content = content.replace(/\{\{SPACE_DIR\}\}/g, spaceConfig.spaceDir || path.join(spacesDir, entry.name));
-      if (spaceConfig.codeDir) {
-        content = content.replace(/\{\{CODE_DIR_SECTION\}\}/g, `Your code directory is \`${spaceConfig.codeDir}\`. This is where your workers should make code changes.`);
+      content = content.replace(/\{\{SPACE_NAME\}\}/g, space.slug);
+      content = content.replace(/\{\{SPACE_SLUG\}\}/g, space.slug);
+      content = content.replace(/\{\{SPACE_DIR\}\}/g, spaceDir);
+      if (space.codeDir) {
+        content = content.replace(/\{\{CODE_DIR_SECTION\}\}/g, `Your code directory is \`${space.codeDir}\`. This is where your workers should make code changes. Your space directory (\`${spaceDir}\`) holds knowledge, config, and project state.`);
       } else {
         content = content.replace(/\n\{\{CODE_DIR_SECTION\}\}\n/g, '\n');
         content = content.replace(/\{\{CODE_DIR_SECTION\}\}/g, '');
       }
 
       fs.writeFileSync(promptPath, content, 'utf-8');
-      console.log(`  ✓ ${entry.name}`);
+      console.log(`  ✓ ${space.slug}`);
     }
   }
 
