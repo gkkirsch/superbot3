@@ -57,6 +57,7 @@ export function ChatSection({ messages, richConversation, thinkingState, sendFn,
   })
 
   // Clear optimistic messages once they appear in the real conversation
+  // We do this silently — the real message takes over with the same key
   useEffect(() => {
     if (optimisticMessages.length === 0) return
     const remaining = optimisticMessages.filter(opt => {
@@ -71,6 +72,17 @@ export function ChatSection({ messages, richConversation, thinkingState, sendFn,
       setOptimisticMessages(remaining)
     }
   }, [richConversation, optimisticMessages])
+
+  // Build stable keys for messages — use text content hash so optimistic and real messages share the same key
+  const getMessageKey = (msg: RichMessage, i: number): string => {
+    if (msg.type === 'user' && msg.blocks?.[0]?.type === 'text') {
+      return `user-${msg.blocks[0].text.slice(0, 80)}`
+    }
+    if (msg.type === 'assistant' && msg.blocks?.[0]?.type === 'text') {
+      return `asst-${msg.timestamp}-${msg.blocks[0].text.slice(0, 40)}`
+    }
+    return `${msg.type}-${msg.timestamp}-${i}`
+  }
 
   // Consolidate assistant messages and add pending inbox messages
   const consolidated = useMemo(() => {
@@ -258,7 +270,7 @@ export function ChatSection({ messages, richConversation, thinkingState, sendFn,
           </div>
         )}
         {consolidated.slice(-visibleCount).map((msg, i) => (
-          <RichMessageBubble key={`${msg.timestamp}-${i}`} message={msg} />
+          <RichMessageBubble key={getMessageKey(msg, i)} message={msg} />
         ))}
         {(thinkingState?.isThinking || waitingForReply) && (
           <ThinkingIndicator
