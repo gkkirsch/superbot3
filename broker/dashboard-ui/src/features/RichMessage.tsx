@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, Terminal, FileText, Pencil, Search, FolderSearch, Globe, Brain, AlertCircle, CheckCircle2, XCircle, Users, Clock, Wrench } from 'lucide-react'
+import { ChevronRight, Terminal, FileText, Pencil, Search, FolderSearch, Globe, Brain, AlertCircle, CheckCircle2, XCircle, Users, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RichMessage, RichAssistantMessage, RichUserMessage, RichSystemMessage, RichToolUseBlock, RichThinkingBlock } from '@/lib/api'
 import Markdown from 'react-markdown'
@@ -104,7 +104,6 @@ function ToolGroup({ tools }: { tools: RichToolUseBlock[] }) {
         className="flex items-center gap-2 text-stone/40 hover:text-stone/60 transition-colors"
       >
         <ChevronRight className={cn('w-3 h-3 transition-transform shrink-0', expanded && 'rotate-90')} />
-        <Wrench className="w-3 h-3" />
         <span className="text-[11px]">
           {tools.length} tool call{tools.length !== 1 ? 's' : ''}
         </span>
@@ -146,25 +145,6 @@ function ThinkingBlock({ block }: { block: RichThinkingBlock }) {
       )}
     </div>
   )
-}
-
-// ── Usage Badge ──
-
-function UsageBadge({ usage }: { usage: NonNullable<RichAssistantMessage['usage']> }) {
-  const total = usage.input_tokens + usage.output_tokens
-  if (total === 0) return null
-  return (
-    <span className="text-[10px] text-stone/30 font-mono">
-      {usage.output_tokens.toLocaleString()} out
-    </span>
-  )
-}
-
-// ── Model Badge ──
-
-function ModelBadge({ model }: { model: string }) {
-  const short = model.replace('claude-', '').replace(/-\d{8}$/, '')
-  return <span className="text-[10px] text-stone/30">{short}</span>
 }
 
 // ── Timestamp ──
@@ -269,10 +249,8 @@ function AssistantMessage({ msg }: { msg: RichAssistantMessage }) {
           <ToolGroup tools={visibleTools} />
         )}
 
-        {/* Footer: model + usage */}
+        {/* Footer: timestamp */}
         <div className="flex items-center gap-2 px-4 mt-1">
-          {msg.model && <ModelBadge model={msg.model} />}
-          {msg.usage && <UsageBadge usage={msg.usage} />}
           <Timestamp ts={msg.timestamp} />
         </div>
       </div>
