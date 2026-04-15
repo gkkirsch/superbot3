@@ -2017,9 +2017,7 @@ app.post('/api/spaces/:name/restart', async (req, res) => {
 
     // Re-launch using shared launchSpace module
     const { launchSpace } = require(path.join(__dirname, '..', 'src', 'launchSpace'));
-    const globalConfig = JSON.parse(fs.readFileSync(path.join(SUPERBOT3_HOME, 'config.json'), 'utf-8'));
-    const model = config.model || globalConfig.model || 'claude-opus-4-6';
-    launchSpace(config, model);
+    launchSpace(SUPERBOT3_HOME, config.slug);
 
     res.json({ ok: true, message: `Space "${config.slug}" restarted` });
   } catch (err) {
