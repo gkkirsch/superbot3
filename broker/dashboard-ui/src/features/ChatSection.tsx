@@ -21,6 +21,7 @@ const PAGE_SIZE = 30
 export function ChatSection({ messages, richConversation, thinkingState, sendFn, queryKey, title }: ChatSectionProps) {
   const [text, setText] = useState('')
   const [waitingForReply, setWaitingForReply] = useState(false)
+  const [optimisticMessages, setOptimisticMessages] = useState<RichMessage[]>([])
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -28,16 +29,48 @@ export function ChatSection({ messages, richConversation, thinkingState, sendFn,
   const prevLenRef = useRef(0)
 
   const mutation = useMutation({
-    mutationFn: (msg: string) => sendFn(msg),
-    onSuccess: () => {
+    mutationFn: (msg: string) => {
+      // Optimistically add user message immediately
+      const optimistic: RichMessage = {
+        type: 'user',
+        blocks: [{ type: 'text', text: msg }],
+        timestamp: new Date().toISOString(),
+        origin: null,
+        teammateId: null,
+        teammateColor: null,
+        teammateSummary: null,
+      }
+      setOptimisticMessages(prev => [...prev, optimistic])
       setText('')
       setWaitingForReply(true)
-      if (inputRef.current) {
-        inputRef.current.style.height = 'auto'
-      }
+      if (inputRef.current) inputRef.current.style.height = 'auto'
+      return sendFn(msg)
+    },
+    onSuccess: () => {
       setTimeout(() => queryClient.invalidateQueries({ queryKey }), 1000)
     },
+    onError: () => {
+      // Remove last optimistic message on failure
+      setOptimisticMessages(prev => prev.slice(0, -1))
+      setWaitingForReply(false)
+    },
   })
+
+  // Clear optimistic messages once they appear in the real conversation
+  useEffect(() => {
+    if (optimisticMessages.length === 0) return
+    const remaining = optimisticMessages.filter(opt => {
+      const optText = opt.type === 'user' && opt.blocks?.[0]?.type === 'text' ? opt.blocks[0].text : ''
+      return !richConversation.some(real =>
+        real.type === 'user' &&
+        real.blocks?.[0]?.type === 'text' &&
+        real.blocks[0].text === optText
+      )
+    })
+    if (remaining.length !== optimisticMessages.length) {
+      setOptimisticMessages(remaining)
+    }
+  }, [richConversation, optimisticMessages])
 
   // Consolidate assistant messages and add pending inbox messages
   const consolidated = useMemo(() => {
@@ -76,10 +109,10 @@ export function ChatSection({ messages, richConversation, thinkingState, sendFn,
       }
     }
 
-    const all = [...rich, ...pendingMessages]
+    const all = [...rich, ...pendingMessages, ...optimisticMessages]
     all.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
     return all
-  }, [richConversation, messages])
+  }, [richConversation, messages, optimisticMessages])
 
   // Clear typing indicator when a new assistant message arrives or backend reports not thinking
   useEffect(() => {
