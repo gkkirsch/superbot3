@@ -15,7 +15,7 @@ import {
   Puzzle, Blocks, Bot, Search, ExternalLink,
   ChevronDown, ChevronRight, ArrowLeft,
   Server, Tag, Code2, Store, FolderPlus, X,
-  Key, Check, AlertTriangle, Loader2,
+  Key, Check, AlertTriangle, Loader2, Plus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useQueryClient } from '@tanstack/react-query'
@@ -110,17 +110,30 @@ function AgentCard({ agent, onClick }: { agent: AgentDef; onClick: () => void })
   )
 }
 
-function CollapsibleSection({ title, count, defaultOpen, children }: {
-  title: string; count: number; defaultOpen: boolean; children: React.ReactNode
+function CollapsibleSection({ title, count, defaultOpen, onAdd, addTitle, children }: {
+  title: string; count: number; defaultOpen: boolean
+  onAdd?: () => void; addTitle?: string
+  children: React.ReactNode
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
     <div>
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 w-full text-left mb-2">
-        {open ? <ChevronDown className="w-3 h-3 text-stone" /> : <ChevronRight className="w-3 h-3 text-stone" />}
-        <span className="text-xs font-medium text-stone uppercase tracking-wider">{title}</span>
-        <span className="text-[10px] text-stone/50">({count})</span>
-      </button>
+      <div className="flex items-center gap-1.5 mb-2">
+        <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 flex-1 text-left">
+          {open ? <ChevronDown className="w-3 h-3 text-stone" /> : <ChevronRight className="w-3 h-3 text-stone" />}
+          <span className="text-xs font-medium text-stone uppercase tracking-wider">{title}</span>
+          <span className="text-[10px] text-stone/50">({count})</span>
+        </button>
+        {onAdd && (
+          <button
+            onClick={onAdd}
+            className="p-1 rounded-md bg-sand/10 border border-sand/20 text-sand hover:bg-sand/20 transition-colors"
+            title={addTitle || `Add ${title.toLowerCase()}`}
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+        )}
+      </div>
       {open && children}
     </div>
   )
@@ -896,29 +909,6 @@ function HomeView({ slug, plugins, skills, agents, onBrowse, onSelectPlugin, onS
       <button onClick={onBrowse} className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-stone/50 bg-ink/50 border border-border-custom rounded-md hover:border-sand/30 hover:text-stone transition-colors text-left">
         <Search className="w-3.5 h-3.5 shrink-0" /><span>Search plugins & marketplace...</span><ChevronRight className="w-3 h-3 ml-auto" />
       </button>
-      {enabledPlugins.length > 0 && (
-        <CollapsibleSection title="Plugins" count={enabledPlugins.length} defaultOpen={false}>
-          <div className="space-y-1">{enabledPlugins.map(p => <PluginCard key={`${p.name}@${p.marketplace}`} plugin={p} onClick={() => onSelectPlugin(p)} compact />)}</div>
-        </CollapsibleSection>
-      )}
-      <CollapsibleSection title="Skills" count={skills.length} defaultOpen={false}>
-        {skills.length > 0 ? (
-          <div className="space-y-1">{skills.map(s => <SkillCard key={`${s.source}:${s.dirname}`} skill={s} onClick={() => onSelectSkill(s)} />)}</div>
-        ) : (
-          <p className="text-xs text-stone mb-2">No skills found.</p>
-        )}
-        <button onClick={onAddSkill}
-          className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 text-[11px] text-stone hover:text-parchment border border-dashed border-border-custom rounded-md hover:bg-ink/30 transition-colors">
-          <FolderPlus className="w-3 h-3" />Add skill
-        </button>
-      </CollapsibleSection>
-      <CollapsibleSection title="Agents" count={agents.length} defaultOpen={false}>
-        {agents.length > 0 ? (
-          <div className="space-y-1">{agents.map(a => <AgentCard key={`${a.source}:${a.filename}`} agent={a} onClick={() => onSelectAgent(a)} />)}</div>
-        ) : (
-          <p className="text-xs text-stone">No agents found.</p>
-        )}
-      </CollapsibleSection>
       <button onClick={onBrowse} className="w-full flex items-center justify-between px-3 py-2.5 border border-border-custom rounded-md hover:bg-ink/30 transition-colors group">
         <div className="flex items-center gap-2.5">
           <Store className="w-3.5 h-3.5 text-stone group-hover:text-sand transition-colors" />
@@ -929,6 +919,25 @@ function HomeView({ slug, plugins, skills, agents, onBrowse, onSelectPlugin, onS
           <ChevronRight className="w-3 h-3 text-stone/40 group-hover:text-stone transition-colors" />
         </div>
       </button>
+      {enabledPlugins.length > 0 && (
+        <CollapsibleSection title="Plugins" count={enabledPlugins.length} defaultOpen={false} onAdd={onBrowse} addTitle="Browse marketplace">
+          <div className="space-y-1">{enabledPlugins.map(p => <PluginCard key={`${p.name}@${p.marketplace}`} plugin={p} onClick={() => onSelectPlugin(p)} compact />)}</div>
+        </CollapsibleSection>
+      )}
+      <CollapsibleSection title="Skills" count={skills.length} defaultOpen={false} onAdd={onAddSkill} addTitle="Add skill">
+        {skills.length > 0 ? (
+          <div className="space-y-1">{skills.map(s => <SkillCard key={`${s.source}:${s.dirname}`} skill={s} onClick={() => onSelectSkill(s)} />)}</div>
+        ) : (
+          <p className="text-xs text-stone mb-2">No skills found.</p>
+        )}
+      </CollapsibleSection>
+      <CollapsibleSection title="Agents" count={agents.length} defaultOpen={false}>
+        {agents.length > 0 ? (
+          <div className="space-y-1">{agents.map(a => <AgentCard key={`${a.source}:${a.filename}`} agent={a} onClick={() => onSelectAgent(a)} />)}</div>
+        ) : (
+          <p className="text-xs text-stone">No agents found.</p>
+        )}
+      </CollapsibleSection>
       {enabledPlugins.length === 0 && skills.length === 0 && agents.length === 0 && (
         <div className="text-center py-6">
           <Puzzle className="w-8 h-8 text-stone/20 mx-auto mb-2" />

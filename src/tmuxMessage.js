@@ -8,6 +8,19 @@ const path = require('path');
 
 const TMUX_SESSION = 'superbot3';
 
+function paneHasText(paneTarget, text) {
+  // Check if the pasted text is still visible in the pane (i.e. not yet submitted)
+  try {
+    const output = execSync(`tmux capture-pane -t ${paneTarget} -p 2>/dev/null`, { encoding: 'utf-8' });
+    // Check last few lines for a substring of the text (use first 60 chars to match)
+    const needle = text.slice(0, 60);
+    const lastLines = output.split('\n').slice(-5).join('\n');
+    return lastLines.includes(needle);
+  } catch {
+    return false;
+  }
+}
+
 function sendToPane(paneTarget, text) {
   const sanitized = text.replace(/\r?\n/g, ' ');
   const tmpDir = path.join(require('os').tmpdir(), 'superbot3-msg');
@@ -17,10 +30,15 @@ function sendToPane(paneTarget, text) {
     fs.writeFileSync(tmpFile, sanitized, 'utf-8');
     execSync(`tmux load-buffer "${tmpFile}"`);
     execSync(`tmux paste-buffer -t ${paneTarget}`);
-    execSync('sleep 0.2');
+    // Wait for paste to settle, then send Enter.
+    // If text is still in the input (Enter got swallowed), retry.
+    execSync('sleep 0.5');
     execSync(`tmux send-keys -t ${paneTarget} Enter`);
-    execSync('sleep 0.1');
-    execSync(`tmux send-keys -t ${paneTarget} Enter`);
+    for (let i = 0; i < 3; i++) {
+      execSync('sleep 0.4');
+      if (!paneHasText(paneTarget, sanitized)) break; // text was consumed — done
+      execSync(`tmux send-keys -t ${paneTarget} Enter`);
+    }
   } finally {
     try { fs.unlinkSync(tmpFile); } catch {}
   }
