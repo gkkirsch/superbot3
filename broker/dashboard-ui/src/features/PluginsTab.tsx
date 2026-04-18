@@ -45,7 +45,7 @@ function BackButton({ onClick, label }: { onClick: () => void; label: string }) 
 
 function PluginCard({ plugin, onClick, compact }: { plugin: PluginInfo; onClick: () => void; compact?: boolean }) {
   return (
-    <Card className="cursor-pointer hover:border-border-custom/80 transition-colors" onClick={onClick}>
+    <Card className="cursor-pointer hover:border-border-custom/80 hover:bg-sand/5 transition-colors" onClick={onClick}>
       <CardContent className={compact ? 'p-2.5' : 'p-3'}>
         <div className="flex items-center gap-2.5">
           <Puzzle className={cn('w-3.5 h-3.5 shrink-0', plugin.enabled ? 'text-sand' : 'text-stone/40')} />
@@ -71,7 +71,7 @@ function SkillCard({ skill, onClick }: { skill: SkillDef; onClick: () => void })
   const isDisabled = skill.enabled === false
 
   return (
-    <Card className={cn('cursor-pointer hover:border-border-custom/80 transition-colors', isDisabled && 'opacity-50')} onClick={onClick}>
+    <Card className={cn('cursor-pointer hover:border-border-custom/80 hover:bg-sand/5 transition-colors', isDisabled && 'opacity-50')} onClick={onClick}>
       <CardContent className="p-2.5 flex items-center gap-2.5">
         <Blocks className={cn('w-3.5 h-3.5 shrink-0', isDisabled ? 'text-stone/40' : 'text-sand/70')} />
         <div className="flex-1 min-w-0">
@@ -92,7 +92,7 @@ function SkillCard({ skill, onClick }: { skill: SkillDef; onClick: () => void })
 
 function AgentCard({ agent, onClick }: { agent: AgentDef; onClick: () => void }) {
   return (
-    <Card className="cursor-pointer hover:border-border-custom/80 transition-colors" onClick={onClick}>
+    <Card className="cursor-pointer hover:border-border-custom/80 hover:bg-sand/5 transition-colors" onClick={onClick}>
       <CardContent className="p-2.5 flex items-center gap-2.5">
         <Bot className="w-3.5 h-3.5 text-sand/70 shrink-0" />
         <div className="flex-1 min-w-0">
@@ -119,7 +119,7 @@ function CollapsibleSection({ title, count, defaultOpen, onAdd, addTitle, childr
   return (
     <div>
       <div className="flex items-center gap-1.5 mb-2">
-        <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 flex-1 text-left">
+        <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 flex-1 text-left rounded-md px-1.5 py-1 -ml-1.5 hover:bg-sand/5 transition-colors">
           {open ? <ChevronDown className="w-3 h-3 text-stone" /> : <ChevronRight className="w-3 h-3 text-stone" />}
           <span className="text-xs font-medium text-stone uppercase tracking-wider">{title}</span>
           <span className="text-[10px] text-stone/50">({count})</span>
