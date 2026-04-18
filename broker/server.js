@@ -45,13 +45,14 @@ function readJsonSafe(filePath) {
 }
 
 function getSpaceConfig(name) {
-  const space = state.getSpace(SUPERBOT3_HOME, name);
-  if (!space) return null;
-  space.running = isWindowRunning(name);
-  // Compute paths for backward compat
-  space.spaceDir = state.spaceDir(SUPERBOT3_HOME, name);
-  space.claudeConfigDir = state.claudeConfigDir(SUPERBOT3_HOME, name);
-  return space;
+  const config = state.getSpaceConfig(SUPERBOT3_HOME, name);
+  if (!config) return null;
+  const runtime = state.getSpace(SUPERBOT3_HOME, name) || {};
+  const merged = { ...config, ...runtime };
+  merged.running = isWindowRunning(name);
+  merged.spaceDir = state.spaceDir(SUPERBOT3_HOME, name);
+  merged.claudeConfigDir = state.claudeConfigDir(SUPERBOT3_HOME, name);
+  return merged;
 }
 
 const { sendToPane, getSpacePaneTarget, getMasterPaneTarget, isSpaceWindowAlive, isPaneAlive, capturePaneOutput, getPaneInfo } = require('../src/tmuxMessage');

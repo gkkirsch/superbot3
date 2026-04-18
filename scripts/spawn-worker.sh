@@ -53,7 +53,7 @@ if [[ ! -f "$SPACE_JSON" ]]; then
   echo "ERROR: Space '$SPACE' not found at $SPACE_JSON" >&2; exit 1
 fi
 
-CONFIG_DIR=$(jq -r '.claudeConfigDir' "$SPACE_JSON")
+CONFIG_DIR="$SPACE_DIR/.claude"
 REGISTRY="$SPACE_DIR/workers.json"
 
 # Create registry if it doesn't exist
@@ -165,7 +165,19 @@ CMD="cd ${ESC_CWD} && env"
 CMD="$CMD CLAUDE_CONFIG_DIR=${ESC_CONFIG}"
 CMD="$CMD ${ESC_CLAUDE}"
 CMD="$CMD --dangerously-skip-permissions"
-CMD="$CMD --model $(printf '%q' "$MODEL")"
+
+# If agent type is specified and exists as an agent definition, use --agent
+# Otherwise fall back to --model
+if [[ "$AGENT_TYPE" != "space-worker" ]]; then
+  AGENT_DEF="$CONFIG_DIR/agents/${AGENT_TYPE}.md"
+  if [[ -f "$AGENT_DEF" ]]; then
+    CMD="$CMD --agent $(printf '%q' "$AGENT_TYPE")"
+  else
+    CMD="$CMD --model $(printf '%q' "$MODEL")"
+  fi
+else
+  CMD="$CMD --model $(printf '%q' "$MODEL")"
+fi
 
 tmux send-keys -t "$PANE_ID" "$CMD" Enter
 
@@ -179,6 +191,9 @@ TMP_PROMPT="$TMPDIR/superbot3-prompt-$$.txt"
 printf '%s' "$PROMPT" > "$TMP_PROMPT"
 tmux load-buffer "$TMP_PROMPT"
 tmux paste-buffer -t "$PANE_ID"
+sleep 0.2
+tmux send-keys -t "$PANE_ID" Enter
+sleep 0.1
 tmux send-keys -t "$PANE_ID" Enter
 rm -f "$TMP_PROMPT"
 

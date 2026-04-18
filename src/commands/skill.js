@@ -1,15 +1,14 @@
 const fs = require('fs');
 const path = require('path');
+const state = require('../state');
 
 function create(home, spaceName, skillName, opts = {}) {
-  const configPath = path.join(home, 'spaces', spaceName, 'space.json');
-  if (!fs.existsSync(configPath)) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" not found.`);
     process.exit(1);
   }
 
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  const skillDir = path.join(config.claudeConfigDir, 'skills', skillName);
+  const skillDir = path.join(state.claudeConfigDir(home, spaceName), 'skills', skillName);
 
   if (fs.existsSync(skillDir)) {
     console.error(`Error: Skill "${skillName}" already exists at ${skillDir}`);
@@ -34,14 +33,12 @@ ${body}`;
 }
 
 function list(home, spaceName) {
-  const configPath = path.join(home, 'spaces', spaceName, 'space.json');
-  if (!fs.existsSync(configPath)) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" not found.`);
     process.exit(1);
   }
 
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  const skillsDir = path.join(config.claudeConfigDir, 'skills');
+  const skillsDir = path.join(state.claudeConfigDir(home, spaceName), 'skills');
 
   if (!fs.existsSync(skillsDir)) {
     console.log('No skills.');
@@ -63,14 +60,12 @@ function list(home, spaceName) {
 }
 
 function remove(home, spaceName, skillName) {
-  const configPath = path.join(home, 'spaces', spaceName, 'space.json');
-  if (!fs.existsSync(configPath)) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" not found.`);
     process.exit(1);
   }
 
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  const skillDir = path.join(config.claudeConfigDir, 'skills', skillName);
+  const skillDir = path.join(state.claudeConfigDir(home, spaceName), 'skills', skillName);
 
   if (!fs.existsSync(skillDir)) {
     console.error(`Error: Skill "${skillName}" not found.`);

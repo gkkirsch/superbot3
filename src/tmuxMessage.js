@@ -17,6 +17,9 @@ function sendToPane(paneTarget, text) {
     fs.writeFileSync(tmpFile, sanitized, 'utf-8');
     execSync(`tmux load-buffer "${tmpFile}"`);
     execSync(`tmux paste-buffer -t ${paneTarget}`);
+    execSync('sleep 0.2');
+    execSync(`tmux send-keys -t ${paneTarget} Enter`);
+    execSync('sleep 0.1');
     execSync(`tmux send-keys -t ${paneTarget} Enter`);
   } finally {
     try { fs.unlinkSync(tmpFile); } catch {}

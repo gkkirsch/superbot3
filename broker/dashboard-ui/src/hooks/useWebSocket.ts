@@ -13,6 +13,7 @@ export function useWebSocket() {
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const url = `${protocol}//${window.location.host}/ws`
+    let hasConnected = false
 
     function notify(title: string, body?: string) {
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -24,6 +25,16 @@ export function useWebSocket() {
     function connect() {
       const ws = new WebSocket(url)
       wsRef.current = ws
+
+      ws.onopen = () => {
+        if (hasConnected) {
+          // Reconnecting after a disconnect — broker was reloaded.
+          // Full page reload to pick up new dashboard build.
+          window.location.reload()
+          return
+        }
+        hasConnected = true
+      }
 
       ws.onmessage = (event) => {
         try {

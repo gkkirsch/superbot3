@@ -897,11 +897,11 @@ function HomeView({ slug, plugins, skills, agents, onBrowse, onSelectPlugin, onS
         <Search className="w-3.5 h-3.5 shrink-0" /><span>Search plugins & marketplace...</span><ChevronRight className="w-3 h-3 ml-auto" />
       </button>
       {enabledPlugins.length > 0 && (
-        <CollapsibleSection title="Plugins" count={enabledPlugins.length} defaultOpen={true}>
+        <CollapsibleSection title="Plugins" count={enabledPlugins.length} defaultOpen={false}>
           <div className="space-y-1">{enabledPlugins.map(p => <PluginCard key={`${p.name}@${p.marketplace}`} plugin={p} onClick={() => onSelectPlugin(p)} compact />)}</div>
         </CollapsibleSection>
       )}
-      <CollapsibleSection title="Skills" count={skills.length} defaultOpen={true}>
+      <CollapsibleSection title="Skills" count={skills.length} defaultOpen={false}>
         {skills.length > 0 ? (
           <div className="space-y-1">{skills.map(s => <SkillCard key={`${s.source}:${s.dirname}`} skill={s} onClick={() => onSelectSkill(s)} />)}</div>
         ) : (
@@ -912,7 +912,7 @@ function HomeView({ slug, plugins, skills, agents, onBrowse, onSelectPlugin, onS
           <FolderPlus className="w-3 h-3" />Add skill
         </button>
       </CollapsibleSection>
-      <CollapsibleSection title="Agents" count={agents.length} defaultOpen={true}>
+      <CollapsibleSection title="Agents" count={agents.length} defaultOpen={false}>
         {agents.length > 0 ? (
           <div className="space-y-1">{agents.map(a => <AgentCard key={`${a.source}:${a.filename}`} agent={a} onClick={() => onSelectAgent(a)} />)}</div>
         ) : (

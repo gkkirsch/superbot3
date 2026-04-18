@@ -5,6 +5,7 @@ const { refreshAllSpaceCredentials } = require('../auth');
 const { tmuxSessionExists, tmuxWindowExists } = require('../tmuxMessage');
 const { writeLaunchScript, launchSpace } = require('../launchSpace');
 const state = require('../state');
+const { generateMissingSpaceJsons } = require('../migrate');
 
 function findNewestSession(claudeConfigDir) {
   const projectsDir = path.join(claudeConfigDir, 'projects');
@@ -32,6 +33,9 @@ function findNewestSession(claudeConfigDir) {
 
 module.exports = async function start(home) {
   console.log('Starting superbot3...\n');
+
+  // Ensure space.json exists for all spaces in state.json
+  generateMissingSpaceJsons(home);
 
   const config = JSON.parse(fs.readFileSync(path.join(home, 'config.json'), 'utf-8'));
   const port = config.broker?.port || 3100;

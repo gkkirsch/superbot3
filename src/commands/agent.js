@@ -1,15 +1,14 @@
 const fs = require('fs');
 const path = require('path');
+const state = require('../state');
 
 function create(home, spaceName, agentName, opts = {}) {
-  const configPath = path.join(home, 'spaces', spaceName, 'space.json');
-  if (!fs.existsSync(configPath)) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" not found.`);
     process.exit(1);
   }
 
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  const agentDir = path.join(config.claudeConfigDir, 'agents');
+  const agentDir = path.join(state.claudeConfigDir(home, spaceName), 'agents');
   fs.mkdirSync(agentDir, { recursive: true });
 
   const agentPath = path.join(agentDir, `${agentName}.md`);
@@ -35,14 +34,12 @@ function create(home, spaceName, agentName, opts = {}) {
 }
 
 function list(home, spaceName) {
-  const configPath = path.join(home, 'spaces', spaceName, 'space.json');
-  if (!fs.existsSync(configPath)) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" not found.`);
     process.exit(1);
   }
 
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  const agentDir = path.join(config.claudeConfigDir, 'agents');
+  const agentDir = path.join(state.claudeConfigDir(home, spaceName), 'agents');
 
   if (!fs.existsSync(agentDir)) {
     console.log('No agents.');
@@ -53,7 +50,6 @@ function list(home, spaceName) {
   for (const file of files) {
     const name = path.basename(file, '.md');
     const content = fs.readFileSync(path.join(agentDir, file), 'utf-8');
-    // Extract model from frontmatter
     const modelMatch = content.match(/model:\s*(.+)/);
     const model = modelMatch ? modelMatch[1].trim() : 'default';
     console.log(`  ${name} (model: ${model})`);
@@ -61,14 +57,12 @@ function list(home, spaceName) {
 }
 
 function remove(home, spaceName, agentName) {
-  const configPath = path.join(home, 'spaces', spaceName, 'space.json');
-  if (!fs.existsSync(configPath)) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" not found.`);
     process.exit(1);
   }
 
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  const agentPath = path.join(config.claudeConfigDir, 'agents', `${agentName}.md`);
+  const agentPath = path.join(state.claudeConfigDir(home, spaceName), 'agents', `${agentName}.md`);
 
   if (!fs.existsSync(agentPath)) {
     console.error(`Error: Agent "${agentName}" not found.`);
@@ -80,14 +74,12 @@ function remove(home, spaceName, agentName) {
 }
 
 function show(home, spaceName, agentName) {
-  const configPath = path.join(home, 'spaces', spaceName, 'space.json');
-  if (!fs.existsSync(configPath)) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" not found.`);
     process.exit(1);
   }
 
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  const agentPath = path.join(config.claudeConfigDir, 'agents', `${agentName}.md`);
+  const agentPath = path.join(state.claudeConfigDir(home, spaceName), 'agents', `${agentName}.md`);
 
   if (!fs.existsSync(agentPath)) {
     console.error(`Error: Agent "${agentName}" not found.`);

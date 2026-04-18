@@ -21,12 +21,19 @@ module.exports = function workers(home, spaceName) {
     console.log('  ' + '─'.repeat(60));
 
     for (const w of ws) {
-      const alive = w.paneId && isPaneAlive(w.paneId);
-      const status = alive ? '● alive' : '○ dead';
-      const info = w.paneId ? getPaneInfo(w.paneId) : null;
-      const uptime = w.spawnedAt ? timeSince(w.spawnedAt) : '?';
-      const pid = info ? `  pid=${info.pid}` : '';
-      console.log(`  ${status}  ${w.name}  pane=${w.paneId || 'none'}  model=${w.model || '?'}  up=${uptime}${pid}`);
+      if (w.status === 'hibernated') {
+        const ago = w.hibernatedAt ? timeSince(w.hibernatedAt) : '?';
+        const summarySnip = w.summary ? w.summary.split('\n').filter(l => l.trim()).slice(-1)[0] || '' : '';
+        const truncated = summarySnip.length > 50 ? summarySnip.slice(0, 50) + '…' : summarySnip;
+        console.log(`  ◆ hibernated  ${w.name}  ${ago} ago  model=${w.model || '?'}  ${truncated}`);
+      } else {
+        const alive = w.paneId && isPaneAlive(w.paneId);
+        const status = alive ? '● alive' : '○ dead';
+        const info = w.paneId ? getPaneInfo(w.paneId) : null;
+        const uptime = w.spawnedAt ? timeSince(w.spawnedAt) : '?';
+        const pid = info ? `  pid=${info.pid}` : '';
+        console.log(`  ${status}  ${w.name}  pane=${w.paneId || 'none'}  model=${w.model || '?'}  up=${uptime}${pid}`);
+      }
       total++;
     }
   }

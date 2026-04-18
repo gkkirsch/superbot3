@@ -72,6 +72,7 @@ worker.command('spawn <space> <name> <prompt>')
   .description('Spawn a worker in a space')
   .option('--cwd <path>', 'Working directory')
   .option('--model <model>', 'Claude model')
+  .option('--type <type>', 'Agent type (matches .claude/agents/<type>.md)')
   .option('--agent <name>', 'Agent definition')
   .option('--color <color>', 'Pane border color')
   .action((space, name, prompt, opts) => require('../src/commands/spawn-worker')(SUPERBOT3_HOME, space, name, prompt, opts));
@@ -94,6 +95,18 @@ worker.command('interrupt <space> <name>').description('Interrupt a worker')
 
 worker.command('peek <space> <name>').description('Show last 50 lines of worker output')
   .action((space, name) => require('../src/commands/peek')(SUPERBOT3_HOME, space, name));
+
+worker.command('hibernate <space> <name>')
+  .description('Hibernate a worker (kill process, preserve session)')
+  .action((space, name) => require('../src/commands/hibernate-worker')(SUPERBOT3_HOME, space, name));
+
+worker.command('resume <space> <name> [prompt]')
+  .description('Resume a hibernated worker')
+  .action((space, name, prompt) => require('../src/commands/resume-worker')(SUPERBOT3_HOME, space, name, prompt));
+
+worker.command('cleanup <space>')
+  .description('Hibernate all alive workers in a space')
+  .action((space) => require('../src/commands/cleanup-workers')(SUPERBOT3_HOME, space));
 
 // ── message (shortcut) ─────────────────────────────────────────────────────
 program.command('message <args...>')
@@ -155,7 +168,7 @@ schedule.command('remove <space> <id>').action((s, i) => require('../src/command
 program.command('restart <space>', { hidden: true })
   .action((s) => require('../src/commands/restart')(SUPERBOT3_HOME, s));
 program.command('spawn-worker <space> <name> <prompt>', { hidden: true })
-  .option('--cwd <path>').option('--model <model>').option('--color <color>')
+  .option('--cwd <path>').option('--model <model>').option('--type <type>', 'Agent type').option('--color <color>')
   .action((s, n, p, o) => require('../src/commands/spawn-worker')(SUPERBOT3_HOME, s, n, p, o));
 program.command('workers [space]', { hidden: true })
   .action((s) => require('../src/commands/workers')(SUPERBOT3_HOME, s));
@@ -168,5 +181,12 @@ program.command('message-worker <space> <worker> <text>', { hidden: true })
 program.command('interrupt <space> <worker>', { hidden: true })
   .option('-m, --message <text>')
   .action(async (s, w, o) => require('../src/commands/interrupt-worker')(SUPERBOT3_HOME, s, w, o));
+
+program.command('hibernate-worker <space> <name>', { hidden: true })
+  .action((s, n) => require('../src/commands/hibernate-worker')(SUPERBOT3_HOME, s, n));
+program.command('resume-worker <space> <name> [prompt]', { hidden: true })
+  .action((s, n, p) => require('../src/commands/resume-worker')(SUPERBOT3_HOME, s, n, p));
+program.command('cleanup-workers <space>', { hidden: true })
+  .action((s) => require('../src/commands/cleanup-workers')(SUPERBOT3_HOME, s));
 
 program.parse();

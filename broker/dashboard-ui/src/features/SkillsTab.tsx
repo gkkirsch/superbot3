@@ -382,7 +382,7 @@ export function SkillsTab({ slug }: { slug: string }) {
   return (
     <div className="space-y-4">
       {/* Skills section */}
-      <CollapsibleSection title="Skills" count={allSkills.length} defaultOpen={true}>
+      <CollapsibleSection title="Skills" count={allSkills.length} defaultOpen={false}>
         <div className="space-y-1">
           {allSkills.length === 0 ? (
             <p className="text-xs text-stone">No skills found.</p>
@@ -410,7 +410,7 @@ export function SkillsTab({ slug }: { slug: string }) {
       </CollapsibleSection>
 
       {/* Agents section */}
-      <CollapsibleSection title="Agents" count={allAgents.length} defaultOpen={true}>
+      <CollapsibleSection title="Agents" count={allAgents.length} defaultOpen={false}>
         <div className="space-y-1">
           {allAgents.length === 0 ? (
             <p className="text-xs text-stone">No agents found.</p>

@@ -95,8 +95,18 @@ module.exports = function update() {
     } catch {}
   }
 
+  // 7. Reload broker (picks up new code + rebuilt dashboard)
+  console.log('');
+  console.log('Reloading broker...');
+  try {
+    const reload = require('./reload');
+    await reload(home);
+  } catch (err) {
+    console.log('  Broker reload failed — run `superbot3 reload` manually');
+  }
+
   console.log('');
   console.log('Updated successfully!');
-  console.log('');
-  console.log('  Restart: superbot3 stop && superbot3 start');
+  console.log('  Broker reloaded with new code.');
+  console.log('  Running spaces are untouched — restart individually if needed.');
 };

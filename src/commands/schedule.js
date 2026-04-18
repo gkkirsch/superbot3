@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const state = require('../state');
 
 function getSchedulePath(home, spaceName) {
   return path.join(home, 'spaces', spaceName, '.claude', 'scheduled_tasks.json');
@@ -45,8 +46,7 @@ function cronToHuman(cron) {
 }
 
 function add(home, spaceName, cron, prompt, opts = {}) {
-  const spaceDir = path.join(home, 'spaces', spaceName);
-  if (!fs.existsSync(path.join(spaceDir, 'space.json'))) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" does not exist.`);
     process.exit(1);
   }
@@ -72,8 +72,7 @@ function add(home, spaceName, cron, prompt, opts = {}) {
 }
 
 function list(home, spaceName) {
-  const spaceDir = path.join(home, 'spaces', spaceName);
-  if (!fs.existsSync(path.join(spaceDir, 'space.json'))) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" does not exist.`);
     process.exit(1);
   }
@@ -92,8 +91,7 @@ function list(home, spaceName) {
 }
 
 function remove(home, spaceName, id) {
-  const spaceDir = path.join(home, 'spaces', spaceName);
-  if (!fs.existsSync(path.join(spaceDir, 'space.json'))) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" does not exist.`);
     process.exit(1);
   }

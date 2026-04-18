@@ -55,8 +55,8 @@ function createSpace(home, name, opts = {}) {
   const spaceDir = state.spaceDir(home, slug);
   const configDir = state.claudeConfigDir(home, slug);
 
-  // Check if space already exists in state
-  if (state.getSpace(home, slug)) {
+  // Check if space already exists
+  if (state.getSpaceConfig(home, slug) || state.getSpace(home, slug)) {
     throw new Error(`Space "${slug}" already exists`);
   }
 
@@ -95,8 +95,8 @@ function createSpace(home, name, opts = {}) {
 
   const spaceColor = getSpaceColor(slug);
 
-  // Write space to central state.json
-  const spaceData = {
+  // Write space config to per-space space.json
+  const spaceJsonData = {
     name: friendlyName,
     slug,
     codeDir,
@@ -104,14 +104,21 @@ function createSpace(home, name, opts = {}) {
     active: true,
     archived: false,
     created: new Date().toISOString(),
-    sessionId: null,
-    paneId: null,
     color: spaceColor.hex,
     systemPrompt: opts.systemPrompt || null,
     agent: opts.agent || null,
-    workers: [],
   };
-  state.setSpace(home, slug, spaceData);
+  fs.writeFileSync(path.join(spaceDir, 'space.json'), JSON.stringify(spaceJsonData, null, 2), 'utf-8');
+
+  // Write runtime state to central state.json
+  state.setSpace(home, slug, {
+    paneId: null,
+    sessionId: null,
+    workers: [],
+  });
+
+  // Merged view for return value
+  const spaceData = { ...spaceJsonData, paneId: null, sessionId: null, workers: [] };
 
   // Default plugins
   const SUPERBOT3_MARKETPLACE = 'superbot3';

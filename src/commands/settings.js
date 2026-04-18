@@ -1,14 +1,13 @@
 const fs = require('fs');
 const path = require('path');
+const state = require('../state');
 
 function getSettingsPath(home, spaceName) {
-  const configPath = path.join(home, 'spaces', spaceName, 'space.json');
-  if (!fs.existsSync(configPath)) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" not found.`);
     process.exit(1);
   }
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-  return path.join(config.claudeConfigDir, 'settings.json');
+  return path.join(state.claudeConfigDir(home, spaceName), 'settings.json');
 }
 
 function readSettings(settingsPath) {

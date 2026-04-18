@@ -107,7 +107,21 @@ module.exports = function spawnWorker(home, spaceName, name, prompt, opts = {}) 
   const escapedConfig = configDir.replace(/'/g, "'\\''");
   const escapedModel = model.replace(/'/g, "'\\''");
 
-  const cmd = `cd '${escapedCwd}' && env CLAUDE_CONFIG_DIR='${escapedConfig}' '${escapedClaude}' --dangerously-skip-permissions --model '${escapedModel}'`;
+  // If an agent type is specified and exists as an agent definition, use --agent
+  const agentType = opts.type || opts.agent || null;
+  let claudeFlags;
+  if (agentType && agentType !== 'space-worker') {
+    const agentDef = path.join(configDir, 'agents', `${agentType}.md`);
+    if (fs.existsSync(agentDef)) {
+      claudeFlags = `--agent '${agentType.replace(/'/g, "'\\''")}'`;
+    } else {
+      claudeFlags = `--model '${escapedModel}'`;
+    }
+  } else {
+    claudeFlags = `--model '${escapedModel}'`;
+  }
+
+  const cmd = `cd '${escapedCwd}' && env CLAUDE_CONFIG_DIR='${escapedConfig}' '${escapedClaude}' --dangerously-skip-permissions ${claudeFlags}`;
   execSync(`tmux send-keys -t ${paneId} ${JSON.stringify(cmd)} Enter`);
 
   // Send initial prompt after Claude starts up

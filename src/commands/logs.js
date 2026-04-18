@@ -1,13 +1,14 @@
 const fs = require('fs');
 const path = require('path');
+const state = require('../state');
 
 module.exports = function logs(home, spaceName) {
-  const spaceDir = path.join(home, 'spaces', spaceName);
-  if (!fs.existsSync(path.join(spaceDir, 'space.json'))) {
+  if (!state.getSpace(home, spaceName)) {
     console.error(`Error: Space "${spaceName}" not found.`);
     process.exit(1);
   }
 
+  const spaceDir = path.join(home, 'spaces', spaceName);
   const now = new Date();
   const year = now.getFullYear();
   const month = String(now.getMonth() + 1).padStart(2, '0');

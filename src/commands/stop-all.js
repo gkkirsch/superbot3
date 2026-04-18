@@ -1,6 +1,6 @@
 const { execSync } = require('child_process');
-const fs = require('fs');
 const path = require('path');
+const state = require('../state');
 const { getSpaces } = require('./space-list');
 
 module.exports = async function stopAll(home) {
@@ -16,11 +16,7 @@ module.exports = async function stopAll(home) {
         execSync(`tmux kill-window -t superbot3:${space.slug} 2>/dev/null`);
         console.log(`  Stopped space "${space.slug}"`);
 
-        // Update space.json
-        const configPath = path.join(home, 'spaces', space.slug, 'space.json');
-        const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-        config.lastStopped = new Date().toISOString();
-        fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+        state.updateSpace(home, space.slug, { lastStopped: new Date().toISOString() });
       }
     } catch {}
   }
