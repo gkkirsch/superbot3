@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 
-module.exports = function update() {
+module.exports = async function update() {
   const appDir = path.resolve(__dirname, '..', '..');
   const home = process.env.SUPERBOT3_HOME || path.join(os.homedir(), '.superbot3');
 
