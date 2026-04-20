@@ -1,7 +1,7 @@
 {
   "name": "browser",
-  "version": "1.0.0",
-  "description": "Browser automation with per-space session isolation. Each space gets its own browser session — no conflicts, no shared state. Built on agent-browser (Vercel). Triggers: 'open website', 'fill form', 'click button', 'screenshot', 'scrape data', 'automate browser', 'extract from page'.",
+  "version": "1.0.1",
+  "description": "Browser automation using the space's real Chrome browser via CDP — real Chrome, real fingerprint, real extensions, no bot detection. Each space runs its own persistent Chrome profile launched from the superbot3 dashboard globe icon. All commands must pass --cdp $AGENT_BROWSER_CDP. Triggers: 'open website', 'fill form', 'click button', 'screenshot', 'scrape data', 'automate browser', 'extract from page'.",
   "author": {
     "name": "superbot3",
     "email": "built-in"
